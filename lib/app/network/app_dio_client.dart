@@ -29,8 +29,7 @@ class AppDioClient {
   static Dio _create() {
     final dio = Dio(
       BaseOptions(
-        // TODO: Replace with your actual base URL (e.g. from env/flavor)
-        baseUrl: 'https://api.medihive.app/v1',
+        baseUrl: 'https://api.medhive.skillhiveinnovations.com',
         connectTimeout: const Duration(seconds: 15),
         receiveTimeout: const Duration(seconds: 30),
         sendTimeout: const Duration(seconds: 15),
