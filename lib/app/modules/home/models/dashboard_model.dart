@@ -110,31 +110,85 @@ class RecentPatient {
   }
 }
 
+class AppointmentPatient {
+  final String id;
+  final String mrn;
+  final String firstName;
+  final String lastName;
+
+  const AppointmentPatient({
+    required this.id,
+    required this.mrn,
+    required this.firstName,
+    required this.lastName,
+  });
+
+  factory AppointmentPatient.fromJson(Map<String, dynamic> json) =>
+      AppointmentPatient(
+        id: json['id'] as String? ?? '',
+        mrn: json['mrn'] as String? ?? '',
+        firstName: json['firstName'] as String? ?? '',
+        lastName: json['lastName'] as String? ?? '',
+      );
+
+  String get fullName => '$firstName $lastName'.trim();
+
+  String get initials {
+    final f = firstName.trim().isNotEmpty ? firstName.trim()[0].toUpperCase() : '';
+    final l = lastName.trim().isNotEmpty ? lastName.trim()[0].toUpperCase() : '';
+    return '$f$l';
+  }
+}
+
 class UpcomingAppointment {
   final String id;
-  final String patientName;
-  final String doctorName;
-  final DateTime appointmentTime;
+  final DateTime appointmentDate;
+  /// Raw time string from API e.g. "11:00" or "15:30"
+  final String appointmentTime;
   final String status;
+  final AppointmentPatient patient;
 
   const UpcomingAppointment({
     required this.id,
-    required this.patientName,
-    required this.doctorName,
+    required this.appointmentDate,
     required this.appointmentTime,
     required this.status,
+    required this.patient,
   });
 
   factory UpcomingAppointment.fromJson(Map<String, dynamic> json) =>
       UpcomingAppointment(
         id: json['id'] as String? ?? '',
-        patientName: json['patientName'] as String? ?? '',
-        doctorName: json['doctorName'] as String? ?? '',
-        appointmentTime:
-            DateTime.tryParse(json['appointmentTime'] as String? ?? '') ??
+        appointmentDate:
+            DateTime.tryParse(json['appointmentDate'] as String? ?? '') ??
                 DateTime.now(),
+        appointmentTime: json['appointmentTime'] as String? ?? '',
         status: json['status'] as String? ?? '',
+        patient: AppointmentPatient.fromJson(
+            (json['patient'] as Map<String, dynamic>?) ?? {}),
       );
+
+  /// Converts "15:30" → "3:30 PM"
+  String get formattedTime {
+    final parts = appointmentTime.split(':');
+    if (parts.length < 2) return appointmentTime;
+    final h = int.tryParse(parts[0]) ?? 0;
+    final m = parts[1].padLeft(2, '0');
+    final period = h >= 12 ? 'PM' : 'AM';
+    final displayH = h > 12 ? h - 12 : (h == 0 ? 12 : h);
+    return '$displayH:$m $period';
+  }
+
+  /// Formats date as "Mon, 22 Jun"
+  String get formattedDate {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final d = appointmentDate;
+    return '${days[d.weekday - 1]}, ${d.day} ${months[d.month - 1]}';
+  }
 }
 
 class AppointmentStatuses {

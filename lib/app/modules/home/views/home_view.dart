@@ -553,9 +553,11 @@ class _AppointmentBreakdownCard extends GetView<HomeController> {
               )
             else ...[
               SizedBox(
-                height: 160,
+                height: 180,
                 child: _AppointmentPieChart(
-                    sections: _buildSections(sections, total), isDark: isDark),
+                    sections: _buildSections(sections, total),
+                    isDark: isDark,
+                    total: total),
               ),
               const SizedBox(height: AppSpacing.lg),
               ...sections.map((seg) => _LegendRow(
@@ -599,19 +601,47 @@ class _PieSegment {
 }
 
 class _AppointmentPieChart extends StatelessWidget {
-  const _AppointmentPieChart({required this.sections, required this.isDark});
+  const _AppointmentPieChart({
+    required this.sections,
+    required this.isDark,
+    required this.total,
+  });
   final List<PieChartSectionData> sections;
   final bool isDark;
+  final int total;
 
   @override
   Widget build(BuildContext context) {
-    return PieChart(
-      PieChartData(
-        sections: sections,
-        centerSpaceRadius: 40,
-        sectionsSpace: 3,
-        borderData: FlBorderData(show: false),
-      ),
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        PieChart(
+          PieChartData(
+            sections: sections,
+            centerSpaceRadius: 44,
+            sectionsSpace: 3,
+            borderData: FlBorderData(show: false),
+          ),
+        ),
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$total',
+              style: AppTextStyles.headlineSmall(textPrimary),
+            ),
+            Text(
+              'Total Slots',
+              style: AppTextStyles.labelSmall(textSecondary),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -1189,18 +1219,30 @@ class _AppointmentRow extends StatelessWidget {
   final UpcomingAppointment appointment;
   final bool isDark;
 
+  Color _avatarColor(String initials) {
+    final colors = [
+      AppColors.primary,
+      AppColors.secondary,
+      AppColors.tertiary,
+      AppColors.warning,
+      AppColors.info,
+    ];
+    final idx = initials.isNotEmpty ? initials.codeUnitAt(0) % colors.length : 0;
+    return colors[idx];
+  }
+
   @override
   Widget build(BuildContext context) {
     final textPrimary =
         isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final textSecondary =
         isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+    final divider = isDark ? AppColors.darkDivider : AppColors.lightDivider;
+    final surface =
+        isDark ? AppColors.darkSurfaceVariant : AppColors.lightSurfaceVariant;
 
-    final hour = appointment.appointmentTime.hour;
-    final min = appointment.appointmentTime.minute.toString().padLeft(2, '0');
-    final period = hour >= 12 ? 'PM' : 'AM';
-    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-    final timeStr = '$displayHour:$min $period';
+    final initials = appointment.patient.initials;
+    final avatarColor = _avatarColor(initials);
 
     StatusType statusType;
     switch (appointment.status.toLowerCase()) {
@@ -1217,41 +1259,111 @@ class _AppointmentRow extends StatelessWidget {
         statusType = StatusType.neutral;
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.08),
-              borderRadius: AppDecorations.borderSM,
-            ),
-            child: Text(timeStr,
-                style: AppTextStyles.numeric(AppColors.primary, fontSize: 12)),
+    final statusLabel = appointment.status.isEmpty
+        ? 'Unknown'
+        : '${appointment.status[0].toUpperCase()}${appointment.status.substring(1)}';
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Avatar ──
+              CircleAvatar(
+                radius: AppSpacing.avatarMD / 2,
+                backgroundColor: avatarColor.withValues(alpha: 0.15),
+                child: Text(
+                  initials,
+                  style: AppTextStyles.labelMedium(avatarColor),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              // ── Main Info ──
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Time + Date row
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.sm,
+                              vertical: AppSpacing.xxs),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: AppDecorations.borderFull,
+                          ),
+                          child: Text(
+                            appointment.formattedTime,
+                            style: AppTextStyles.numeric(
+                                AppColors.primary,
+                                fontSize: 12),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Text(
+                          appointment.formattedDate,
+                          style: AppTextStyles.bodySmall(textSecondary),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    // Patient name
+                    Text(
+                      appointment.patient.fullName,
+                      style: AppTextStyles.titleSmall(textPrimary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: AppSpacing.xxs),
+                    // MRN
+                    Text(
+                      appointment.patient.mrn,
+                      style: AppTextStyles.numeric(textSecondary, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              // ── Trailing: status + details ──
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  StatusBadge(label: statusLabel, type: statusType),
+                  const SizedBox(height: AppSpacing.xs),
+                  GestureDetector(
+                    onTap: () {},
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sm, vertical: AppSpacing.xxs),
+                      decoration: BoxDecoration(
+                        color: surface,
+                        borderRadius: AppDecorations.borderFull,
+                        border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.3)),
+                      ),
+                      child: Text(
+                        'Details',
+                        style: AppTextStyles.labelSmall(AppColors.primary),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(appointment.patientName,
-                    style: AppTextStyles.titleSmall(textPrimary)),
-                Text('Dr. ${appointment.doctorName}',
-                    style: AppTextStyles.bodySmall(textSecondary)),
-              ],
-            ),
-          ),
-          StatusBadge(
-              label: appointment.status, type: statusType),
-        ],
-      ),
+        ),
+        Divider(color: divider, height: 1, thickness: 0.5),
+      ],
     );
   }
 }
 
 // ─── Bottom Navigation ─────────────────────────────────────────────────────────
+
 
 class _BottomNav extends GetView<HomeController> {
   const _BottomNav();
