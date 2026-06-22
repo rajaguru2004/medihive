@@ -38,6 +38,8 @@ dependencies:
   google_fonts: ^8.1.0
   dio: ^5.9.2
   pretty_dio_logger: ^1.4.0
+  fl_chart: ^1.2.0
+  shimmer: ^3.0.0
 
 dev_dependencies:
   flutter_test:
