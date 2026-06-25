@@ -15,6 +15,8 @@ import '../modules/inpatient/views/add_bed_view.dart';
 import '../modules/login/bindings/login_binding.dart';
 import '../modules/login/views/login_view.dart';
 import '../modules/placeholders/views/placeholder_view.dart';
+import '../modules/queue/bindings/queue_binding.dart';
+import '../modules/queue/views/queue_view.dart';
 
 part 'app_routes.dart';
 
@@ -72,8 +74,8 @@ class AppPages {
     ),
     GetPage(
       name: _Paths.QUEUE,
-      page: () =>
-          const PlaceholderView(title: 'Queue', icon: Icons.queue_rounded),
+      page: () => const QueueView(),
+      binding: QueueBinding(),
       transition: Transition.cupertino,
     ),
     GetPage(
