@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
 import 'interceptors/app_log_interceptor.dart';
+import 'interceptors/auth_interceptor.dart';
 
 /// Singleton Dio instance for the entire MediHive app.
 ///
@@ -67,8 +68,8 @@ class AppDioClient {
       );
     }
 
-    // 3. Auth interceptor placeholder — add token injection here
-    // dio.interceptors.add(AuthInterceptor());
+    // 3. Auth interceptor — add token injection here
+    dio.interceptors.add(const AuthInterceptor());
 
     // 4. Retry / error interceptor placeholder
     // dio.interceptors.add(RetryInterceptor(dio));

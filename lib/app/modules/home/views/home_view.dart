@@ -1191,8 +1191,8 @@ class _UpcomingAppointmentsCard extends GetView<HomeController> {
                   ),
                 ),
                 TextButton(
-                  onPressed: () {},
-                  child: Text('Calendar →',
+                  onPressed: () => Get.toNamed('/appointments'),
+                  child: Text('View Calendar →',
                       style: AppTextStyles.labelMedium(AppColors.primary)),
                 ),
               ],
@@ -1365,11 +1365,255 @@ class _AppointmentRow extends StatelessWidget {
 // ─── Bottom Navigation ─────────────────────────────────────────────────────────
 
 
-class _BottomNav extends GetView<HomeController> {
+class _BottomNav extends StatefulWidget {
   const _BottomNav();
 
   @override
+  State<_BottomNav> createState() => _BottomNavState();
+}
+
+class _BottomNavState extends State<_BottomNav> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _animation;
+  OverlayEntry? _overlayEntry;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _animation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    );
+  }
+
+  void _toggleMenu() {
+    if (_overlayEntry != null) {
+      _closeMenu();
+    } else {
+      _openMenu();
+    }
+  }
+
+  void _openMenu() {
+    _overlayEntry = _createOverlayEntry();
+    Overlay.of(context).insert(_overlayEntry!);
+    _animationController.forward();
+  }
+
+  void _closeMenu() {
+    if (_overlayEntry == null) return;
+    _animationController.reverse().then((_) {
+      _overlayEntry?.remove();
+      _overlayEntry = null;
+    });
+  }
+
+  @override
+  void dispose() {
+    _overlayEntry?.remove();
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  OverlayEntry _createOverlayEntry() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+
+    return OverlayEntry(
+      builder: (context) => Stack(
+        children: [
+          GestureDetector(
+            onTap: _closeMenu,
+            behavior: HitTestBehavior.translucent,
+            child: const SizedBox.expand(),
+          ),
+          Positioned(
+            right: AppSpacing.md,
+            bottom: kBottomNavigationBarHeight + MediaQuery.of(context).padding.bottom + AppSpacing.sm,
+            child: FadeTransition(
+              opacity: _animation,
+              child: ScaleTransition(
+                scale: _animation,
+                alignment: Alignment.bottomRight,
+                child: Material(
+                  color: Colors.transparent,
+                  child: Container(
+                    width: 290,
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: AppDecorations.glassCard(isDark: isDark),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            left: AppSpacing.xs,
+                            bottom: AppSpacing.sm,
+                          ),
+                          child: Text(
+                            'Quick Services',
+                            style: AppTextStyles.labelMedium(AppColors.primary),
+                          ),
+                        ),
+                        GridView.count(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          crossAxisCount: 3,
+                          mainAxisSpacing: AppSpacing.sm,
+                          crossAxisSpacing: AppSpacing.sm,
+                          childAspectRatio: 0.95,
+                          children: [
+                            _buildMenuItem(
+                              context,
+                              'Consultations',
+                              Icons.medical_services_outlined,
+                              '/consultations',
+                              isDark,
+                              textPrimary,
+                            ),
+                            _buildMenuItem(
+                              context,
+                              'Patients',
+                              Icons.people_rounded,
+                              '/patients',
+                              isDark,
+                              textPrimary,
+                            ),
+                            _buildMenuItem(
+                              context,
+                              'Pharmacy',
+                              Icons.local_pharmacy_rounded,
+                              '/pharmacy',
+                              isDark,
+                              textPrimary,
+                            ),
+                            _buildMenuItem(
+                              context,
+                              'Laboratory',
+                              Icons.science_rounded,
+                              '/laboratory',
+                              isDark,
+                              textPrimary,
+                            ),
+                            _buildMenuItem(
+                              context,
+                              'Radiology',
+                              Icons.settings_accessibility_rounded,
+                              '/radiology',
+                              isDark,
+                              textPrimary,
+                            ),
+                            _buildMenuItem(
+                              context,
+                              'Pre-Triage',
+                              Icons.assignment_ind_rounded,
+                              '/pre-triage',
+                              isDark,
+                              textPrimary,
+                            ),
+                            _buildMenuItem(
+                              context,
+                              'Billing & Rev',
+                              Icons.currency_rupee_rounded,
+                              '/billing',
+                              isDark,
+                              textPrimary,
+                            ),
+                            _buildMenuItem(
+                              context,
+                              'Users & Staff',
+                              Icons.badge_rounded,
+                              '/users-staff',
+                              isDark,
+                              textPrimary,
+                            ),
+                            _buildMenuItem(
+                              context,
+                              'Integrations',
+                              Icons.integration_instructions_rounded,
+                              '/integrations',
+                              isDark,
+                              textPrimary,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMenuItem(
+    BuildContext context,
+    String label,
+    IconData icon,
+    String route,
+    bool isDark,
+    Color textPrimary,
+  ) {
+    final cardBg = isDark
+        ? AppColors.darkSurfaceVariant.withValues(alpha: 0.6)
+        : AppColors.lightSurfaceVariant.withValues(alpha: 0.6);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: AppDecorations.borderSM,
+      ),
+      child: ClipRRect(
+        borderRadius: AppDecorations.borderSM,
+        child: InkWell(
+          onTap: () {
+            _closeMenu();
+            Get.toNamed(route);
+          },
+          splashColor: AppColors.primary.withValues(alpha: 0.15),
+          highlightColor: AppColors.primary.withValues(alpha: 0.08),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              vertical: AppSpacing.xs,
+              horizontal: AppSpacing.xxs,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  color: AppColors.primary,
+                  size: AppSpacing.iconLG,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  label,
+                  style: AppTextStyles.labelSmall(textPrimary).copyWith(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final controller = Get.find<HomeController>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
     final divider = isDark ? AppColors.darkDivider : AppColors.lightDivider;
@@ -1377,11 +1621,15 @@ class _BottomNav extends GetView<HomeController> {
     return Obx(() => Container(
           decoration: BoxDecoration(
             color: surface,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(AppDecorations.radiusLG),
+              topRight: Radius.circular(AppDecorations.radiusLG),
+            ),
             border: Border(
                 top: BorderSide(color: divider, width: 0.5)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
+                color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
                 blurRadius: 16,
                 offset: const Offset(0, -4),
               ),
@@ -1390,41 +1638,74 @@ class _BottomNav extends GetView<HomeController> {
           child: SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.xl, vertical: AppSpacing.sm),
+                  horizontal: AppSpacing.md, vertical: AppSpacing.sm),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   _NavItem(
-                    icon: Icons.dashboard_rounded,
-                    label: 'Dashboard',
+                    icon: Icons.home_rounded,
+                    label: 'Home',
                     index: 0,
                     selected: controller.selectedNavIndex == 0,
                     isDark: isDark,
                     onTap: () => controller.setNavIndex(0),
                   ),
                   _NavItem(
-                    icon: Icons.people_rounded,
-                    label: 'Patients',
+                    icon: Icons.calendar_month_rounded,
+                    label: 'Appointments',
                     index: 1,
                     selected: controller.selectedNavIndex == 1,
                     isDark: isDark,
-                    onTap: () => controller.setNavIndex(1),
+                    onTap: () {
+                      controller.setNavIndex(1);
+                      Get.toNamed('/appointments');
+                    },
                   ),
                   _NavItem(
-                    icon: Icons.calendar_month_rounded,
-                    label: 'Appointments',
+                    icon: Icons.bed_rounded,
+                    label: 'Inpatient',
                     index: 2,
                     selected: controller.selectedNavIndex == 2,
                     isDark: isDark,
-                    onTap: () => controller.setNavIndex(2),
+                    onTap: () {
+                      controller.setNavIndex(2);
+                      Get.toNamed('/inpatient');
+                    },
                   ),
                   _NavItem(
-                    icon: Icons.science_rounded,
-                    label: 'Lab',
+                    icon: Icons.queue_rounded,
+                    label: 'Queue',
                     index: 3,
                     selected: controller.selectedNavIndex == 3,
                     isDark: isDark,
-                    onTap: () => controller.setNavIndex(3),
+                    onTap: () {
+                      controller.setNavIndex(3);
+                      Get.toNamed('/queue');
+                    },
+                  ),
+                  // Floating More Button
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: ClipOval(
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _toggleMenu,
+                          splashColor: AppColors.primary.withValues(alpha: 0.25),
+                          highlightColor: AppColors.primary.withValues(alpha: 0.1),
+                          child: const Icon(
+                            Icons.more_horiz_rounded,
+                            color: AppColors.primary,
+                            size: AppSpacing.iconLG,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -1461,7 +1742,7 @@ class _NavItem extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+            horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
         decoration: BoxDecoration(
           color: selected
               ? AppColors.primary.withValues(alpha: 0.1)

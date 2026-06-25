@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:medihive/app/routes/app_pages.dart';
-import 'package:medihive/app/theme/theme.dart';
 
 void main() {
   testWidgets('MediHive app smoke test', (WidgetTester tester) async {
