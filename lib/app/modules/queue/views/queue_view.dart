@@ -1,1268 +1,466 @@
-// lib/app/modules/queue/views/queue_view.dart
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:shimmer/shimmer.dart';
-
+import 'package:medihive/app/routes/app_pages.dart';
 import 'package:medihive/app/theme/theme.dart';
 import '../controllers/queue_controller.dart';
-import '../models/queue_model.dart';
-import 'add_to_queue_view.dart';
-import 'queue_detail_view.dart';
+import '../../../models/queue_item.dart';
 
 class QueueView extends GetView<QueueController> {
-  const QueueView({super.key});
-
-  static const _serviceAreas = [
-    ('', 'All Areas'),
-    ('opd', 'OPD'),
-    ('emergency', 'Emergency'),
-    ('mch', 'MCH'),
-    ('psychiatric', 'Psychiatric'),
-    ('laboratory', 'Laboratory'),
-    ('pharmacy', 'Pharmacy'),
-    ('radiology', 'Radiology'),
-    ('pediatric', 'Pediatric'),
-  ];
-
-  static const _priorities = [
-    ('', 'All Priorities'),
-    ('urgent', 'Urgent'),
-    ('normal', 'Normal'),
-    ('low', 'Low'),
-    ('routine', 'Routine'),
-  ];
+  final bool isEmbedded;
+  const QueueView({super.key, this.isEmbedded = true});
 
   @override
   Widget build(BuildContext context) {
+    // Ensure controller is initialized
+    if (!Get.isRegistered<QueueController>()) {
+      Get.put(QueueController());
+    }
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.darkBackground : AppColors.lightBackground;
-    final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+
+    Widget bodyWidget = Obx(() {
+      if (controller.isLoading && controller.liveQueueItems.isEmpty) {
+        return const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        );
+      }
+      if (controller.hasError && controller.liveQueueItems.isEmpty) {
+        return _buildErrorState(isDark);
+      }
+
+      return RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: controller.onRefresh,
+        child: ListView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.lg,
+          ),
+          children: [
+            _buildTopSection(context, isDark),
+            const SizedBox(height: AppSpacing.lg),
+            _buildStatsGrid(isDark),
+            const SizedBox(height: AppSpacing.lg),
+            _buildFilterRow(context, isDark),
+            const SizedBox(height: AppSpacing.lg),
+            _buildTabsRow(isDark),
+            const SizedBox(height: AppSpacing.md),
+            _buildQueueList(isDark),
+          ],
+        ),
+      );
+    });
+
+    if (isEmbedded) {
+      return Scaffold(
+        backgroundColor: bg,
+        body: SafeArea(child: bodyWidget),
+      );
+    }
 
     return Scaffold(
       backgroundColor: bg,
-      // ── Custom AppBar as body header (avoids overflow) ──────────────────────
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(64),
-        child: _QueueAppBar(
-          isDark: isDark,
-          surface: surface,
-          textPrimary: textPrimary,
-          textSecondary: textSecondary,
+      appBar: AppBar(
+        backgroundColor: isDark
+            ? AppColors.darkSurface
+            : AppColors.lightSurface,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: isDark
+                ? AppColors.darkTextPrimary
+                : AppColors.lightTextPrimary,
+            size: AppSpacing.iconMD,
+          ),
+          onPressed: () => Get.back(),
+        ),
+        title: Text(
+          'Queue Management',
+          style: AppTextStyles.titleMedium(
+            isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+          ),
         ),
       ),
-      body: GetBuilder<QueueController>(
-        builder: (ctrl) {
-          if (ctrl.isLoading) {
-            return _QueueSkeleton(isDark: isDark);
-          }
-          if (ctrl.hasError) {
-            return _QueueErrorState(
-              message: ctrl.errorMessage,
-              onRetry: ctrl.fetchQueue,
-              isDark: isDark,
-            );
-          }
-          return RefreshIndicator(
-            color: AppColors.primary,
-            backgroundColor: surface,
-            onRefresh: ctrl.onRefresh,
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                // ── Summary Grid ─────────────────────────────────────────────
-                _SummaryGrid(summary: ctrl.summary, isDark: isDark),
-
-                // ── Service Area Tabs ─────────────────────────────────────────
-                const SizedBox(height: AppSpacing.xxs),
-                _ServiceAreaRow(
-                  areas: _serviceAreas,
-                  selected: ctrl.selectedArea,
-                  onSelect: ctrl.setServiceArea,
-                  isDark: isDark,
-                ),
-
-                // ── Priority Dropdown ─────────────────────────────────────────
-                const SizedBox(height: AppSpacing.sm),
-                _PriorityFilterRow(
-                  priorities: _priorities,
-                  selected: ctrl.selectedPriority,
-                  onSelect: ctrl.setPriority,
-                  isDark: isDark,
-                ),
-
-                // ── Live / History Tabs ───────────────────────────────────────
-                const SizedBox(height: AppSpacing.md),
-                _ViewTabBar(
-                  selected: ctrl.viewTab,
-                  onSelect: ctrl.setViewTab,
-                  isDark: isDark,
-                ),
-                const SizedBox(height: AppSpacing.sm),
-
-                // ── Queue List ────────────────────────────────────────────────
-                if (ctrl.viewTab == QueueViewTab.live)
-                  _QueueList(
-                    items: ctrl.filteredItems,
-                    isDark: isDark,
-                    controller: ctrl,
-                  )
-                else
-                  _HistoryList(
-                    items: ctrl.filteredHistory,
-                    isLoading: ctrl.isHistoryLoading,
-                    isDark: isDark,
-                  ),
-
-                const SizedBox(height: AppSpacing.massive),
-              ],
-            ),
-          );
-        },
-      ),
+      body: SafeArea(child: bodyWidget),
     );
   }
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Custom AppBar — Title left, buttons right, no overflow
-// ─────────────────────────────────────────────────────────────────────────────
-class _QueueAppBar extends StatelessWidget {
-  const _QueueAppBar({
-    required this.isDark,
-    required this.surface,
-    required this.textPrimary,
-    required this.textSecondary,
-  });
+  // ─── Component Builders ───────────────────────────────────────────────────
 
-  final bool isDark;
-  final Color surface;
-  final Color textPrimary;
-  final Color textSecondary;
+  Widget _buildTopSection(BuildContext context, bool isDark) {
+    final textPrimary = isDark
+        ? AppColors.darkTextPrimary
+        : AppColors.lightTextPrimary;
+    final textSecondary = isDark
+        ? AppColors.darkTextSecondary
+        : AppColors.lightTextSecondary;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: surface,
-        border: Border(
-          bottom: BorderSide(
-            color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
-            width: 0.5,
-          ),
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.sm,
-          ),
-          child: Row(
-            children: [
-              // Back button
-              GestureDetector(
-                onTap: () => Get.back(),
-                child: Icon(
-                  Icons.arrow_back_ios_new_rounded,
-                  color: textPrimary,
-                  size: AppSpacing.iconMD,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-
-              // Title + Subtitle
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Queue Management',
-                      style: AppTextStyles.titleMedium(textPrimary),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      'Real-time patient queue',
-                      style: AppTextStyles.labelSmall(textSecondary),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-
-              // Call Next button
-              GetBuilder<QueueController>(
-                builder: (ctrl) => _AppBarButton(
-                  label: 'Call Next',
-                  icon: Icons.phone_in_talk_rounded,
-                  onTap: ctrl.callNext,
-                  backgroundColor: isDark
-                      ? AppColors.darkSurfaceVariant
-                      : AppColors.lightSurfaceVariant,
-                  foregroundColor: textPrimary,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-
-              // Add to Queue button
-              _AppBarButton(
-                label: 'Add',
-                icon: Icons.add_circle_outline_rounded,
-                onTap: () async {
-                  await Get.to(
-                    () => const AddToQueueView(),
-                    transition: Transition.cupertino,
-                  );
-                  // Refresh after returning from Add screen
-                  Get.find<QueueController>().fetchQueue();
-                },
-                backgroundColor: AppColors.secondary,
-                foregroundColor: AppColors.lightSurface,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AppBarButton extends StatelessWidget {
-  const _AppBarButton({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-    required this.backgroundColor,
-    required this.foregroundColor,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-  final Color backgroundColor;
-  final Color foregroundColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.xs + 2,
-        ),
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(AppSpacing.sm),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: AppSpacing.iconXS + 2, color: foregroundColor),
-            const SizedBox(width: AppSpacing.xs),
-            Text(label, style: AppTextStyles.labelSmall(foregroundColor)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Summary Grid (2×2)
-// ─────────────────────────────────────────────────────────────────────────────
-class _SummaryGrid extends StatelessWidget {
-  const _SummaryGrid({required this.summary, required this.isDark});
-
-  final QueueSummary summary;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
-
-    final cards = [
-      _SummaryCardData(
-        icon: Icons.people_alt_rounded,
-        count: summary.waiting,
-        label: 'Waiting',
-        color: AppColors.warning,
-      ),
-      _SummaryCardData(
-        icon: Icons.phone_in_talk_rounded,
-        count: summary.called,
-        label: 'Called',
-        color: AppColors.info,
-      ),
-      _SummaryCardData(
-        icon: Icons.medical_services_rounded,
-        count: summary.inService,
-        label: 'In Service',
-        color: AppColors.secondary,
-      ),
-      _SummaryCardData(
-        icon: Icons.check_circle_outline_rounded,
-        count: summary.completed,
-        label: 'Completed',
-        color: isDark
-            ? AppColors.darkTextTertiary
-            : AppColors.lightTextTertiary,
-      ),
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.md,
-        AppSpacing.lg,
-        0,
-      ),
-      child: GridView.count(
-        crossAxisCount: 2,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        crossAxisSpacing: AppSpacing.sm,
-        mainAxisSpacing: AppSpacing.sm,
-        childAspectRatio: 2.4,
-        children: cards
-            .map((c) => _SummaryCard(data: c, surface: surface, isDark: isDark))
-            .toList(),
-      ),
-    );
-  }
-}
-
-class _SummaryCardData {
-  final IconData icon;
-  final int count;
-  final String label;
-  final Color color;
-
-  const _SummaryCardData({
-    required this.icon,
-    required this.count,
-    required this.label,
-    required this.color,
-  });
-}
-
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
-    required this.data,
-    required this.surface,
-    required this.isDark,
-  });
-
-  final _SummaryCardData data;
-  final Color surface;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
-      ),
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(AppSpacing.md),
-        border: Border.all(
-          color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
-          width: 0.5,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: data.color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(AppSpacing.sm),
-            ),
-            child: Icon(data.icon, color: data.color, size: AppSpacing.iconSM),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                '${data.count}',
-                style: AppTextStyles.titleLarge(
-                  data.color,
-                ).copyWith(fontSize: 22, fontWeight: FontWeight.w700),
-              ),
-              Text(data.label, style: AppTextStyles.labelSmall(textSecondary)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Service Area Tabs — horizontally scrollable chips
-// ─────────────────────────────────────────────────────────────────────────────
-class _ServiceAreaRow extends StatelessWidget {
-  const _ServiceAreaRow({
-    required this.areas,
-    required this.selected,
-    required this.onSelect,
-    required this.isDark,
-  });
-
-  final List<(String, String)> areas;
-  final String selected;
-  final ValueChanged<String> onSelect;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 42,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-        itemCount: areas.length,
-        separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
-        itemBuilder: (_, i) {
-          final (value, label) = areas[i];
-          final isSelected = selected == value;
-          return _AreaChip(
-            label: label,
-            isSelected: isSelected,
-            isDark: isDark,
-            onTap: () => onSelect(value),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _AreaChip extends StatelessWidget {
-  const _AreaChip({
-    required this.label,
-    required this.isSelected,
-    required this.isDark,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool isSelected;
-  final bool isDark;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: 0,
-        ),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : surface,
-          borderRadius: BorderRadius.circular(AppSpacing.massive),
-          border: Border.all(
-            color: isSelected
-                ? AppColors.primary
-                : (isDark ? AppColors.darkDivider : AppColors.lightDivider),
-          ),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.labelSmall(
-            isSelected ? AppColors.lightSurface : textPrimary,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Priority Filter Dropdown
-// ─────────────────────────────────────────────────────────────────────────────
-class _PriorityFilterRow extends StatelessWidget {
-  const _PriorityFilterRow({
-    required this.priorities,
-    required this.selected,
-    required this.onSelect,
-    required this.isDark,
-  });
-
-  final List<(String, String)> priorities;
-  final String selected;
-  final ValueChanged<String> onSelect;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-      child: Container(
-        height: 40,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        decoration: BoxDecoration(
-          color: surface,
-          borderRadius: BorderRadius.circular(AppSpacing.sm),
-          border: Border.all(
-            color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
-          ),
-        ),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<String>(
-            value: selected,
-            isExpanded: true,
-            icon: Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: textSecondary,
-              size: AppSpacing.iconSM,
-            ),
-            dropdownColor: surface,
-            style: AppTextStyles.bodySmall(textPrimary),
-            onChanged: (v) => onSelect(v ?? ''),
-            items: priorities
-                .map(
-                  (p) => DropdownMenuItem(
-                    value: p.$1,
-                    child: Text(
-                      p.$2,
-                      style: AppTextStyles.bodySmall(textPrimary),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Live / History Tab Bar
-// ─────────────────────────────────────────────────────────────────────────────
-class _ViewTabBar extends StatelessWidget {
-  const _ViewTabBar({
-    required this.selected,
-    required this.onSelect,
-    required this.isDark,
-  });
-
-  final QueueViewTab selected;
-  final ValueChanged<QueueViewTab> onSelect;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-      child: Row(
-        children: [
-          _TabBtn(
-            label: 'Live Queue',
-            isSelected: selected == QueueViewTab.live,
-            onTap: () => onSelect(QueueViewTab.live),
-            isDark: isDark,
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          _TabBtn(
-            label: 'History',
-            isSelected: selected == QueueViewTab.history,
-            onTap: () => onSelect(QueueViewTab.history),
-            isDark: isDark,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TabBtn extends StatelessWidget {
-  const _TabBtn({
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-    required this.isDark,
-  });
-
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg,
-          vertical: AppSpacing.sm,
-        ),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? (isDark
-                    ? AppColors.darkTextPrimary
-                    : AppColors.lightTextPrimary)
-              : AppColors.lightBackground.withValues(alpha: 0),
-          borderRadius: BorderRadius.circular(AppSpacing.sm),
-          border: Border.all(
-            color: isSelected
-                ? Colors.transparent
-                : (isDark ? AppColors.darkDivider : AppColors.lightDivider),
-          ),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.labelMedium(
-            isSelected ? AppColors.lightSurface : textSecondary,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Queue List
-// ─────────────────────────────────────────────────────────────────────────────
-class _QueueList extends StatelessWidget {
-  const _QueueList({
-    required this.items,
-    required this.isDark,
-    required this.controller,
-  });
-
-  final List<QueueModel> items;
-  final bool isDark;
-  final QueueController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return _EmptyState(
-        isDark: isDark,
-        message: 'No patients in queue',
-        icon: Icons.queue_rounded,
-      );
-    }
-
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-      itemCount: items.length,
-      separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
-      itemBuilder: (_, i) =>
-          _QueueCard(item: items[i], isDark: isDark, controller: controller),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Queue Card
-// ─────────────────────────────────────────────────────────────────────────────
-class _QueueCard extends StatelessWidget {
-  const _QueueCard({
-    required this.item,
-    required this.isDark,
-    required this.controller,
-  });
-
-  final QueueModel item;
-  final bool isDark;
-  final QueueController controller;
-
-  Color get _priorityColor {
-    switch (item.priority.toLowerCase()) {
-      case 'urgent':
-        return AppColors.error;
-      case 'normal':
-        return AppColors.info;
-      case 'low':
-        return AppColors.secondary;
-      default:
-        return AppColors.darkTextTertiary;
-    }
-  }
-
-  Color get _statusColor {
-    switch (item.status.toLowerCase()) {
-      case 'waiting':
-        return AppColors.warning;
-      case 'called':
-        return AppColors.primary;
-      case 'in_service':
-        return AppColors.secondary;
-      case 'completed':
-        return AppColors.success;
-      default:
-        return AppColors.info;
-    }
-  }
-
-  String get _statusLabel {
-    switch (item.status.toLowerCase()) {
-      case 'waiting':
-        return 'Waiting';
-      case 'called':
-        return 'Called';
-      case 'in_service':
-        return 'In Service';
-      case 'completed':
-        return 'Completed';
-      default:
-        return item.status;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textTertiary = isDark
-        ? AppColors.darkTextTertiary
-        : AppColors.lightTextTertiary;
-
-    return GestureDetector(
-      onTap: () {
-        Get.to(
-          () => QueueDetailView(item: item),
-          transition: Transition.cupertino,
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: surface,
-          borderRadius: BorderRadius.circular(AppSpacing.md),
-          border: Border.all(
-            color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
-            width: 0.5,
-          ),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Queue number badge
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.secondary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(AppSpacing.sm),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                item.shortQueueNumber,
-                style: AppTextStyles.numeric(AppColors.secondary, fontSize: 13),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-  
-            // Patient info — takes remaining space
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Name + MRN
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.person_rounded,
-                        size: AppSpacing.iconXS,
-                        color: textTertiary,
-                      ),
-                      const SizedBox(width: AppSpacing.xxs + 2),
-                      Expanded(
-                        child: Text(
-                          '${item.patient.fullName} · ${item.patient.mrn}',
-                          style: AppTextStyles.titleSmall(textPrimary),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-  
-                  // Priority chip + Wait time
-                  Row(
-                    children: [
-                      _PriorityChip(
-                        label: _capitalize(item.priority),
-                        color: _priorityColor,
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Icon(
-                        Icons.access_time_rounded,
-                        size: AppSpacing.iconXS,
-                        color: AppColors.error,
-                      ),
-                      const SizedBox(width: AppSpacing.xxs + 2),
-                      Text(
-                        item.formattedWaitTime,
-                        style: AppTextStyles.bodySmall(
-                          textTertiary,
-                        ).copyWith(color: AppColors.error),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-  
-            const SizedBox(width: AppSpacing.sm),
-  
-            // Status + 3-dot menu column
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _StatusBadge(label: _statusLabel, color: _statusColor),
-                _QueueItemMenu(
-                  item: item,
-                  isDark: isDark,
-                  controller: controller,
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _capitalize(String s) =>
-      s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';
-}
-
-class _PriorityChip extends StatelessWidget {
-  const _PriorityChip({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xxs + 1,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppSpacing.massive),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircleAvatar(radius: 3, backgroundColor: color),
-          const SizedBox(width: AppSpacing.xs),
-          Text(label, style: AppTextStyles.labelSmall(color)),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xxs + 1,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppSpacing.massive),
-      ),
-      child: Text('• $label', style: AppTextStyles.labelSmall(color)),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 3-Dot Menu
-// ─────────────────────────────────────────────────────────────────────────────
-class _QueueItemMenu extends StatelessWidget {
-  const _QueueItemMenu({
-    required this.item,
-    required this.isDark,
-    required this.controller,
-  });
-
-  final QueueModel item;
-  final bool isDark;
-  final QueueController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final surface = isDark
-        ? AppColors.darkSurfaceVariant
-        : AppColors.lightSurface;
-
-    return PopupMenuButton<String>(
-      icon: Icon(
-        Icons.more_vert_rounded,
-        size: AppSpacing.iconSM,
-        color: textPrimary,
-      ),
-      color: surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.md),
-      ),
-      padding: EdgeInsets.zero,
-      elevation: 4,
-      onSelected: (val) async {
-        switch (val) {
-          case 'call':
-            await controller.callPatient(item);
-            break;
-          case 'start_service':
-            await controller.startService(item);
-            break;
-          case 'mark_no_show':
-            await controller.markNoShow(item);
-            break;
-          case 'mark_complete':
-            await controller.markComplete(item);
-            break;
-          case 'cancel':
-            await controller.cancelPatient(item);
-            break;
-          case 'remove':
-            await controller.removeFromQueue(item);
-            break;
-        }
-      },
-      itemBuilder: (_) {
-        final status = item.status.toLowerCase();
-        if (status == 'waiting') {
-          return [
-            _menuItem(
-              'call',
-              Icons.phone_in_talk_rounded,
-              AppColors.primary,
-              'Call Patient',
-              textPrimary,
-            ),
-            _menuItem(
-              'cancel',
-              Icons.cancel_outlined,
-              AppColors.error,
-              'Cancel',
-              AppColors.error,
-            ),
-            _menuItem(
-              'remove',
-              Icons.delete_outline_rounded,
-              AppColors.error,
-              'Remove from Queue',
-              AppColors.error,
-            ),
-          ];
-        } else if (status == 'called') {
-          return [
-            _menuItem(
-              'start_service',
-              Icons.play_arrow_outlined,
-              textPrimary,
-              'Start Service',
-              textPrimary,
-            ),
-            _menuItem(
-              'mark_no_show',
-              Icons.info_outline_rounded,
-              textPrimary,
-              'Mark No-Show',
-              textPrimary,
-            ),
-            _menuItem(
-              'cancel',
-              Icons.cancel_outlined,
-              AppColors.error,
-              'Cancel',
-              AppColors.error,
-            ),
-            _menuItem(
-              'remove',
-              Icons.delete_outline_rounded,
-              AppColors.error,
-              'Remove from Queue',
-              AppColors.error,
-            ),
-          ];
-        } else if (status == 'in_service') {
-          return [
-            _menuItem(
-              'mark_complete',
-              Icons.check_circle_outline_rounded,
-              textPrimary,
-              'Mark Complete',
-              textPrimary,
-            ),
-            _menuItem(
-              'cancel',
-              Icons.cancel_outlined,
-              AppColors.error,
-              'Cancel',
-              AppColors.error,
-            ),
-            _menuItem(
-              'remove',
-              Icons.delete_outline_rounded,
-              AppColors.error,
-              'Remove from Queue',
-              AppColors.error,
-            ),
-          ];
-        }
-        return [];
-      },
-    );
-  }
-
-  PopupMenuItem<String> _menuItem(
-    String value,
-    IconData icon,
-    Color iconColor,
-    String label,
-    Color textColor,
-  ) {
-    return PopupMenuItem(
-      value: value,
-      child: Row(
-        children: [
-          Icon(icon, size: AppSpacing.iconSM, color: iconColor),
-          const SizedBox(width: AppSpacing.sm),
-          Text(label, style: AppTextStyles.bodySmall(textColor)),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// History List
-// ─────────────────────────────────────────────────────────────────────────────
-class _HistoryList extends StatelessWidget {
-  const _HistoryList({
-    required this.items,
-    required this.isLoading,
-    required this.isDark,
-  });
-
-  final List<QueueModel> items;
-  final bool isLoading;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    if (isLoading) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(AppSpacing.xxxl),
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    if (items.isEmpty) {
-      return _EmptyState(
-        isDark: isDark,
-        message: 'No history records found',
-        icon: Icons.history_rounded,
-      );
-    }
-
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-      itemCount: items.length,
-      separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
-      itemBuilder: (_, i) => _HistoryCard(item: items[i], isDark: isDark),
-    );
-  }
-}
-
-class _HistoryCard extends StatelessWidget {
-  const _HistoryCard({required this.item, required this.isDark});
-
-  final QueueModel item;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
-
-    return GestureDetector(
-      onTap: () {
-        Get.to(
-          () => QueueDetailView(item: item),
-          transition: Transition.cupertino,
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: surface,
-          borderRadius: BorderRadius.circular(AppSpacing.md),
-          border: Border.all(
-            color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
-            width: 0.5,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.success.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(AppSpacing.sm),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                item.shortQueueNumber,
-                style: AppTextStyles.numeric(AppColors.success, fontSize: 12),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    item.patient.fullName,
-                    style: AppTextStyles.titleSmall(textPrimary),
+                    'Queue Management',
+                    style: AppTextStyles.headlineSmall(textPrimary),
                   ),
+                  const SizedBox(height: AppSpacing.xxs),
                   Text(
-                    item.patient.mrn,
+                    'Real-time patient queue across service areas',
                     style: AppTextStyles.bodySmall(textSecondary),
                   ),
                 ],
               ),
             ),
-            _StatusBadge(label: 'Completed', color: AppColors.success),
           ],
         ),
-      ),
+        const SizedBox(height: AppSpacing.md),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => controller.callNextPatient(),
+                icon: const Icon(
+                  Icons.volume_up_rounded,
+                  size: AppSpacing.iconSM,
+                ),
+                label: const Text('Call Next'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: AppDecorations.borderMD,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => Get.toNamed(Routes.ADD_TO_QUEUE),
+                icon: const Icon(
+                  Icons.add_circle_outline_rounded,
+                  size: AppSpacing.iconSM,
+                ),
+                label: const Text('Add to Queue'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.secondary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: AppDecorations.borderMD,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Empty State
-// ─────────────────────────────────────────────────────────────────────────────
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({
-    required this.isDark,
-    required this.message,
-    required this.icon,
-  });
+  Widget _buildStatsGrid(bool isDark) {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      crossAxisSpacing: AppSpacing.md,
+      mainAxisSpacing: AppSpacing.md,
+      childAspectRatio: 1.6,
+      children: [
+        _buildStatCard(
+          icon: Icons.hourglass_empty_rounded,
+          count: controller.waitingCount,
+          label: 'Waiting',
+          color: AppColors.warning,
+          isDark: isDark,
+        ),
+        _buildStatCard(
+          icon: Icons.phone_forwarded_rounded,
+          count: controller.calledCount,
+          label: 'Called',
+          color: AppColors.secondary,
+          isDark: isDark,
+        ),
+        _buildStatCard(
+          icon: Icons.medical_services_rounded,
+          count: controller.inServiceCount,
+          label: 'In Service',
+          color: AppColors.primary,
+          isDark: isDark,
+        ),
+        _buildStatCard(
+          icon: Icons.check_circle_rounded,
+          count: controller.completedCount,
+          label: 'Completed',
+          color: AppColors.tertiary,
+          isDark: isDark,
+        ),
+      ],
+    );
+  }
 
-  final bool isDark;
-  final String message;
-  final IconData icon;
+  Widget _buildStatCard({
+    required IconData icon,
+    required int count,
+    required String label,
+    required Color color,
+    required bool isDark,
+  }) {
+    final textPrimary = isDark
+        ? AppColors.darkTextPrimary
+        : AppColors.lightTextPrimary;
+    final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
 
-  @override
-  Widget build(BuildContext context) {
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.colossal),
-      child: Column(
+    return Container(
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: AppDecorations.borderMD,
+        boxShadow: AppDecorations.elevation1(isDark),
+        border: Border.all(color: color.withValues(alpha: 0.15), width: 1),
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      child: Row(
         children: [
-          Icon(
-            icon,
-            size: AppSpacing.iconXL,
-            color: textSecondary.withValues(alpha: 0.4),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: AppDecorations.borderSM,
+            ),
+            child: Icon(icon, color: color, size: AppSpacing.iconMD),
           ),
-          const SizedBox(height: AppSpacing.md),
-          Text(message, style: AppTextStyles.bodyMedium(textSecondary)),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('$count', style: AppTextStyles.headlineSmall(textPrimary)),
+                Text(
+                  label,
+                  style: AppTextStyles.labelSmall(color),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Error State
-// ─────────────────────────────────────────────────────────────────────────────
-class _QueueErrorState extends StatelessWidget {
-  const _QueueErrorState({
-    required this.message,
-    required this.onRetry,
-    required this.isDark,
-  });
+  Widget _buildFilterRow(BuildContext context, bool isDark) {
+    final textPrimary = isDark
+        ? AppColors.darkTextPrimary
+        : AppColors.lightTextPrimary;
 
-  final String message;
-  final VoidCallback onRetry;
-  final bool isDark;
+    final List<String> areas = [
+      'All Areas',
+      'OPD',
+      'Emergency',
+      'MCH',
+      'Psychiatric',
+      'Laboratory',
+      'Pharmacy',
+      'Radiology',
+      'Pediatric',
+    ];
 
-  @override
-  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        // Horizontal scroll area for Service tabs
+        Expanded(
+          child: SizedBox(
+            height: 38,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: areas.length,
+              itemBuilder: (context, idx) {
+                final area = areas[idx];
+                final isSelected = controller.selectedServiceArea.value == area;
+
+                return GestureDetector(
+                  onTap: () => controller.setServiceAreaFilter(area),
+                  child: Container(
+                    margin: const EdgeInsets.only(right: AppSpacing.sm),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.xs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.secondary
+                          : Colors.transparent,
+                      borderRadius: AppDecorations.borderMD,
+                      border: Border.all(
+                        color: isSelected
+                            ? AppColors.secondary
+                            : (isDark
+                                  ? AppColors.darkDivider
+                                  : AppColors.lightDivider),
+                        width: 1,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      area,
+                      style: AppTextStyles.labelMedium(
+                        isSelected ? Colors.white : textPrimary,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        // Dropdown filter
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+          decoration: BoxDecoration(
+            borderRadius: AppDecorations.borderMD,
+            border: Border.all(
+              color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
+              width: 1,
+            ),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: controller.selectedPriority.value,
+              icon: const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: AppColors.primary,
+              ),
+              style: AppTextStyles.labelMedium(textPrimary),
+              dropdownColor: isDark
+                  ? AppColors.darkSurface
+                  : AppColors.lightSurface,
+              borderRadius: AppDecorations.borderMD,
+              onChanged: (val) {
+                if (val != null) controller.setPriorityFilter(val);
+              },
+              items:
+                  <String>[
+                    'All Priorities',
+                    'Urgent',
+                    'Normal',
+                    'Low',
+                    'Routine',
+                  ].map<DropdownMenuItem<String>>((String value) {
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    );
+                  }).toList(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTabsRow(bool isDark) {
+    final divider = isDark ? AppColors.darkDivider : AppColors.lightDivider;
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: divider, width: 1)),
+      ),
+      child: Row(
+        children: [
+          _buildTabButton('Live Queue', isDark),
+          _buildTabButton('History', isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabButton(String tabName, bool isDark) {
+    final isSelected = controller.activeTab.value == tabName;
+    final color = isSelected
+        ? AppColors.primary
+        : (isDark ? AppColors.darkTextTertiary : AppColors.lightTextTertiary);
+
+    return GestureDetector(
+      onTap: () => controller.setActiveTab(tabName),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: isSelected ? AppColors.primary : Colors.transparent,
+              width: 2,
+            ),
+          ),
+        ),
+        child: Text(tabName, style: AppTextStyles.labelLarge(color)),
+      ),
+    );
+  }
+
+  Widget _buildQueueList(bool isDark) {
+    final items = controller.displayedQueueItems;
+
+    if (items.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.colossal),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.inbox_rounded,
+                color: isDark
+                    ? AppColors.darkTextTertiary
+                    : AppColors.lightTextTertiary,
+                size: AppSpacing.iconXL,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'No queue items found matching filters',
+                style: AppTextStyles.bodyMedium(
+                  isDark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.lightTextSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return _buildQueueCard(context, item, isDark);
+      },
+    );
+  }
+
+  Widget _buildQueueCard(BuildContext context, QueueItem item, bool isDark) {
+    final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
     final textPrimary = isDark
         ? AppColors.darkTextPrimary
         : AppColors.lightTextPrimary;
@@ -1270,114 +468,284 @@ class _QueueErrorState extends StatelessWidget {
         ? AppColors.darkTextSecondary
         : AppColors.lightTextSecondary;
 
+    // Calculate waiting time
+    final diff = DateTime.now().difference(item.joinedQueueAt);
+    final waitText = "${diff.inHours}h ${diff.inMinutes % 60}m";
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: AppDecorations.borderMD,
+        boxShadow: AppDecorations.elevation1(isDark),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Queue Number Badge (Left)
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.secondary.withValues(alpha: 0.1),
+              borderRadius: AppDecorations.borderSM,
+            ),
+            child: Text(
+              item.displayQueueNumber,
+              style: AppTextStyles.numeric(
+                AppColors.secondary,
+                fontSize: 16,
+              ).copyWith(fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          // Patient info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.patient.fullName,
+                  style: AppTextStyles.titleSmall(
+                    textPrimary,
+                  ).copyWith(fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: AppSpacing.xxs),
+                Text(
+                  item.patient.mrn,
+                  style: AppTextStyles.numeric(textSecondary, fontSize: 11),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Row(
+                  children: [
+                    _buildPriorityChip(item.priority),
+                    const SizedBox(width: AppSpacing.sm),
+                    // Clock icon and wait time
+                    Icon(
+                      Icons.access_time_rounded,
+                      color: AppColors.error,
+                      size: AppSpacing.iconXS,
+                    ),
+                    const SizedBox(width: AppSpacing.xxs),
+                    Text(
+                      waitText,
+                      style: AppTextStyles.labelSmall(AppColors.error),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          // Status Badge
+          _buildStatusBadge(item.status),
+          const SizedBox(width: AppSpacing.sm),
+          // Option menu
+          if (item.status.toLowerCase() == 'waiting' ||
+              item.status.toLowerCase() == 'called' ||
+              item.status.toLowerCase() == 'in_service')
+            PopupMenuButton<String>(
+              icon: Icon(
+                Icons.more_vert_rounded,
+                color: isDark
+                    ? AppColors.darkTextTertiary
+                    : AppColors.lightTextTertiary,
+                size: AppSpacing.iconMD,
+              ),
+              offset: const Offset(0, AppSpacing.massive),
+              shape: RoundedRectangleBorder(
+                borderRadius: AppDecorations.borderMD,
+              ),
+              color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+              onSelected: (val) {
+                if (val == 'call') {
+                  controller.callPatient(item.id, item.patient.fullName);
+                } else if (val == 'start_service') {
+                  controller.startService(item.id, item.patient.fullName);
+                } else if (val == 'mark_no_show') {
+                  controller.markNoShow(item.id, item.patient.fullName);
+                } else if (val == 'mark_complete') {
+                  controller.markComplete(item.id, item.patient.fullName);
+                } else if (val == 'cancel') {
+                  controller.cancelQueueItem(item.id, item.patient.fullName);
+                } else if (val == 'remove') {
+                  controller.deleteQueueItem(item.id, item.patient.fullName);
+                }
+              },
+              itemBuilder: (context) {
+                final status = item.status.toLowerCase();
+                final menuItems = <PopupMenuEntry<String>>[];
+
+                if (status == 'waiting') {
+                  menuItems.addAll([
+                    _buildMenuItem('call', 'Call Patient', Icons.volume_up_rounded, AppColors.primary, textPrimary),
+                    _buildMenuItem('cancel', 'Cancel', Icons.cancel_outlined, AppColors.error, textPrimary),
+                    _buildMenuItem('remove', 'Remove from Queue', Icons.delete_outline_rounded, AppColors.error, AppColors.error),
+                  ]);
+                } else if (status == 'called') {
+                  menuItems.addAll([
+                    _buildMenuItem('start_service', 'Start Service', Icons.play_arrow_rounded, AppColors.secondary, textPrimary),
+                    _buildMenuItem('mark_no_show', 'Mark No-Show', Icons.person_off_rounded, AppColors.warning, textPrimary),
+                    _buildMenuItem('cancel', 'Cancel', Icons.cancel_outlined, AppColors.error, textPrimary),
+                    _buildMenuItem('remove', 'Remove from Queue', Icons.delete_outline_rounded, AppColors.error, AppColors.error),
+                  ]);
+                } else if (status == 'in_service') {
+                  menuItems.addAll([
+                    _buildMenuItem('mark_complete', 'Mark Complete', Icons.check_circle_outline_rounded, AppColors.secondary, textPrimary),
+                    _buildMenuItem('cancel', 'Cancel', Icons.cancel_outlined, AppColors.error, textPrimary),
+                    _buildMenuItem('remove', 'Remove from Queue', Icons.delete_outline_rounded, AppColors.error, AppColors.error),
+                  ]);
+                }
+
+                return menuItems;
+              },
+            )
+          else
+            const SizedBox(width: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPriorityChip(String priority) {
+    final p = priority.toLowerCase();
+    Color color;
+    switch (p) {
+      case 'urgent':
+        color = AppColors.error;
+        break;
+      case 'normal':
+        color = AppColors.secondary;
+        break;
+      case 'low':
+        color = AppColors.info;
+        break;
+      case 'routine':
+      default:
+        color = AppColors.tertiary;
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xxs,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: AppDecorations.borderFull,
+      ),
+      child: Text(
+        priority[0].toUpperCase() + priority.substring(1),
+        style: AppTextStyles.labelSmall(color),
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(String status) {
+    final s = status.toLowerCase();
+    String label;
+    StatusType type;
+
+    switch (s) {
+      case 'waiting':
+        label = '• Waiting';
+        type = StatusType.warning;
+        break;
+      case 'called':
+        label = '• Called';
+        type = StatusType.success;
+        break;
+      case 'in_service':
+        label = '• In Service';
+        type = StatusType.info;
+        break;
+      case 'completed':
+        label = 'Completed';
+        type = StatusType.success;
+        break;
+      case 'cancelled':
+        label = 'Cancelled';
+        type = StatusType.error;
+        break;
+      default:
+        label = status;
+        type = StatusType.neutral;
+    }
+
+    return StatusBadge(label: label, type: type);
+  }
+
+  Widget _buildErrorState(bool isDark) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.xxxl),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.error_outline_rounded,
-              size: AppSpacing.iconXL,
               color: AppColors.error,
+              size: AppSpacing.iconXL,
             ),
             const SizedBox(height: AppSpacing.md),
             Text(
-              'Failed to load queue',
-              style: AppTextStyles.titleSmall(textPrimary),
+              'Error loading queue data',
+              style: AppTextStyles.titleMedium(
+                isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+              ),
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.xs),
             Text(
-              message,
-              style: AppTextStyles.bodySmall(textSecondary),
+              controller.errorMessage,
+              style: AppTextStyles.bodySmall(
+                isDark
+                    ? AppColors.darkTextSecondary
+                    : AppColors.lightTextSecondary,
+              ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: AppSpacing.xl),
-            ElevatedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded, size: AppSpacing.iconSM),
-              label: const Text('Retry'),
+            const SizedBox(height: AppSpacing.lg),
+            ElevatedButton(
+              onPressed: () => controller.fetchQueueData(),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.lightSurface,
               ),
+              child: const Text('Retry'),
             ),
           ],
         ),
       ),
     );
   }
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Skeleton Loading
-// ─────────────────────────────────────────────────────────────────────────────
-class _QueueSkeleton extends StatelessWidget {
-  const _QueueSkeleton({required this.isDark});
-
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final baseColor = isDark
-        ? const Color(0xFF2C2C2E)
-        : const Color(0xFFE5E5EA);
-    final highlightColor = isDark
-        ? const Color(0xFF3A3A3C)
-        : const Color(0xFFF5F5F5);
-
-    return Shimmer.fromColors(
-      baseColor: baseColor,
-      highlightColor: highlightColor,
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Grid skeleton
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisSpacing: AppSpacing.sm,
-              mainAxisSpacing: AppSpacing.sm,
-              childAspectRatio: 2.4,
-              children: List.generate(
-                4,
-                (_) => Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.lightSurface,
-                    borderRadius: BorderRadius.circular(AppSpacing.md),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            // Chips skeleton
-            Container(
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppColors.lightSurface,
-                borderRadius: BorderRadius.circular(AppSpacing.massive),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            // Cards
-            ...List.generate(
-              5,
-              (_) => Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: Container(
-                  height: 76,
-                  decoration: BoxDecoration(
-                    color: AppColors.lightSurface,
-                    borderRadius: BorderRadius.circular(AppSpacing.md),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+  PopupMenuItem<String> _buildMenuItem(
+    String value,
+    String label,
+    IconData icon,
+    Color iconColor,
+    Color textColor,
+  ) {
+    return PopupMenuItem<String>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: iconColor,
+            size: AppSpacing.iconSM,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Text(
+            label,
+            style: AppTextStyles.bodyMedium(textColor),
+          ),
+        ],
       ),
     );
   }

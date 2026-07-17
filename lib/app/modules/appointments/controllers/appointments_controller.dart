@@ -1,358 +1,349 @@
-// lib/app/modules/appointments/controllers/appointments_controller.dart
-
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
-import 'package:dio/dio.dart';
-
-import '../models/appointment_model.dart';
-import '../providers/appointments_provider.dart';
-
-enum AppointmentsLoadState { idle, loading, success, error }
-
-/// Tab index for the view switcher
-enum AppointmentViewTab { calendar, list, todaySchedule }
+import '../../../models/appointment_model.dart';
+import '../../../services/appointment_service.dart';
+import '../../../theme/theme.dart';
 
 class AppointmentsController extends GetxController {
-  final _provider = AppointmentsProvider();
+  final _service = Get.find<AppointmentService>();
 
-  // ── State ─────────────────────────────────────────────────────────────────
-  AppointmentsLoadState _loadState = AppointmentsLoadState.idle;
-  String _errorMessage = '';
+  // ─── Controller State ──────────────────────────────────────────────────────
+  List<AppointmentModel> allAppointments = [];
+  List<AppointmentModel> filteredAppointments = [];
+  List<AppointmentDoctor> doctors = [];
+  
+  bool isLoading = false;
+  String errorMessage = '';
 
-  /// Raw list from the API (all pages fetched in one call for simplicity)
-  List<AppointmentModel> _allAppointments = [];
+  // Active View Tab (0: Calendar View, 1: List View, 2: Today's Schedule)
+  int activeViewTab = 0;
 
-  /// Currently selected view tab
-  AppointmentViewTab _selectedTab = AppointmentViewTab.calendar;
+  // Filter States
+  String searchQuery = '';
+  DateTime? selectedFilterDate;
+  String selectedStatusFilter = 'All Statuses';
+  String selectedDoctorFilter = 'All Doctors';
 
-  /// Currently focused calendar date (defaults to today)
-  DateTime _focusedDate = DateTime.now();
+  // Calendar States
+  DateTime calendarSelectedDate = DateTime.now();
+  List<AppointmentModel> calendarAppointmentsForDate = [];
 
-  /// Selected date in the calendar (for showing day appointments)
-  DateTime? _selectedDate;
+  // ─── Getters ───────────────────────────────────────────────────────────────
+  int get todayTotalCount => _getTodayCountForStatus(null);
+  int get todayConfirmedCount => _getTodayCountForStatus('confirmed');
+  int get todayCheckedInCount => _getTodayCountForStatus('checked_in');
+  int get todayInProgressCount => _getTodayCountForStatus('in_progress');
+  int get todayCompletedCount => _getTodayCountForStatus('completed');
+  int get todayCancelledCount => _getTodayCountForStatus('cancelled');
+  int get todayNoShowCount => _getTodayCountForStatus('no_show');
+  int get todayScheduledCount => _getTodayCountForStatus('scheduled');
 
-  /// Selected date for the ListView search filters
-  DateTime _listFilterDate = DateTime.now();
-
-  /// List of appointments loaded for the ListView
-  List<AppointmentModel> _listViewAppointments = [];
-
-  /// Loading state for the ListView specific date fetch
-  bool _isListLoading = false;
-
-  /// Search / filter state for List view
-  String _searchQuery = '';
-  String _filterStatus = ''; // empty = all
-  String _filterDoctorId = '';
-
-  // ── Getters ───────────────────────────────────────────────────────────────
-  AppointmentsLoadState get loadState => _loadState;
-  bool get isLoading => _loadState == AppointmentsLoadState.loading;
-  bool get hasError => _loadState == AppointmentsLoadState.error;
-  bool get hasData => _loadState == AppointmentsLoadState.success;
-  String get errorMessage => _errorMessage;
-
-  AppointmentViewTab get selectedTab => _selectedTab;
-  DateTime get focusedDate => _focusedDate;
-  DateTime? get selectedDate => _selectedDate;
-  String get searchQuery => _searchQuery;
-  String get filterStatus => _filterStatus;
-  DateTime get listFilterDate => _listFilterDate;
-  List<AppointmentModel> get listViewAppointments => _listViewAppointments;
-  bool get isListLoading => _isListLoading;
-  String get filterDoctorId => _filterDoctorId;
-
-  /// Summary counts derived from the full list
-  AppointmentSummary get summary =>
-      AppointmentSummary.fromList(_allAppointments);
-
-  /// All appointments sorted by date+time
-  List<AppointmentModel> get allAppointments => List.unmodifiable(_allAppointments);
-
-  /// Appointments for a specific date (used by calendar bottom sheet)
-  List<AppointmentModel> appointmentsForDate(DateTime date) =>
-      _allAppointments
-          .where((a) =>
-              a.appointmentDate.year == date.year &&
-              a.appointmentDate.month == date.month &&
-              a.appointmentDate.day == date.day)
-          .toList()
-        ..sort(_compareByTime);
-
-  /// Whether a given date has any appointments (for calendar dot indicators)
-  bool hasAppointmentsOnDate(DateTime date) =>
-      _allAppointments.any((a) =>
-          a.appointmentDate.year == date.year &&
-          a.appointmentDate.month == date.month &&
-          a.appointmentDate.day == date.day);
-
-  /// Filtered list for the List View
-  List<AppointmentModel> get filteredAppointments {
-    var list = _listViewAppointments.toList();
-    if (_filterStatus.isNotEmpty) {
-      list = list.where((a) => a.status == _filterStatus).toList();
-    }
-    if (_filterDoctorId.isNotEmpty) {
-      list = list.where((a) => a.doctorId == _filterDoctorId).toList();
-    }
-    if (_searchQuery.isNotEmpty) {
-      final q = _searchQuery.toLowerCase();
-      list = list.where((a) {
-        return a.patient.fullName.toLowerCase().contains(q) ||
-            a.patient.mrn.toLowerCase().contains(q) ||
-            a.doctor.fullName.toLowerCase().contains(q) ||
-            (a.chiefComplaint?.toLowerCase().contains(q) ?? false);
+  List<AppointmentModel> get todayCurrentAndUpcoming => allAppointments.where((a) {
+        final now = DateTime.now();
+        final isToday = _isSameDay(a.appointmentDate, now);
+        if (!isToday) return false;
+        final status = a.status.toLowerCase();
+        return status == 'scheduled' || status == 'confirmed' || status == 'checked_in' || status == 'in_progress';
       }).toList();
-    }
-    list.sort(_compareByTime);
-    return list;
-  }
 
-  /// Today's appointments split into active vs completed
-  List<AppointmentModel> get todayActiveAppointments => _allAppointments
-      .where((a) => a.isToday && a.isActive)
-      .toList()
-    ..sort(_compareByTime);
+  List<AppointmentModel> get todayCompletedAndOthers => allAppointments.where((a) {
+        final now = DateTime.now();
+        final isToday = _isSameDay(a.appointmentDate, now);
+        if (!isToday) return false;
+        final status = a.status.toLowerCase();
+        return status == 'completed' || status == 'cancelled' || status == 'no_show';
+      }).toList();
 
-  List<AppointmentModel> get todayCompletedAppointments => _allAppointments
-      .where((a) => a.isToday && a.isCompleted)
-      .toList()
-    ..sort(_compareByTime);
-
-  /// Unique doctor list for filter dropdown
-  List<AppointmentDoctor> get doctors {
-    final seen = <String>{};
-    return _allAppointments
-        .where((a) => seen.add(a.doctorId))
-        .map((a) => a.doctor)
-        .toList();
-  }
-
-  // ── Lifecycle ─────────────────────────────────────────────────────────────
   @override
   void onInit() {
     super.onInit();
-    _selectedDate = DateTime.now();
-    fetchAppointments();
-    fetchListViewAppointments();
+    refreshData();
   }
 
-  // ── Data Loading ──────────────────────────────────────────────────────────
-  Future<void> fetchAppointments() async {
-    _loadState = AppointmentsLoadState.loading;
-    _errorMessage = '';
+  // ─── Fetching Data ─────────────────────────────────────────────────────────
+  Future<void> refreshData() async {
+    isLoading = true;
+    errorMessage = '';
     update();
 
     try {
-      final response = await _provider.fetchAppointments(limit: 100);
-      final body = response.data as Map<String, dynamic>;
+      await Future.wait([
+        fetchAppointmentsInternal(),
+        fetchDoctorsInternal(),
+      ]);
+      applyFilters();
+      // Initialize calendar list with selected date
+      calendarAppointmentsForDate = allAppointments
+          .where((a) => _isSameDay(a.appointmentDate, calendarSelectedDate))
+          .toList();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[AppointmentsController] Refresh error: $e');
+      }
+    } finally {
+      isLoading = false;
+      update();
+    }
+  }
 
-      if (body['success'] == true) {
-        final parsed = AppointmentsResponse.fromJson(body);
-        _allAppointments = parsed.data;
-        _loadState = AppointmentsLoadState.success;
-      } else {
-        _loadState = AppointmentsLoadState.error;
-        _errorMessage = body['message'] as String? ?? 'Unknown error';
+  Future<void> fetchAppointments() async {
+    isLoading = true;
+    update();
+    try {
+      await fetchAppointmentsInternal();
+      applyFilters();
+      calendarAppointmentsForDate = allAppointments
+          .where((a) => _isSameDay(a.appointmentDate, calendarSelectedDate))
+          .toList();
+    } finally {
+      isLoading = false;
+      update();
+    }
+  }
+
+  Future<void> fetchAppointmentsInternal() async {
+    try {
+      final res = await _service.fetchAppointments();
+      if (res.data != null && res.data['success'] == true) {
+        final List<dynamic> list = res.data['data']['data'] ?? [];
+        allAppointments = list
+            .map((e) => AppointmentModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+        
+        // Sort chronologically by date then time
+        allAppointments.sort((a, b) {
+          final dateCompare = a.appointmentDate.compareTo(b.appointmentDate);
+          if (dateCompare != 0) return dateCompare;
+          return a.appointmentTime.compareTo(b.appointmentTime);
+        });
       }
     } on DioException catch (e) {
-      _loadState = AppointmentsLoadState.error;
-      _errorMessage = e.message ?? 'Network error. Please try again.';
-      if (kDebugMode) debugPrint('[AppointmentsController] DioException: $e');
+      errorMessage = e.message ?? 'Network error. Please try again.';
+      rethrow;
     } catch (e) {
-      _loadState = AppointmentsLoadState.error;
-      _errorMessage = 'Something went wrong. Please try again.';
-      if (kDebugMode) debugPrint('[AppointmentsController] Error: $e');
+      errorMessage = 'Failed to load appointments';
+      rethrow;
     }
-
-    update();
   }
 
-  Future<void> onRefresh() async {
-    await Future.wait([
-      fetchAppointments(),
-      fetchListViewAppointments(),
-    ]);
-  }
-
-  // ── Navigation ────────────────────────────────────────────────────────────
-  void setTab(AppointmentViewTab tab) {
-    _selectedTab = tab;
-    update();
-  }
-
-  void setFocusedDate(DateTime date) {
-    _focusedDate = date;
-    update();
-  }
-
-  void setSelectedDate(DateTime? date) {
-    _selectedDate = date;
-    update();
-  }
-
-  // ── Search & Filter ───────────────────────────────────────────────────────
-  void setSearchQuery(String q) {
-    _searchQuery = q;
-    update();
-  }
-
-  void setFilterStatus(String status) {
-    _filterStatus = status;
-    update();
-  }
-
-  void setFilterDoctor(String doctorId) {
-    _filterDoctorId = doctorId;
-    update();
-  }
-
-  void setListFilterDate(DateTime date) {
-    _listFilterDate = date;
-    fetchListViewAppointments();
-  }
-
-  Future<void> fetchListViewAppointments() async {
-    _isListLoading = true;
-    _listViewAppointments = [];
-    update();
-
+  Future<void> fetchDoctorsInternal() async {
     try {
-      final dateStr = "${_listFilterDate.year}-${_listFilterDate.month.toString().padLeft(2, '0')}-${_listFilterDate.day.toString().padLeft(2, '0')}";
-      final response = await _provider.fetchAppointments(date: dateStr, limit: 100);
-      final body = response.data as Map<String, dynamic>;
-
-      if (body['success'] == true) {
-        final parsed = AppointmentsResponse.fromJson(body);
-        _listViewAppointments = parsed.data;
+      final res = await _service.fetchDoctors();
+      if (res.data != null && res.data['success'] == true) {
+        final List<dynamic> list = res.data['data'] ?? [];
+        doctors = list
+            .map((e) => AppointmentDoctor.fromJson(e as Map<String, dynamic>))
+            .toList();
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('[AppointmentsController] fetchListViewAppointments error: $e');
+      if (kDebugMode) {
+        debugPrint('[AppointmentsController] Error fetching doctors: $e');
+      }
+    }
+  }
+
+  // ─── Filter Logic ──────────────────────────────────────────────────────────
+  void applyFilters() {
+    filteredAppointments = allAppointments.where((a) {
+      // 1. Search Query
+      if (searchQuery.isNotEmpty) {
+        final q = searchQuery.toLowerCase();
+        final patientName = a.patient.fullName.toLowerCase();
+        final patientMrn = a.patient.mrn.toLowerCase();
+        final docName = a.doctor.fullName.toLowerCase();
+        final complaint = a.chiefComplaint.toLowerCase();
+        if (!patientName.contains(q) &&
+            !patientMrn.contains(q) &&
+            !docName.contains(q) &&
+            !complaint.contains(q)) {
+          return false;
+        }
+      }
+
+      // 2. Date Filter
+      if (selectedFilterDate != null) {
+        if (!_isSameDay(a.appointmentDate, selectedFilterDate!)) {
+          return false;
+        }
+      }
+
+      // 3. Status Filter
+      if (selectedStatusFilter != 'All Statuses') {
+        if (a.status.toLowerCase() != selectedStatusFilter.toLowerCase()) {
+          return false;
+        }
+      }
+
+      // 4. Doctor Filter
+      if (selectedDoctorFilter != 'All Doctors') {
+        if (a.doctorId != selectedDoctorFilter) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
+  }
+
+  void setSearchQuery(String query) {
+    searchQuery = query;
+    applyFilters();
+    update();
+  }
+
+  void setFilterDate(DateTime? date) {
+    selectedFilterDate = date;
+    applyFilters();
+    update();
+  }
+
+  void setStatusFilter(String status) {
+    selectedStatusFilter = status;
+    applyFilters();
+    update();
+  }
+
+  void setDoctorFilter(String docId) {
+    selectedDoctorFilter = docId;
+    applyFilters();
+    update();
+  }
+
+  void resetFilters() {
+    searchQuery = '';
+    selectedFilterDate = null;
+    selectedStatusFilter = 'All Statuses';
+    selectedDoctorFilter = 'All Doctors';
+    applyFilters();
+    update();
+  }
+
+  // ─── Calendar / Switcher Actions ──────────────────────────────────────────
+  void setActiveTab(int index) {
+    activeViewTab = index;
+    update();
+  }
+
+  void setCalendarSelectedDate(DateTime date) {
+    calendarSelectedDate = date;
+    calendarAppointmentsForDate = allAppointments
+        .where((a) => _isSameDay(a.appointmentDate, date))
+        .toList();
+    update();
+  }
+
+  // ─── API Mutator Actions ───────────────────────────────────────────────────
+  Future<void> updateStatus(String id, String status, {Map<String, dynamic>? additionalData}) async {
+    isLoading = true;
+    update();
+    try {
+      await _service.updateAppointmentStatus(id, status, additionalData: additionalData);
+      Get.snackbar(
+        'Success',
+        'Appointment status updated to ${status.replaceAll('_', ' ')}',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.secondary.withValues(alpha: 0.15),
+        colorText: AppColors.primary,
+      );
+      await fetchAppointmentsInternal();
+      applyFilters();
+      calendarAppointmentsForDate = allAppointments
+          .where((a) => _isSameDay(a.appointmentDate, calendarSelectedDate))
+          .toList();
+    } on DioException catch (e) {
+      Get.snackbar(
+        'Error',
+        e.response?.data['message'] ?? 'Failed to update appointment status',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.error.withValues(alpha: 0.15),
+        colorText: AppColors.error,
+      );
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Something went wrong',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.error.withValues(alpha: 0.15),
+        colorText: AppColors.error,
+      );
     } finally {
-      _isListLoading = false;
+      isLoading = false;
       update();
     }
   }
 
-  void clearFilters() {
-    _searchQuery = '';
-    _filterStatus = '';
-    _filterDoctorId = '';
+  Future<void> sendReminder(String id) async {
+    isLoading = true;
     update();
-  }
-
-  // ── Actions ───────────────────────────────────────────────────────────────
-  Future<void> updateStatus(AppointmentModel appt, String newStatus) async {
     try {
-      await _provider.updateAppointmentStatus(appt.id, newStatus);
-      final updated = AppointmentModel(
-        id: appt.id,
-        organizationId: appt.organizationId,
-        patientId: appt.patientId,
-        doctorId: appt.doctorId,
-        appointmentDate: appt.appointmentDate,
-        appointmentTime: appt.appointmentTime,
-        durationMinutes: appt.durationMinutes,
-        appointmentType: appt.appointmentType,
-        departmentId: appt.departmentId,
-        status: newStatus,
-        chiefComplaint: appt.chiefComplaint,
-        notes: appt.notes,
-        reminderSent: appt.reminderSent,
-        createdAt: appt.createdAt,
-        updatedAt: DateTime.now(),
-        patient: appt.patient,
-        doctor: appt.doctor,
-      );
-
-      final idx = _allAppointments.indexWhere((a) => a.id == appt.id);
-      if (idx != -1) {
-        _allAppointments[idx] = updated;
-      }
-
-      final listIdx = _listViewAppointments.indexWhere((a) => a.id == appt.id);
-      if (listIdx != -1) {
-        _listViewAppointments[listIdx] = updated;
-      }
-
-      update();
+      await _service.sendReminder(id);
       Get.snackbar(
-        '✓ Success',
-        'Status updated to ${_formatStatus(newStatus)}',
+        'Reminder Sent',
+        'Appointment reminder sent successfully',
         snackPosition: SnackPosition.BOTTOM,
-        duration: const Duration(seconds: 2),
+        backgroundColor: AppColors.secondary.withValues(alpha: 0.15),
+        colorText: AppColors.primary,
       );
-    } catch (e) {
+      await fetchAppointmentsInternal();
+      applyFilters();
+    } on DioException catch (e) {
       Get.snackbar(
         'Error',
-        'Failed to update status',
+        e.response?.data['message'] ?? 'Failed to send reminder',
         snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.error.withValues(alpha: 0.15),
+        colorText: AppColors.error,
       );
+    } finally {
+      isLoading = false;
+      update();
     }
   }
 
-  Future<void> sendReminder(AppointmentModel appt) async {
+  Future<void> reschedule(String id, DateTime date, String time) async {
+    isLoading = true;
+    update();
     try {
-      await _provider.sendReminder(appt.id);
-      final updated = AppointmentModel(
-        id: appt.id,
-        organizationId: appt.organizationId,
-        patientId: appt.patientId,
-        doctorId: appt.doctorId,
-        appointmentDate: appt.appointmentDate,
-        appointmentTime: appt.appointmentTime,
-        durationMinutes: appt.durationMinutes,
-        appointmentType: appt.appointmentType,
-        departmentId: appt.departmentId,
-        status: appt.status,
-        chiefComplaint: appt.chiefComplaint,
-        notes: appt.notes,
-        reminderSent: true,
-        createdAt: appt.createdAt,
-        updatedAt: DateTime.now(),
-        patient: appt.patient,
-        doctor: appt.doctor,
-      );
-
-      final idx = _allAppointments.indexWhere((a) => a.id == appt.id);
-      if (idx != -1) {
-        _allAppointments[idx] = updated;
-      }
-
-      final listIdx = _listViewAppointments.indexWhere((a) => a.id == appt.id);
-      if (listIdx != -1) {
-        _listViewAppointments[listIdx] = updated;
-      }
-
-      update();
+      await _service.rescheduleAppointment(id, date, time);
       Get.snackbar(
-        '✓ Success',
-        'Reminder sent successfully',
+        'Rescheduled',
+        'Appointment rescheduled successfully',
         snackPosition: SnackPosition.BOTTOM,
-        duration: const Duration(seconds: 2),
+        backgroundColor: AppColors.secondary.withValues(alpha: 0.15),
+        colorText: AppColors.primary,
       );
-    } catch (e) {
+      await fetchAppointmentsInternal();
+      applyFilters();
+      calendarAppointmentsForDate = allAppointments
+          .where((a) => _isSameDay(a.appointmentDate, calendarSelectedDate))
+          .toList();
+    } on DioException catch (e) {
       Get.snackbar(
         'Error',
-        'Failed to send reminder',
+        e.response?.data['message'] ?? 'Failed to reschedule',
         snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.error.withValues(alpha: 0.15),
+        colorText: AppColors.error,
       );
+    } finally {
+      isLoading = false;
+      update();
     }
   }
 
-  void showActionMenu(AppointmentModel appt) {
-    // This is triggered from the view — handled via bottom sheet in the view layer
+  // ─── Helpers ───────────────────────────────────────────────────────────────
+  bool _isSameDay(DateTime d1, DateTime d2) {
+    return d1.year == d2.year && d1.month == d2.month && d1.day == d2.day;
   }
 
-  // ── Private helpers ───────────────────────────────────────────────────────
-  int _compareByTime(AppointmentModel a, AppointmentModel b) {
-    final dateCompare = a.appointmentDate.compareTo(b.appointmentDate);
-    if (dateCompare != 0) return dateCompare;
-    return a.appointmentTime.compareTo(b.appointmentTime);
+  int _getTodayCountForStatus(String? status) {
+    final now = DateTime.now();
+    return allAppointments.where((a) {
+      final isSame = _isSameDay(a.appointmentDate, now);
+      if (!isSame) return false;
+      if (status == null) return true;
+      return a.status.toLowerCase() == status.toLowerCase();
+    }).length;
   }
-
-  String _formatStatus(String status) => status
-      .split('_')
-      .map((w) => '${w[0].toUpperCase()}${w.substring(1)}')
-      .join(' ');
 }

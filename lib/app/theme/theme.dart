@@ -37,30 +37,41 @@ class AppThemeX {
 
 /// GetX controller — manages theme mode + persists preference.
 class AppThemeController extends GetxController {
-  final _isDark = false.obs;
+  final _themeMode = ThemeMode.system.obs;
 
-  bool get isDark => _isDark.value;
-  ThemeMode get themeMode => _isDark.value ? ThemeMode.dark : ThemeMode.light;
+  ThemeMode get themeMode => _themeMode.value;
+
+  bool get isDark {
+    if (_themeMode.value == ThemeMode.system) {
+      return Get.isPlatformDarkMode;
+    }
+    return _themeMode.value == ThemeMode.dark;
+  }
 
   @override
   void onInit() {
     super.onInit();
     // Optional: restore from GetStorage
-    // _isDark.value = GetStorage().read('isDark') ?? false;
+    // _themeMode.value = ...
     _applySystemChrome();
   }
 
   void toggleTheme() {
-    _isDark.value = !_isDark.value;
-    Get.changeThemeMode(_isDark.value ? ThemeMode.dark : ThemeMode.light);
-    // Optional: GetStorage().write('isDark', _isDark.value);
+    if (isDark) {
+      setThemeMode(ThemeMode.light);
+    } else {
+      setThemeMode(ThemeMode.dark);
+    }
+  }
+
+  void setThemeMode(ThemeMode mode) {
+    _themeMode.value = mode;
+    Get.changeThemeMode(mode);
     _applySystemChrome();
   }
 
   void setDark(bool value) {
-    _isDark.value = value;
-    Get.changeThemeMode(value ? ThemeMode.dark : ThemeMode.light);
-    _applySystemChrome();
+    setThemeMode(value ? ThemeMode.dark : ThemeMode.light);
   }
 
   void _applySystemChrome() {

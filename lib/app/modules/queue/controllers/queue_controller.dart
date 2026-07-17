@@ -1,347 +1,285 @@
-// lib/app/modules/queue/controllers/queue_controller.dart
-
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
-import 'package:dio/dio.dart';
-
-import '../models/queue_model.dart';
-import '../providers/queue_provider.dart';
+import '../../../models/queue_item.dart';
+import '../../../services/queue_service.dart';
 
 enum QueueLoadState { idle, loading, success, error }
 
-enum QueueViewTab { live, history }
-
 class QueueController extends GetxController {
-  final _provider = QueueProvider();
+  final _queueService = Get.find<QueueService>();
 
-  // ── State ─────────────────────────────────────────────────────────────────
-  QueueLoadState _loadState = QueueLoadState.idle;
-  String _errorMessage = '';
+  // ─── Observables ───────────────────────────────────────────────────────────
+  final _loadState = QueueLoadState.idle.obs;
+  final _errorMessage = ''.obs;
 
-  List<QueueModel> _allItems = [];
-  List<QueueModel> _historyItems = [];
+  final liveQueueItems = <QueueItem>[].obs;
+  final historyQueueItems = <QueueItem>[].obs;
 
-  QueueViewTab _viewTab = QueueViewTab.live;
-  String _selectedArea = ''; // '' = all areas
-  String _selectedPriority = ''; // '' = all priorities
+  // Selected filters
+  final selectedServiceArea = 'All Areas'.obs;
+  final selectedPriority = 'All Priorities'.obs;
+  final activeTab = 'Live Queue'.obs; // 'Live Queue' or 'History'
 
-  bool _isHistoryLoading = false;
+  // ─── Getters ────────────────────────────────────────────────────────────────
+  QueueLoadState get loadState => _loadState.value;
+  String get errorMessage => _errorMessage.value;
+  bool get isLoading => _loadState.value == QueueLoadState.loading;
+  bool get hasError => _loadState.value == QueueLoadState.error;
 
-  // Patient dropdown for Add to Queue
-  List<PatientOption> _patients = [];
-  bool _isPatientsLoading = false;
+  // Stats computed from full (unfiltered) lists
+  int get waitingCount => liveQueueItems.where((x) => x.status.toLowerCase() == 'waiting').length;
+  int get calledCount => liveQueueItems.where((x) => x.status.toLowerCase() == 'called').length;
+  int get inServiceCount => liveQueueItems.where((x) => x.status.toLowerCase() == 'in_service').length;
+  int get completedCount => historyQueueItems.where((x) => x.status.toLowerCase() == 'completed').length;
 
-  // ── Getters ───────────────────────────────────────────────────────────────
-  QueueLoadState get loadState => _loadState;
-  bool get isLoading => _loadState == QueueLoadState.loading;
-  bool get hasError => _loadState == QueueLoadState.error;
-  bool get hasData => _loadState == QueueLoadState.success;
-  String get errorMessage => _errorMessage;
-
-  QueueViewTab get viewTab => _viewTab;
-  String get selectedArea => _selectedArea;
-  String get selectedPriority => _selectedPriority;
-  bool get isHistoryLoading => _isHistoryLoading;
-
-  List<PatientOption> get patients => _patients;
-  bool get isPatientsLoading => _isPatientsLoading;
-
-  /// All live items
-  List<QueueModel> get allItems => List.unmodifiable(_allItems);
-
-  /// History items
-  List<QueueModel> get historyItems => List.unmodifiable(_historyItems);
-
-  /// Filtered live items by area + priority
-  List<QueueModel> get filteredItems {
-    var list = _allItems.toList();
-    if (_selectedArea.isNotEmpty) {
-      list = list.where((q) => q.serviceArea == _selectedArea).toList();
-    }
-    if (_selectedPriority.isNotEmpty) {
-      list = list.where((q) => q.priority == _selectedPriority).toList();
-    }
-    return list;
+  // Filtered lists for rendering
+  List<QueueItem> get displayedQueueItems {
+    final list = activeTab.value == 'Live Queue' ? liveQueueItems : historyQueueItems;
+    return list.where((item) {
+      // 1. Service Area filter
+      if (selectedServiceArea.value != 'All Areas') {
+        final areaVal = _mapServiceArea(selectedServiceArea.value);
+        if (item.serviceArea.toLowerCase() != areaVal.toLowerCase()) {
+          return false;
+        }
+      }
+      // 2. Priority filter
+      if (selectedPriority.value != 'All Priorities') {
+        if (item.priority.toLowerCase() != selectedPriority.value.toLowerCase()) {
+          return false;
+        }
+      }
+      return true;
+    }).toList();
   }
 
-  /// Filtered history by area + priority
-  List<QueueModel> get filteredHistory {
-    var list = _historyItems.toList();
-    if (_selectedArea.isNotEmpty) {
-      list = list.where((q) => q.serviceArea == _selectedArea).toList();
-    }
-    if (_selectedPriority.isNotEmpty) {
-      list = list.where((q) => q.priority == _selectedPriority).toList();
-    }
-    return list;
-  }
-
-  /// Summary based on all items
-  QueueSummary get summary => QueueSummary.fromList(_allItems);
-
-  // ── Lifecycle ─────────────────────────────────────────────────────────────
   @override
   void onInit() {
     super.onInit();
-    fetchQueue();
-    fetchPatients();
+    fetchQueueData();
   }
 
-  // ── Data Loading ──────────────────────────────────────────────────────────
-  Future<void> fetchQueue() async {
-    _loadState = QueueLoadState.loading;
-    _errorMessage = '';
-    update();
+  // ─── API Actions ────────────────────────────────────────────────────────────
+  Future<void> fetchQueueData() async {
+    _loadState.value = QueueLoadState.loading;
+    _errorMessage.value = '';
 
     try {
-      final response = await _provider.fetchQueue(limit: 100);
-      final body = response.data as Map<String, dynamic>;
+      final results = await Future.wait([
+        _queueService.fetchQueueItems(statuses: 'waiting,called,in_service'),
+        _queueService.fetchQueueItems(statuses: 'completed,cancelled'),
+      ]);
 
-      if (body['success'] == true) {
-        final parsed = QueueResponse.fromJson(body);
-        _allItems = parsed.data;
-        _loadState = QueueLoadState.success;
-      } else {
-        _loadState = QueueLoadState.error;
-        _errorMessage = body['message'] as String? ?? 'Unknown error';
+      final liveRes = results[0];
+      final historyRes = results[1];
+
+      if (liveRes.data != null && liveRes.data['success'] == true) {
+        final List<dynamic> list = liveRes.data['data']['data'] ?? [];
+        liveQueueItems.assignAll(list.map((e) => QueueItem.fromJson(e as Map<String, dynamic>)));
       }
+
+      if (historyRes.data != null && historyRes.data['success'] == true) {
+        final List<dynamic> list = historyRes.data['data']['data'] ?? [];
+        historyQueueItems.assignAll(list.map((e) => QueueItem.fromJson(e as Map<String, dynamic>)));
+      }
+
+      _loadState.value = QueueLoadState.success;
     } on DioException catch (e) {
-      _loadState = QueueLoadState.error;
-      _errorMessage = e.message ?? 'Network error. Please try again.';
-      if (kDebugMode) debugPrint('[QueueController] DioException: $e');
-    } catch (e) {
-      _loadState = QueueLoadState.error;
-      _errorMessage = 'Something went wrong. Please try again.';
-      if (kDebugMode) debugPrint('[QueueController] Error: $e');
-    }
-
-    update();
-  }
-
-  Future<void> fetchHistory() async {
-    _isHistoryLoading = true;
-    _historyItems = [];
-    update();
-
-    try {
-      final response = await _provider.fetchHistory(limit: 100);
-      final body = response.data as Map<String, dynamic>;
-
-      if (body['success'] == true) {
-        final parsed = QueueResponse.fromJson(body);
-        _historyItems = parsed.data;
-      }
-    } catch (e) {
+      _loadState.value = QueueLoadState.error;
+      _errorMessage.value = e.message ?? 'Network error. Please try again.';
       if (kDebugMode) {
-        debugPrint('[QueueController] fetchHistory error: $e');
-      }
-    } finally {
-      _isHistoryLoading = false;
-      update();
-    }
-  }
-
-  Future<void> fetchPatients() async {
-    _isPatientsLoading = true;
-    update();
-    try {
-      final response = await _provider.fetchPatients();
-      final body = response.data as Map<String, dynamic>;
-      if (body['success'] == true) {
-        final outer = body['data'] as Map<String, dynamic>? ?? body;
-        final dataList = outer['data'] as List<dynamic>? ?? [];
-        _patients = dataList
-            .map((e) => PatientOption.fromJson(e as Map<String, dynamic>))
-            .toList();
+        debugPrint('[QueueController] DioException: ${e.message}');
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('[QueueController] fetchPatients error: $e');
-    } finally {
-      _isPatientsLoading = false;
-      update();
+      _loadState.value = QueueLoadState.error;
+      _errorMessage.value = 'Failed to load queue. Please try again.';
+      if (kDebugMode) {
+        debugPrint('[QueueController] Error: $e');
+      }
     }
   }
 
+  /// Refreshes data cleanly
   Future<void> onRefresh() async {
-    await fetchQueue();
-    if (_viewTab == QueueViewTab.history) {
-      await fetchHistory();
+    await fetchQueueData();
+  }
+
+  /// Change active tab: Live Queue / History
+  void setActiveTab(String tabName) {
+    activeTab.value = tabName;
+  }
+
+  /// Change active service area filter
+  void setServiceAreaFilter(String area) {
+    selectedServiceArea.value = area;
+  }
+
+  /// Change active priority filter
+  void setPriorityFilter(String priority) {
+    selectedPriority.value = priority;
+  }
+
+  /// Call Next: Find the first patient in 'waiting' status, sorted by priority (Urgent > Normal > Low > Routine)
+  /// and joinedQueueAt (FIFO), and mark them as 'called'
+  Future<void> callNextPatient() async {
+    final waitingList = liveQueueItems.where((x) => x.status.toLowerCase() == 'waiting').toList();
+    if (waitingList.isEmpty) {
+      Get.snackbar(
+        'Call Next',
+        'No patients waiting in queue.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
     }
-  }
 
-  // ── Tab & Filter ──────────────────────────────────────────────────────────
-  void setViewTab(QueueViewTab tab) {
-    _viewTab = tab;
-    if (tab == QueueViewTab.history && _historyItems.isEmpty) {
-      fetchHistory();
-    }
-    update();
-  }
-
-  void setServiceArea(String area) {
-    _selectedArea = area;
-    update();
-  }
-
-  void setPriority(String priority) {
-    _selectedPriority = priority;
-    update();
-  }
-
-  // ── Actions ───────────────────────────────────────────────────────────────
-
-  /// Call Next — finds first waiting item and calls it
-  Future<void> callNext() async {
-    final waiting = _allItems.where((q) => q.status == 'waiting').toList();
-    if (_selectedArea.isNotEmpty) {
-      final areaWaiting =
-          waiting.where((q) => q.serviceArea == _selectedArea).toList();
-      if (areaWaiting.isNotEmpty) {
-        await _callItem(areaWaiting.first);
-        return;
+    // Sort by priority weight, then by joinedQueueAt
+    waitingList.sort((a, b) {
+      final pA = _getPriorityWeight(a.priority);
+      final pB = _getPriorityWeight(b.priority);
+      if (pA != pB) {
+        return pB.compareTo(pA); // Descending (higher weight first)
       }
-    }
-    if (waiting.isNotEmpty) {
-      await _callItem(waiting.first);
-    } else {
-      Get.snackbar(
-        'No Patients',
-        'No waiting patients in queue',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-    }
+      return a.joinedQueueAt.compareTo(b.joinedQueueAt); // Ascending (older first)
+    });
+
+    final nextPatient = waitingList.first;
+    await updateStatus(nextPatient.id, 'called', patientName: nextPatient.patient.fullName);
   }
 
-  Future<void> _callItem(QueueModel item) async {
+  /// Updates status of a patient in queue
+  Future<void> updateStatus(String id, String status, {required String patientName}) async {
     try {
-      await _provider.updateQueueStatus(item.id, 'called');
-      await fetchQueue();
-      Get.snackbar(
-        '✓ Called',
-        '${item.patient.fullName} (${item.queueNumber}) has been called',
-        snackPosition: SnackPosition.BOTTOM,
-        duration: const Duration(seconds: 3),
-      );
+      final res = await _queueService.updateQueueStatus(id, status);
+      if (res.statusCode == 200 || res.statusCode == 204 || (res.data is Map && res.data['success'] == true)) {
+        final displayStatus = status.replaceAll('_', ' ');
+        Get.snackbar(
+          'Queue Update',
+          '$patientName is now marked as $displayStatus.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        await fetchQueueData();
+      } else {
+        final errorMsg = (res.data is Map) ? res.data['message'] : null;
+        Get.snackbar(
+          'Queue Update Failed',
+          errorMsg ?? 'Could not update patient status.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
     } catch (e) {
+      debugPrint('[QueueController] error updating status: $e');
+      String msg = 'An unexpected error occurred.';
+      if (e is DioException) {
+        msg = e.response?.data?['message'] as String? ?? e.message ?? msg;
+      }
       Get.snackbar(
         'Error',
-        'Failed to call patient',
+        msg,
         snackPosition: SnackPosition.BOTTOM,
       );
     }
   }
 
-  Future<void> callPatient(QueueModel item) async {
-    await _callItem(item);
-  }
-
-  Future<void> cancelPatient(QueueModel item) async {
+  /// Removes patient completely from queue
+  Future<void> removeFromQueue(String id, {required String patientName}) async {
     try {
-      await _provider.updateQueueStatus(item.id, 'cancelled');
-      await fetchQueue();
-      Get.snackbar(
-        '✓ Cancelled',
-        'Queue entry for ${item.patient.fullName} cancelled',
-        snackPosition: SnackPosition.BOTTOM,
-        duration: const Duration(seconds: 2),
-      );
-    } catch (e) {
-      Get.snackbar('Error', 'Failed to cancel',
-          snackPosition: SnackPosition.BOTTOM);
-    }
-  }
-
-  Future<void> startService(QueueModel item) async {
-    try {
-      await _provider.updateQueueStatus(item.id, 'in_service');
-      await fetchQueue();
-      Get.snackbar(
-        '✓ Service Started',
-        'Service started for ${item.patient.fullName}',
-        snackPosition: SnackPosition.BOTTOM,
-        duration: const Duration(seconds: 2),
-      );
-    } catch (e) {
-      Get.snackbar('Error', 'Failed to start service',
-          snackPosition: SnackPosition.BOTTOM);
-    }
-  }
-
-  Future<void> markNoShow(QueueModel item) async {
-    try {
-      await _provider.updateQueueStatus(item.id, 'no_show');
-      await fetchQueue();
-      Get.snackbar(
-        '✓ Marked No-Show',
-        '${item.patient.fullName} marked as No-Show',
-        snackPosition: SnackPosition.BOTTOM,
-        duration: const Duration(seconds: 2),
-      );
-    } catch (e) {
-      Get.snackbar('Error', 'Failed to mark no-show',
-          snackPosition: SnackPosition.BOTTOM);
-    }
-  }
-
-  Future<void> markComplete(QueueModel item) async {
-    try {
-      await _provider.updateQueueStatus(item.id, 'completed');
-      await fetchQueue();
-      Get.snackbar(
-        '✓ Completed',
-        'Service completed for ${item.patient.fullName}',
-        snackPosition: SnackPosition.BOTTOM,
-        duration: const Duration(seconds: 2),
-      );
-    } catch (e) {
-      Get.snackbar('Error', 'Failed to complete service',
-          snackPosition: SnackPosition.BOTTOM);
-    }
-  }
-
-  Future<void> removeFromQueue(QueueModel item) async {
-    try {
-      await _provider.deleteQueue(item.id);
-      _allItems.removeWhere((q) => q.id == item.id);
-      update();
-      Get.snackbar(
-        '✓ Removed',
-        '${item.patient.fullName} removed from queue',
-        snackPosition: SnackPosition.BOTTOM,
-        duration: const Duration(seconds: 2),
-      );
-    } catch (e) {
-      Get.snackbar('Error', 'Failed to remove from queue',
-          snackPosition: SnackPosition.BOTTOM);
-    }
-  }
-
-  Future<bool> addToQueue({
-    required String patientId,
-    required String serviceArea,
-    String? serviceType,
-    required String priority,
-    String? assignedRoom,
-  }) async {
-    try {
-      final body = <String, dynamic>{
-        'patientId': patientId,
-        'serviceArea': serviceArea,
-        'priority': priority,
-      };
-      if (serviceType != null && serviceType.isNotEmpty) {
-        body['serviceType'] = serviceType;
+      final res = await _queueService.deleteQueueItem(id);
+      if (res.statusCode == 200 || res.statusCode == 204 || (res.data is Map && res.data['success'] == true)) {
+        Get.snackbar(
+          'Queue Update',
+          '$patientName has been removed from queue.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        await fetchQueueData();
+      } else {
+        final errorMsg = (res.data is Map) ? res.data['message'] : null;
+        Get.snackbar(
+          'Queue Update Failed',
+          errorMsg ?? 'Could not remove patient.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
       }
-      if (assignedRoom != null && assignedRoom.isNotEmpty) {
-        body['assignedRoom'] = assignedRoom;
-      }
-
-      await _provider.createQueue(body);
-      await fetchQueue();
-      return true;
     } catch (e) {
-      if (kDebugMode) debugPrint('[QueueController] addToQueue error: $e');
-      return false;
+      debugPrint('[QueueController] error removing from queue: $e');
+      String msg = 'An unexpected error occurred.';
+      if (e is DioException) {
+        msg = e.response?.data?['message'] as String? ?? e.message ?? msg;
+      }
+      Get.snackbar(
+        'Error',
+        msg,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  /// Call patient action
+  Future<void> callPatient(String id, String patientName) async {
+    await updateStatus(id, 'called', patientName: patientName);
+  }
+
+  /// Start service action
+  Future<void> startService(String id, String patientName) async {
+    await updateStatus(id, 'in_service', patientName: patientName);
+  }
+
+  /// Mark patient as no-show
+  Future<void> markNoShow(String id, String patientName) async {
+    await updateStatus(id, 'no_show', patientName: patientName);
+  }
+
+  /// Mark service as complete
+  Future<void> markComplete(String id, String patientName) async {
+    await updateStatus(id, 'completed', patientName: patientName);
+  }
+
+  /// Cancel queue item
+  Future<void> cancelQueueItem(String id, String patientName) async {
+    await updateStatus(id, 'cancelled', patientName: patientName);
+  }
+
+  /// Delete queue item
+  Future<void> deleteQueueItem(String id, String patientName) async {
+    await removeFromQueue(id, patientName: patientName);
+  }
+
+  // ─── Helpers ───────────────────────────────────────────────────────────────
+  int _getPriorityWeight(String p) {
+    switch (p.toLowerCase()) {
+      case 'urgent':
+        return 4;
+      case 'normal':
+        return 3;
+      case 'low':
+        return 2;
+      case 'routine':
+        return 1;
+      default:
+        return 0;
+    }
+  }
+
+  String _mapServiceArea(String display) {
+    switch (display) {
+      case 'OPD':
+        return 'opd';
+      case 'Emergency':
+        return 'emergency';
+      case 'MCH':
+        return 'mch';
+      case 'Psychiatric':
+        return 'psychiatric';
+      case 'Laboratory':
+        return 'laboratory';
+      case 'Pharmacy':
+        return 'pharmacy';
+      case 'Radiology':
+        return 'radiology';
+      case 'Pediatric':
+        return 'pediatric';
+      default:
+        return display.toLowerCase();
     }
   }
 }

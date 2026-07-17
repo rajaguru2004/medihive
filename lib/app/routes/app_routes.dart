@@ -12,6 +12,7 @@ abstract class Routes {
   static const INPATIENT_ADD_BED = _Paths.INPATIENT_ADD_BED;
   static const INPATIENT_ADMIT = _Paths.INPATIENT_ADMIT;
   static const QUEUE = _Paths.QUEUE;
+  static const ADD_TO_QUEUE = _Paths.ADD_TO_QUEUE;
   static const CONSULTATIONS = _Paths.CONSULTATIONS;
   static const PATIENTS = _Paths.PATIENTS;
   static const PHARMACY = _Paths.PHARMACY;
@@ -30,10 +31,11 @@ abstract class _Paths {
   static const APPOINTMENTS = '/appointments';
   static const APPOINTMENT_CREATE = '/appointments/create';
   static const INPATIENT = '/inpatient';
-  static const INPATIENT_DISCHARGE = '/discharge';
-  static const INPATIENT_ADD_BED = '/add-bed';
-  static const INPATIENT_ADMIT = '/admit';
+  static const INPATIENT_DISCHARGE = '/inpatient/discharge';
+  static const INPATIENT_ADD_BED = '/inpatient/add-bed';
+  static const INPATIENT_ADMIT = '/inpatient/admit';
   static const QUEUE = '/queue';
+  static const ADD_TO_QUEUE = '/add-to-queue';
   static const CONSULTATIONS = '/consultations';
   static const PATIENTS = '/patients';
   static const PHARMACY = '/pharmacy';

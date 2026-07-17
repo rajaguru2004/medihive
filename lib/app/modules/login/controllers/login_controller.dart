@@ -5,10 +5,10 @@ import 'package:get/get.dart';
 
 import '../../../network/token_manager.dart';
 import '../../../routes/app_pages.dart';
-import '../providers/auth_provider.dart';
+import '../../../services/auth_service.dart';
 
 class LoginController extends GetxController {
-  final _provider = AuthProvider();
+  final _authService = Get.find<AuthService>();
 
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
@@ -37,7 +37,7 @@ class LoginController extends GetxController {
     errorMessage.value = '';
 
     try {
-      final res = await _provider.login(
+      final res = await _authService.login(
         email: emailController.text.trim(),
         password: passwordController.text,
       );

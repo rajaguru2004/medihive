@@ -1,11 +1,11 @@
-// lib/app/modules/queue/bindings/queue_binding.dart
-
 import 'package:get/get.dart';
 import '../controllers/queue_controller.dart';
 
 class QueueBinding extends Bindings {
   @override
   void dependencies() {
-    Get.lazyPut<QueueController>(() => QueueController());
+    Get.lazyPut<QueueController>(
+      () => QueueController(),
+    );
   }
 }

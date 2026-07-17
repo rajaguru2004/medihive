@@ -3,13 +3,13 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
-import 'package:medihive/app/modules/home/models/dashboard_model.dart';
-import 'package:medihive/app/modules/home/providers/home_provider.dart';
+import 'package:medihive/app/models/dashboard_model.dart';
+import 'package:medihive/app/services/home_service.dart';
 
 enum LoadState { idle, loading, success, error }
 
 class HomeController extends GetxController {
-  final _provider = HomeProvider();
+  final _homeService = Get.find<HomeService>();
 
   // ── Observable State ───────────────────────────────────────────────────────
   final _loadState = LoadState.idle.obs;
@@ -76,8 +76,8 @@ class HomeController extends GetxController {
 
     try {
       final results = await Future.wait([
-        _provider.fetchDashboard(),
-        _provider.fetchOrganization(),
+        _homeService.fetchDashboard(),
+        _homeService.fetchOrganization(),
       ]);
 
       final dashRes = results[0];
