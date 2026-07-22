@@ -12,12 +12,18 @@ abstract class AppDecorations {
   static const double radiusXL = 28;
   static const double radiusFull = 999;
 
-  static const BorderRadius borderXS = BorderRadius.all(Radius.circular(radiusXS));
-  static const BorderRadius borderSM = BorderRadius.all(Radius.circular(radiusSM));
-  static const BorderRadius borderMD = BorderRadius.all(Radius.circular(radiusMD));
-  static const BorderRadius borderLG = BorderRadius.all(Radius.circular(radiusLG));
-  static const BorderRadius borderXL = BorderRadius.all(Radius.circular(radiusXL));
-  static const BorderRadius borderFull = BorderRadius.all(Radius.circular(radiusFull));
+  static const BorderRadius borderXS =
+      BorderRadius.all(Radius.circular(radiusXS));
+  static const BorderRadius borderSM =
+      BorderRadius.all(Radius.circular(radiusSM));
+  static const BorderRadius borderMD =
+      BorderRadius.all(Radius.circular(radiusMD));
+  static const BorderRadius borderLG =
+      BorderRadius.all(Radius.circular(radiusLG));
+  static const BorderRadius borderXL =
+      BorderRadius.all(Radius.circular(radiusXL));
+  static const BorderRadius borderFull =
+      BorderRadius.all(Radius.circular(radiusFull));
 
   // ─── Glass Card ───────────────────────────────────────────────────────────
   static BoxDecoration glassCard({
@@ -26,14 +32,12 @@ abstract class AppDecorations {
     double blurSigma = 20,
   }) =>
       BoxDecoration(
-        gradient: isDark
-            ? AppColors.glassGradientDark
-            : AppColors.glassGradientLight,
+        gradient:
+            isDark ? AppColors.glassGradientDark : AppColors.glassGradientLight,
         borderRadius: borderRadius ?? borderLG,
         border: Border.all(
-          color: isDark
-              ? AppColors.darkGlassBorder
-              : AppColors.lightGlassBorder,
+          color:
+              isDark ? AppColors.darkGlassBorder : AppColors.lightGlassBorder,
           width: 0.5,
         ),
         boxShadow: isDark
@@ -61,14 +65,11 @@ abstract class AppDecorations {
 
   /// Frosted pill decoration (chips, badges)
   static BoxDecoration glassPill({required bool isDark}) => BoxDecoration(
-        color: isDark
-            ? AppColors.darkGlass
-            : AppColors.lightGlass,
+        color: isDark ? AppColors.darkGlass : AppColors.lightGlass,
         borderRadius: borderFull,
         border: Border.all(
-          color: isDark
-              ? AppColors.darkGlassBorder
-              : AppColors.lightGlassBorder,
+          color:
+              isDark ? AppColors.darkGlassBorder : AppColors.lightGlassBorder,
           width: 0.5,
         ),
       );

@@ -59,6 +59,7 @@ abstract class Endpoints {
   // ─── Pre-Triage ────────────────────────────────────────────────────────────
   static const String preTriage = '/api/pre-triage';
   static String preTriageById(String id) => '/api/pre-triage/$id';
+  static String convertPreTriage(String id) => '/api/pre-triage/$id/convert';
 
   // ─── Queue ─────────────────────────────────────────────────────────────────
   static const String queue = '/api/queue';

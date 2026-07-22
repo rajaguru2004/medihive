@@ -71,10 +71,15 @@ class QueueItem {
       priority: json['priority'] as String? ?? '',
       assignedRoom: json['assignedRoom'] as String?,
       status: json['status'] as String? ?? '',
-      joinedQueueAt: DateTime.tryParse(json['joinedQueueAt'] as String? ?? '') ?? DateTime.now(),
-      calledAt: json['calledAt'] != null ? DateTime.tryParse(json['calledAt'] as String) : null,
+      joinedQueueAt:
+          DateTime.tryParse(json['joinedQueueAt'] as String? ?? '') ??
+              DateTime.now(),
+      calledAt: json['calledAt'] != null
+          ? DateTime.tryParse(json['calledAt'] as String)
+          : null,
       waitTime: (json['waitTime'] as num?)?.toInt() ?? 0,
-      patient: QueueItemPatient.fromJson((json['patient'] as Map<String, dynamic>?) ?? {}),
+      patient: QueueItemPatient.fromJson(
+          (json['patient'] as Map<String, dynamic>?) ?? {}),
     );
   }
 

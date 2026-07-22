@@ -34,8 +34,10 @@ class PatientLookup {
   String get fullName => '$firstName $lastName'.trim();
 
   String get initials {
-    final f = firstName.trim().isNotEmpty ? firstName.trim()[0].toUpperCase() : '';
-    final l = lastName.trim().isNotEmpty ? lastName.trim()[0].toUpperCase() : '';
+    final f =
+        firstName.trim().isNotEmpty ? firstName.trim()[0].toUpperCase() : '';
+    final l =
+        lastName.trim().isNotEmpty ? lastName.trim()[0].toUpperCase() : '';
     return f.isNotEmpty || l.isNotEmpty ? '$f$l' : '?';
   }
 }

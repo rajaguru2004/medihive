@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:get/get.dart' hide Response;
+
 import '../network/app_dio_client.dart';
 
 class InpatientService extends GetxService {
@@ -73,6 +74,85 @@ class InpatientService extends GetxService {
         'admissionReason': admissionReason,
         'admittingDoctorId': admittingDoctorId,
         'attendingDoctorId': attendingDoctorId,
+      },
+    );
+  }
+
+  /// PATCH /api/inpatient/admissions/:id
+  Future<Response> dischargePatient({
+    required String admissionId,
+    required String dischargeReason,
+    required String dischargeSummary,
+    required String dischargeDoctorId,
+    DateTime? followUpDate,
+    String? followUpNotes,
+  }) {
+    return _dio.patch(
+      '/api/inpatient/admissions/$admissionId',
+      data: {
+        'status': 'discharged',
+        'dischargeReason': dischargeReason,
+        'dischargeSummary': dischargeSummary,
+        'dischargeDoctorId': dischargeDoctorId,
+        if (followUpDate != null)
+          'followUpDate': followUpDate.toUtc().toIso8601String(),
+        if (followUpNotes != null && followUpNotes.isNotEmpty)
+          'followUpNotes': followUpNotes,
+      },
+    );
+  }
+
+  /// POST /api/inpatient/wards
+  Future<Response> createWard({
+    required String name,
+    required String code,
+    required String type,
+    required int capacity,
+  }) {
+    return _dio.post(
+      '/api/inpatient/wards',
+      data: {
+        'name': name,
+        'code': code,
+        'type': type,
+        'capacity': capacity,
+      },
+    );
+  }
+
+  /// PATCH /api/inpatient/wards/:id
+  Future<Response> updateWard({
+    required String id,
+    required String name,
+    required String code,
+    required String type,
+    required int capacity,
+  }) {
+    return _dio.patch(
+      '/api/inpatient/wards/$id',
+      data: {
+        'name': name,
+        'code': code,
+        'type': type,
+        'capacity': capacity,
+      },
+    );
+  }
+
+  /// POST /api/inpatient/beds
+  Future<Response> createBed({
+    required String wardId,
+    required String bedNumber,
+    required String type,
+    required String status,
+  }) {
+    return _dio.post(
+      '/api/inpatient/beds',
+      data: {
+        'wardId': wardId,
+        'bedNumber': bedNumber,
+        'type': type,
+        'status': status,
       },
     );
   }

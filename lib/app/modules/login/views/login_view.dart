@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+
 import 'package:get/get.dart';
 
 import '../../../theme/theme.dart';
@@ -85,7 +86,8 @@ class _LogoSection extends StatelessWidget {
         const SizedBox(height: AppSpacing.sm),
         Text(
           'Hospital Management System',
-          style: AppTextStyles.bodySmall(AppColors.primary.withValues(alpha: 0.7)),
+          style:
+              AppTextStyles.bodySmall(AppColors.primary.withValues(alpha: 0.7)),
           textAlign: TextAlign.center,
         ),
       ],
@@ -208,8 +210,7 @@ class _LoginCard extends StatelessWidget {
                     return const SizedBox.shrink();
                   }
                   return Padding(
-                    padding:
-                        const EdgeInsets.only(bottom: AppSpacing.lg),
+                    padding: const EdgeInsets.only(bottom: AppSpacing.lg),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.md,
@@ -369,13 +370,11 @@ class _GlassTextField extends StatelessWidget {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: AppDecorations.borderMD,
-          borderSide:
-              BorderSide(color: AppColors.error.withValues(alpha: 0.7)),
+          borderSide: BorderSide(color: AppColors.error.withValues(alpha: 0.7)),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: AppDecorations.borderMD,
-          borderSide:
-              BorderSide(color: AppColors.error.withValues(alpha: 0.9)),
+          borderSide: BorderSide(color: AppColors.error.withValues(alpha: 0.9)),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.lg,
@@ -483,8 +482,7 @@ class _AmbientBlobs extends StatelessWidget {
           right: -40,
           child: _Blob(
             size: 180,
-            color:
-                AppColors.secondary.withValues(alpha: isDark ? 0.10 : 0.06),
+            color: AppColors.secondary.withValues(alpha: isDark ? 0.10 : 0.06),
           ),
         ),
       ],

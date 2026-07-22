@@ -1,11 +1,14 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+
+import 'package:dio/dio.dart';
 import 'package:get/get.dart' hide Response;
 
-import '../../../models/admission_model.dart';
-import '../../../models/bed_model.dart';
 import '../../../models/ward_model.dart';
 import '../../../services/inpatient_service.dart';
+import '../../inpatient_admissions/controllers/inpatient_admissions_controller.dart';
+import '../../inpatient_beds_grid/controllers/inpatient_beds_grid_controller.dart';
+import '../../inpatient_overview/controllers/inpatient_overview_controller.dart';
+import '../../inpatient_wards/controllers/inpatient_wards_controller.dart';
 
 class InpatientStats {
   final int totalBeds;
@@ -42,46 +45,68 @@ class InpatientController extends GetxController {
   String errorMessage = '';
   InpatientStats? stats;
   List<WardModel> wards = [];
-  List<AdmissionModel> admissions = [];
-  List<BedModel> beds = []; // Beds for the currently selected ward
 
-  // Navigation / Tabs
-  int activeTabIndex = 0; // 0: Overview, 1: Wards, 2: Beds Grid, 3: Admissions
+  // Active Tab state: 0: Overview, 1: Wards, 2: Beds Grid, 3: Admissions
+  int activeTab = 0;
 
-  // Filters / Search
-  String overviewSearchQuery = '';
-  String admissionsSearchQuery = '';
-  String selectedAdmissionStatusFilter = 'Active'; // 'All', 'Active', 'Discharged'
-  
-  String? selectedWardId;
-  String selectedBedStatusFilter = 'All Beds'; // 'All Beds', 'Available', 'Occupied', 'Maintenance'
+  void changeTab(int index) {
+    activeTab = index;
+    update();
+  }
 
   @override
   void onInit() {
     super.onInit();
-    refreshAllData();
+    refreshActiveTabData();
   }
 
-  // Fetch all inpatient data from endpoints
+  // Refresh active tab's specific data alongside main stats
+  Future<void> refreshActiveTabData() async {
+    await refreshAllData();
+
+    switch (activeTab) {
+      case 0:
+        if (Get.isRegistered<InpatientOverviewController>()) {
+          await Get.find<InpatientOverviewController>().refreshData();
+        }
+        break;
+      case 1:
+        if (Get.isRegistered<InpatientWardsController>()) {
+          await Get.find<InpatientWardsController>().refreshAllData();
+        }
+        break;
+      case 2:
+        if (Get.isRegistered<InpatientBedsGridController>()) {
+          await Get.find<InpatientBedsGridController>().refreshAllData();
+        }
+        break;
+      case 3:
+        if (Get.isRegistered<InpatientAdmissionsController>()) {
+          await Get.find<InpatientAdmissionsController>().refreshAllData();
+        }
+        break;
+    }
+  }
+
+  // Fetch stats and wards data
   Future<void> refreshAllData() async {
     isLoading = true;
     errorMessage = '';
     update();
 
     try {
-      // Parallel fetch stats, wards, and admissions
+      // Parallel fetch stats and wards
       final results = await Future.wait([
         _service.fetchStats(),
         _service.fetchWards(),
-        _service.fetchAdmissions(),
       ]);
 
       final statsRes = results[0];
       final wardsRes = results[1];
-      final admissionsRes = results[2];
 
       if (statsRes.data != null && statsRes.data['success'] == true) {
-        stats = InpatientStats.fromJson(statsRes.data['data'] as Map<String, dynamic>);
+        stats = InpatientStats.fromJson(
+            statsRes.data['data'] as Map<String, dynamic>);
       }
 
       if (wardsRes.data != null && wardsRes.data['success'] == true) {
@@ -93,26 +118,6 @@ class InpatientController extends GetxController {
           }
         }
         wards = parsedWards;
-      }
-
-      if (admissionsRes.data != null && admissionsRes.data['success'] == true) {
-        final List<dynamic> admissionsList = admissionsRes.data['data'] ?? [];
-        final List<AdmissionModel> parsedAdmissions = [];
-        for (final item in admissionsList) {
-          if (item is Map<String, dynamic>) {
-            parsedAdmissions.add(AdmissionModel.fromJson(item));
-          }
-        }
-        admissions = parsedAdmissions;
-      }
-
-      // Check selected ward
-      _syncSelectedWard();
-
-      if (selectedWardId != null) {
-        await _fetchBedsForSelectedWardQuietly();
-      } else {
-        beds = [];
       }
     } on DioException catch (e) {
       errorMessage = e.message ?? 'Network error. Please try again.';
@@ -162,131 +167,7 @@ class InpatientController extends GetxController {
     }
   }
 
-  // Update Bed Status
-  Future<void> updateBedStatus(String bedId, String status) async {
-    isLoading = true;
-    update();
-
-    try {
-      final res = await _service.updateBedStatus(bedId, status);
-      if (res.data != null && res.data['success'] == true) {
-        Get.snackbar(
-          'Success',
-          'Bed status updated to $status.',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-        // Refresh all data to sync state
-        await refreshAllData();
-      } else {
-        final msg = res.data != null ? res.data['message'] as String? : null;
-        Get.snackbar(
-          'Error',
-          msg ?? 'Failed to update bed status.',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-        isLoading = false;
-        update();
-      }
-    } catch (e) {
-      Get.snackbar(
-        'Error',
-        'An error occurred: $e',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      isLoading = false;
-      update();
-    }
-  }
-
-  // Select Ward & load beds
-  Future<void> changeSelectedWard(String? wardId) async {
-    selectedWardId = wardId;
-    if (wardId != null) {
-      isLoading = true;
-      update();
-      try {
-        await _fetchBedsForSelectedWardQuietly();
-      } catch (e) {
-        debugPrint('[InpatientController] Error changing ward: $e');
-      } finally {
-        isLoading = false;
-        update();
-      }
-    } else {
-      beds = [];
-      update();
-    }
-  }
-
-  // Change Bed Status Filter
-  void changeBedStatusFilter(String filter) {
-    selectedBedStatusFilter = filter;
-    update();
-  }
-
-  // Change Admission Status Filter
-  void changeAdmissionStatusFilter(String filter) {
-    selectedAdmissionStatusFilter = filter;
-    update();
-  }
-
-  // Set Search Queries
-  void updateOverviewSearch(String query) {
-    overviewSearchQuery = query;
-    update();
-  }
-
-  void updateAdmissionsSearch(String query) {
-    admissionsSearchQuery = query;
-    update();
-  }
-
-  // Set active tab
-  void changeTab(int index) {
-    activeTabIndex = index;
-    update();
-  }
-
-  // Helper: Synchronize selected ward ID based on available active wards list
-  void _syncSelectedWard() {
-    final activeWardsList = activeWards;
-    if (activeWardsList.isEmpty) {
-      selectedWardId = null;
-      return;
-    }
-
-    // Check if current selection is still active
-    bool stillActive = false;
-    for (final w in activeWardsList) {
-      if (w.id == selectedWardId) {
-        stillActive = true;
-        break;
-      }
-    }
-
-    if (!stillActive) {
-      // Default to the first active ward
-      selectedWardId = activeWardsList[0].id;
-    }
-  }
-
-  // Fetch beds quietly (does not handle loader state itself)
-  Future<void> _fetchBedsForSelectedWardQuietly() async {
-    if (selectedWardId == null) return;
-    final res = await _service.fetchBeds(wardId: selectedWardId!, status: 'all');
-    if (res.data != null && res.data['success'] == true) {
-      final List<dynamic> bedsList = res.data['data'] ?? [];
-      final List<BedModel> parsedBeds = [];
-      for (final item in bedsList) {
-        if (item is Map<String, dynamic>) {
-          parsedBeds.add(BedModel.fromJson(item));
-        }
-      }
-      beds = parsedBeds;
-    }
-  }
-
-  // ─── Filtered Getters (strict loop pattern, no .where/.firstWhere/.indexWhere) ───
+  // ─── Filtered Getters ───
 
   // Get active wards only
   List<WardModel> get activeWards {
@@ -294,81 +175,6 @@ class InpatientController extends GetxController {
     for (final w in wards) {
       if (w.isActive) {
         result.add(w);
-      }
-    }
-    return result;
-  }
-
-  // Get selected ward details if available
-  WardModel? get selectedWardDetails {
-    if (selectedWardId == null) return null;
-    for (final w in wards) {
-      if (w.id == selectedWardId) {
-        return w;
-      }
-    }
-    return null;
-  }
-
-  // Get filtered patient list for Overview tab (admitted status only + query filter)
-  List<AdmissionModel> get filteredActiveAdmissions {
-    final query = overviewSearchQuery.trim().toLowerCase();
-    final List<AdmissionModel> result = [];
-    for (final admission in admissions) {
-      if (admission.status.toLowerCase() == 'admitted') {
-        if (query.isEmpty) {
-          result.add(admission);
-        } else {
-          final name = admission.patient.fullName.toLowerCase();
-          final mrn = admission.patient.mrn.toLowerCase();
-          if (name.contains(query) || mrn.contains(query)) {
-            result.add(admission);
-          }
-        }
-      }
-    }
-    return result;
-  }
-
-  // Get filtered admission list for Admissions tab (status filter + query filter)
-  List<AdmissionModel> get filteredAllAdmissions {
-    final query = admissionsSearchQuery.trim().toLowerCase();
-    final filter = selectedAdmissionStatusFilter;
-    final List<AdmissionModel> result = [];
-    for (final admission in admissions) {
-      bool matchesStatus = true;
-      if (filter == 'Active') {
-        matchesStatus = admission.status.toLowerCase() == 'admitted';
-      } else if (filter == 'Discharged') {
-        matchesStatus = admission.status.toLowerCase() == 'discharged';
-      }
-
-      if (matchesStatus) {
-        if (query.isEmpty) {
-          result.add(admission);
-        } else {
-          final name = admission.patient.fullName.toLowerCase();
-          final mrn = admission.patient.mrn.toLowerCase();
-          if (name.contains(query) || mrn.contains(query)) {
-            result.add(admission);
-          }
-        }
-      }
-    }
-    return result;
-  }
-
-  // Get filtered bed list for Beds Grid tab
-  List<BedModel> get filteredBeds {
-    final List<BedModel> result = [];
-    final filter = selectedBedStatusFilter;
-    for (final bed in beds) {
-      bool matchesStatus = true;
-      if (filter != 'All Beds') {
-        matchesStatus = bed.status.toLowerCase() == filter.toLowerCase();
-      }
-      if (matchesStatus) {
-        result.add(bed);
       }
     }
     return result;

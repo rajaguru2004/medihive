@@ -1,5 +1,6 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
+import 'package:dio/dio.dart';
 import 'package:get/get.dart' hide Response;
 
 import '../../../models/appointment_model.dart';
@@ -8,6 +9,10 @@ import '../../../models/patient_lookup.dart';
 import '../../../models/ward_model.dart';
 import '../../../services/inpatient_service.dart';
 import '../../inpatient/controllers/inpatient_controller.dart';
+import '../../inpatient_admissions/controllers/inpatient_admissions_controller.dart';
+import '../../inpatient_beds_grid/controllers/inpatient_beds_grid_controller.dart';
+import '../../inpatient_overview/controllers/inpatient_overview_controller.dart';
+import '../../inpatient_wards/controllers/inpatient_wards_controller.dart';
 
 class AdmitPatientController extends GetxController {
   final _service = Get.find<InpatientService>();
@@ -99,11 +104,18 @@ class AdmitPatientController extends GetxController {
     update();
 
     try {
-      // Use existing InpatientController wards if already loaded to ensure consistency
+      // Use existing controllers if already loaded to ensure consistency
+      if (Get.isRegistered<InpatientWardsController>()) {
+        final wardsCtrl = Get.find<InpatientWardsController>();
+        if (wardsCtrl.wards.isNotEmpty) {
+          wards = wardsCtrl.activeWards;
+          isLoadingWards = false;
+          return;
+        }
+      }
       if (Get.isRegistered<InpatientController>()) {
         final inpatientCtrl = Get.find<InpatientController>();
         if (inpatientCtrl.wards.isNotEmpty) {
-          // Filter active wards
           wards = inpatientCtrl.activeWards;
           isLoadingWards = false;
           return;
@@ -271,6 +283,9 @@ class AdmitPatientController extends GetxController {
       );
 
       if (res.data != null && res.data['success'] == true) {
+        // Navigate back to Inpatient View first
+        Get.back();
+
         Get.snackbar(
           'Success',
           res.data['message'] ?? 'Patient admitted successfully.',
@@ -283,9 +298,18 @@ class AdmitPatientController extends GetxController {
         if (Get.isRegistered<InpatientController>()) {
           Get.find<InpatientController>().refreshAllData();
         }
-
-        // Navigate back to Inpatient View
-        Get.back();
+        if (Get.isRegistered<InpatientWardsController>()) {
+          Get.find<InpatientWardsController>().refreshAllData();
+        }
+        if (Get.isRegistered<InpatientOverviewController>()) {
+          Get.find<InpatientOverviewController>().refreshData();
+        }
+        if (Get.isRegistered<InpatientAdmissionsController>()) {
+          Get.find<InpatientAdmissionsController>().refreshAllData();
+        }
+        if (Get.isRegistered<InpatientBedsGridController>()) {
+          Get.find<InpatientBedsGridController>().refreshAllData();
+        }
       } else {
         final msg = res.data != null ? res.data['message'] as String? : null;
         Get.snackbar(
@@ -297,8 +321,7 @@ class AdmitPatientController extends GetxController {
         );
       }
     } on DioException catch (e) {
-      final msg =
-          e.response?.data?['message'] ??
+      final msg = e.response?.data?['message'] ??
           e.message ??
           'Network error. Please try again.';
       Get.snackbar(

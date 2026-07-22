@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+
 import '../controllers/appointments_controller.dart';
 
 class AppointmentsBinding extends Bindings {

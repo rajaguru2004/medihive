@@ -1,6 +1,8 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+
+import 'package:dio/dio.dart';
 import 'package:get/get.dart';
+
 import '../../../models/queue_item.dart';
 import '../../../services/queue_service.dart';
 
@@ -28,14 +30,21 @@ class QueueController extends GetxController {
   bool get hasError => _loadState.value == QueueLoadState.error;
 
   // Stats computed from full (unfiltered) lists
-  int get waitingCount => liveQueueItems.where((x) => x.status.toLowerCase() == 'waiting').length;
-  int get calledCount => liveQueueItems.where((x) => x.status.toLowerCase() == 'called').length;
-  int get inServiceCount => liveQueueItems.where((x) => x.status.toLowerCase() == 'in_service').length;
-  int get completedCount => historyQueueItems.where((x) => x.status.toLowerCase() == 'completed').length;
+  int get waitingCount =>
+      liveQueueItems.where((x) => x.status.toLowerCase() == 'waiting').length;
+  int get calledCount =>
+      liveQueueItems.where((x) => x.status.toLowerCase() == 'called').length;
+  int get inServiceCount => liveQueueItems
+      .where((x) => x.status.toLowerCase() == 'in_service')
+      .length;
+  int get completedCount => historyQueueItems
+      .where((x) => x.status.toLowerCase() == 'completed')
+      .length;
 
   // Filtered lists for rendering
   List<QueueItem> get displayedQueueItems {
-    final list = activeTab.value == 'Live Queue' ? liveQueueItems : historyQueueItems;
+    final list =
+        activeTab.value == 'Live Queue' ? liveQueueItems : historyQueueItems;
     return list.where((item) {
       // 1. Service Area filter
       if (selectedServiceArea.value != 'All Areas') {
@@ -46,7 +55,8 @@ class QueueController extends GetxController {
       }
       // 2. Priority filter
       if (selectedPriority.value != 'All Priorities') {
-        if (item.priority.toLowerCase() != selectedPriority.value.toLowerCase()) {
+        if (item.priority.toLowerCase() !=
+            selectedPriority.value.toLowerCase()) {
           return false;
         }
       }
@@ -76,12 +86,14 @@ class QueueController extends GetxController {
 
       if (liveRes.data != null && liveRes.data['success'] == true) {
         final List<dynamic> list = liveRes.data['data']['data'] ?? [];
-        liveQueueItems.assignAll(list.map((e) => QueueItem.fromJson(e as Map<String, dynamic>)));
+        liveQueueItems.assignAll(
+            list.map((e) => QueueItem.fromJson(e as Map<String, dynamic>)));
       }
 
       if (historyRes.data != null && historyRes.data['success'] == true) {
         final List<dynamic> list = historyRes.data['data']['data'] ?? [];
-        historyQueueItems.assignAll(list.map((e) => QueueItem.fromJson(e as Map<String, dynamic>)));
+        historyQueueItems.assignAll(
+            list.map((e) => QueueItem.fromJson(e as Map<String, dynamic>)));
       }
 
       _loadState.value = QueueLoadState.success;
@@ -123,7 +135,9 @@ class QueueController extends GetxController {
   /// Call Next: Find the first patient in 'waiting' status, sorted by priority (Urgent > Normal > Low > Routine)
   /// and joinedQueueAt (FIFO), and mark them as 'called'
   Future<void> callNextPatient() async {
-    final waitingList = liveQueueItems.where((x) => x.status.toLowerCase() == 'waiting').toList();
+    final waitingList = liveQueueItems
+        .where((x) => x.status.toLowerCase() == 'waiting')
+        .toList();
     if (waitingList.isEmpty) {
       Get.snackbar(
         'Call Next',
@@ -140,18 +154,23 @@ class QueueController extends GetxController {
       if (pA != pB) {
         return pB.compareTo(pA); // Descending (higher weight first)
       }
-      return a.joinedQueueAt.compareTo(b.joinedQueueAt); // Ascending (older first)
+      return a.joinedQueueAt
+          .compareTo(b.joinedQueueAt); // Ascending (older first)
     });
 
     final nextPatient = waitingList.first;
-    await updateStatus(nextPatient.id, 'called', patientName: nextPatient.patient.fullName);
+    await updateStatus(nextPatient.id, 'called',
+        patientName: nextPatient.patient.fullName);
   }
 
   /// Updates status of a patient in queue
-  Future<void> updateStatus(String id, String status, {required String patientName}) async {
+  Future<void> updateStatus(String id, String status,
+      {required String patientName}) async {
     try {
       final res = await _queueService.updateQueueStatus(id, status);
-      if (res.statusCode == 200 || res.statusCode == 204 || (res.data is Map && res.data['success'] == true)) {
+      if (res.statusCode == 200 ||
+          res.statusCode == 204 ||
+          (res.data is Map && res.data['success'] == true)) {
         final displayStatus = status.replaceAll('_', ' ');
         Get.snackbar(
           'Queue Update',
@@ -185,7 +204,9 @@ class QueueController extends GetxController {
   Future<void> removeFromQueue(String id, {required String patientName}) async {
     try {
       final res = await _queueService.deleteQueueItem(id);
-      if (res.statusCode == 200 || res.statusCode == 204 || (res.data is Map && res.data['success'] == true)) {
+      if (res.statusCode == 200 ||
+          res.statusCode == 204 ||
+          (res.data is Map && res.data['success'] == true)) {
         Get.snackbar(
           'Queue Update',
           '$patientName has been removed from queue.',

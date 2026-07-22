@@ -1,5 +1,6 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+
+import 'package:dio/dio.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
 import 'interceptors/app_log_interceptor.dart';
@@ -62,8 +63,7 @@ class AppDioClient {
           compact: false,
           maxWidth: 100,
           // Filter out health-check pings from logs
-          filter: (options, args) =>
-              !options.path.contains('/health'),
+          filter: (options, args) => !options.path.contains('/health'),
         ),
       );
     }

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+
 import 'package:get/get.dart';
+
 import 'package:medihive/app/routes/app_pages.dart';
 import 'package:medihive/app/theme/theme.dart';
-import '../controllers/queue_controller.dart';
+
 import '../../../models/queue_item.dart';
+import '../controllers/queue_controller.dart';
 
 class QueueView extends GetView<QueueController> {
   final bool isEmbedded;
@@ -62,16 +65,14 @@ class QueueView extends GetView<QueueController> {
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
-        backgroundColor: isDark
-            ? AppColors.darkSurface
-            : AppColors.lightSurface,
+        backgroundColor:
+            isDark ? AppColors.darkSurface : AppColors.lightSurface,
         elevation: 0,
         leading: IconButton(
           icon: Icon(
             Icons.arrow_back_ios_new_rounded,
-            color: isDark
-                ? AppColors.darkTextPrimary
-                : AppColors.lightTextPrimary,
+            color:
+                isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
             size: AppSpacing.iconMD,
           ),
           onPressed: () => Get.back(),
@@ -90,12 +91,10 @@ class QueueView extends GetView<QueueController> {
   // ─── Component Builders ───────────────────────────────────────────────────
 
   Widget _buildTopSection(BuildContext context, bool isDark) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -216,9 +215,8 @@ class QueueView extends GetView<QueueController> {
     required Color color,
     required bool isDark,
   }) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
 
     return Container(
@@ -264,9 +262,8 @@ class QueueView extends GetView<QueueController> {
   }
 
   Widget _buildFilterRow(BuildContext context, bool isDark) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
 
     final List<String> areas = [
       'All Areas',
@@ -302,16 +299,15 @@ class QueueView extends GetView<QueueController> {
                       vertical: AppSpacing.xs,
                     ),
                     decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppColors.secondary
-                          : Colors.transparent,
+                      color:
+                          isSelected ? AppColors.secondary : Colors.transparent,
                       borderRadius: AppDecorations.borderMD,
                       border: Border.all(
                         color: isSelected
                             ? AppColors.secondary
                             : (isDark
-                                  ? AppColors.darkDivider
-                                  : AppColors.lightDivider),
+                                ? AppColors.darkDivider
+                                : AppColors.lightDivider),
                         width: 1,
                       ),
                     ),
@@ -347,26 +343,24 @@ class QueueView extends GetView<QueueController> {
                 color: AppColors.primary,
               ),
               style: AppTextStyles.labelMedium(textPrimary),
-              dropdownColor: isDark
-                  ? AppColors.darkSurface
-                  : AppColors.lightSurface,
+              dropdownColor:
+                  isDark ? AppColors.darkSurface : AppColors.lightSurface,
               borderRadius: AppDecorations.borderMD,
               onChanged: (val) {
                 if (val != null) controller.setPriorityFilter(val);
               },
-              items:
-                  <String>[
-                    'All Priorities',
-                    'Urgent',
-                    'Normal',
-                    'Low',
-                    'Routine',
-                  ].map<DropdownMenuItem<String>>((String value) {
-                    return DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(value),
-                    );
-                  }).toList(),
+              items: <String>[
+                'All Priorities',
+                'Urgent',
+                'Normal',
+                'Low',
+                'Routine',
+              ].map<DropdownMenuItem<String>>((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value),
+                );
+              }).toList(),
             ),
           ),
         ),
@@ -461,12 +455,10 @@ class QueueView extends GetView<QueueController> {
 
   Widget _buildQueueCard(BuildContext context, QueueItem item, bool isDark) {
     final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     // Calculate waiting time
     final diff = DateTime.now().difference(item.joinedQueueAt);
@@ -583,22 +575,60 @@ class QueueView extends GetView<QueueController> {
 
                 if (status == 'waiting') {
                   menuItems.addAll([
-                    _buildMenuItem('call', 'Call Patient', Icons.volume_up_rounded, AppColors.primary, textPrimary),
-                    _buildMenuItem('cancel', 'Cancel', Icons.cancel_outlined, AppColors.error, textPrimary),
-                    _buildMenuItem('remove', 'Remove from Queue', Icons.delete_outline_rounded, AppColors.error, AppColors.error),
+                    _buildMenuItem(
+                        'call',
+                        'Call Patient',
+                        Icons.volume_up_rounded,
+                        AppColors.primary,
+                        textPrimary),
+                    _buildMenuItem('cancel', 'Cancel', Icons.cancel_outlined,
+                        AppColors.error, textPrimary),
+                    _buildMenuItem(
+                        'remove',
+                        'Remove from Queue',
+                        Icons.delete_outline_rounded,
+                        AppColors.error,
+                        AppColors.error),
                   ]);
                 } else if (status == 'called') {
                   menuItems.addAll([
-                    _buildMenuItem('start_service', 'Start Service', Icons.play_arrow_rounded, AppColors.secondary, textPrimary),
-                    _buildMenuItem('mark_no_show', 'Mark No-Show', Icons.person_off_rounded, AppColors.warning, textPrimary),
-                    _buildMenuItem('cancel', 'Cancel', Icons.cancel_outlined, AppColors.error, textPrimary),
-                    _buildMenuItem('remove', 'Remove from Queue', Icons.delete_outline_rounded, AppColors.error, AppColors.error),
+                    _buildMenuItem(
+                        'start_service',
+                        'Start Service',
+                        Icons.play_arrow_rounded,
+                        AppColors.secondary,
+                        textPrimary),
+                    _buildMenuItem(
+                        'mark_no_show',
+                        'Mark No-Show',
+                        Icons.person_off_rounded,
+                        AppColors.warning,
+                        textPrimary),
+                    _buildMenuItem('cancel', 'Cancel', Icons.cancel_outlined,
+                        AppColors.error, textPrimary),
+                    _buildMenuItem(
+                        'remove',
+                        'Remove from Queue',
+                        Icons.delete_outline_rounded,
+                        AppColors.error,
+                        AppColors.error),
                   ]);
                 } else if (status == 'in_service') {
                   menuItems.addAll([
-                    _buildMenuItem('mark_complete', 'Mark Complete', Icons.check_circle_outline_rounded, AppColors.secondary, textPrimary),
-                    _buildMenuItem('cancel', 'Cancel', Icons.cancel_outlined, AppColors.error, textPrimary),
-                    _buildMenuItem('remove', 'Remove from Queue', Icons.delete_outline_rounded, AppColors.error, AppColors.error),
+                    _buildMenuItem(
+                        'mark_complete',
+                        'Mark Complete',
+                        Icons.check_circle_outline_rounded,
+                        AppColors.secondary,
+                        textPrimary),
+                    _buildMenuItem('cancel', 'Cancel', Icons.cancel_outlined,
+                        AppColors.error, textPrimary),
+                    _buildMenuItem(
+                        'remove',
+                        'Remove from Queue',
+                        Icons.delete_outline_rounded,
+                        AppColors.error,
+                        AppColors.error),
                   ]);
                 }
 

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:get/get.dart' hide Response;
+
 import '../network/app_dio_client.dart';
 import '../network/endpoints.dart';
 
@@ -38,7 +39,8 @@ class QueueService extends GetxService {
   }
 
   /// Fetches queue items filtered by comma-separated status strings
-  Future<Response> fetchQueueItems({required String statuses, int limit = 100}) {
+  Future<Response> fetchQueueItems(
+      {required String statuses, int limit = 100}) {
     return _dio.get(
       Endpoints.queue,
       queryParameters: {

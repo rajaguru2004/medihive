@@ -1,6 +1,8 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+
+import 'package:dio/dio.dart';
 import 'package:get/get.dart';
+
 import '../../../models/appointment_model.dart';
 import '../../../services/appointment_service.dart';
 import '../../../theme/theme.dart';
@@ -12,7 +14,7 @@ class AppointmentsController extends GetxController {
   List<AppointmentModel> allAppointments = [];
   List<AppointmentModel> filteredAppointments = [];
   List<AppointmentDoctor> doctors = [];
-  
+
   bool isLoading = false;
   String errorMessage = '';
 
@@ -39,20 +41,27 @@ class AppointmentsController extends GetxController {
   int get todayNoShowCount => _getTodayCountForStatus('no_show');
   int get todayScheduledCount => _getTodayCountForStatus('scheduled');
 
-  List<AppointmentModel> get todayCurrentAndUpcoming => allAppointments.where((a) {
+  List<AppointmentModel> get todayCurrentAndUpcoming =>
+      allAppointments.where((a) {
         final now = DateTime.now();
         final isToday = _isSameDay(a.appointmentDate, now);
         if (!isToday) return false;
         final status = a.status.toLowerCase();
-        return status == 'scheduled' || status == 'confirmed' || status == 'checked_in' || status == 'in_progress';
+        return status == 'scheduled' ||
+            status == 'confirmed' ||
+            status == 'checked_in' ||
+            status == 'in_progress';
       }).toList();
 
-  List<AppointmentModel> get todayCompletedAndOthers => allAppointments.where((a) {
+  List<AppointmentModel> get todayCompletedAndOthers =>
+      allAppointments.where((a) {
         final now = DateTime.now();
         final isToday = _isSameDay(a.appointmentDate, now);
         if (!isToday) return false;
         final status = a.status.toLowerCase();
-        return status == 'completed' || status == 'cancelled' || status == 'no_show';
+        return status == 'completed' ||
+            status == 'cancelled' ||
+            status == 'no_show';
       }).toList();
 
   @override
@@ -110,7 +119,7 @@ class AppointmentsController extends GetxController {
         allAppointments = list
             .map((e) => AppointmentModel.fromJson(e as Map<String, dynamic>))
             .toList();
-        
+
         // Sort chronologically by date then time
         allAppointments.sort((a, b) {
           final dateCompare = a.appointmentDate.compareTo(b.appointmentDate);
@@ -234,11 +243,13 @@ class AppointmentsController extends GetxController {
   }
 
   // ─── API Mutator Actions ───────────────────────────────────────────────────
-  Future<void> updateStatus(String id, String status, {Map<String, dynamic>? additionalData}) async {
+  Future<void> updateStatus(String id, String status,
+      {Map<String, dynamic>? additionalData}) async {
     isLoading = true;
     update();
     try {
-      await _service.updateAppointmentStatus(id, status, additionalData: additionalData);
+      await _service.updateAppointmentStatus(id, status,
+          additionalData: additionalData);
       Get.snackbar(
         'Success',
         'Appointment status updated to ${status.replaceAll('_', ' ')}',

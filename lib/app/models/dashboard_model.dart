@@ -132,8 +132,10 @@ class AppointmentPatient {
   String get fullName => '$firstName $lastName'.trim();
 
   String get initials {
-    final f = firstName.trim().isNotEmpty ? firstName.trim()[0].toUpperCase() : '';
-    final l = lastName.trim().isNotEmpty ? lastName.trim()[0].toUpperCase() : '';
+    final f =
+        firstName.trim().isNotEmpty ? firstName.trim()[0].toUpperCase() : '';
+    final l =
+        lastName.trim().isNotEmpty ? lastName.trim()[0].toUpperCase() : '';
     return '$f$l';
   }
 }
@@ -141,6 +143,7 @@ class AppointmentPatient {
 class UpcomingAppointment {
   final String id;
   final DateTime appointmentDate;
+
   /// Raw time string from API e.g. "11:00" or "15:30"
   final String appointmentTime;
   final String status;
@@ -180,8 +183,18 @@ class UpcomingAppointment {
   /// Formats date as "Mon, 22 Jun"
   String get formattedDate {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final d = appointmentDate;
@@ -239,8 +252,7 @@ class DashboardData {
     final data = json['data'] as Map<String, dynamic>? ?? {};
 
     final statsJson = data['stats'] as Map<String, dynamic>? ?? {};
-    final apptJson =
-        data['appointmentStatuses'] as Map<String, dynamic>? ?? {};
+    final apptJson = data['appointmentStatuses'] as Map<String, dynamic>? ?? {};
     final queueJson = data['queueByService'] as Map<String, dynamic>? ?? {};
     final patientsJson = data['recentPatients'] as List<dynamic>? ?? [];
     final appointmentsJson =
@@ -257,8 +269,9 @@ class DashboardData {
       stats: DashboardStats.fromJson(statsJson),
       appointmentStatuses: AppointmentStatuses.fromJson(apptJson),
       queueByService: queueServices,
-      recentPatients:
-          patientsJson.map((e) => RecentPatient.fromJson(e as Map<String, dynamic>)).toList(),
+      recentPatients: patientsJson
+          .map((e) => RecentPatient.fromJson(e as Map<String, dynamic>))
+          .toList(),
       upcomingAppointments: appointmentsJson
           .map((e) => UpcomingAppointment.fromJson(e as Map<String, dynamic>))
           .toList(),

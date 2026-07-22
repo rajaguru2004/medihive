@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
+
 import 'package:get/get.dart';
 
 import '../../../routes/app_pages.dart';
 import '../../../theme/theme.dart';
+import '../../inpatient_overview/controllers/inpatient_overview_controller.dart';
+import '../../inpatient_overview/views/inpatient_overview_view.dart';
+import '../../inpatient_wards/controllers/inpatient_wards_controller.dart';
+import '../../inpatient_wards/views/inpatient_wards_view.dart';
+import '../../inpatient_beds_grid/controllers/inpatient_beds_grid_controller.dart';
+import '../../inpatient_beds_grid/views/inpatient_beds_grid_view.dart';
+import '../../inpatient_admissions/controllers/inpatient_admissions_controller.dart';
+import '../../inpatient_admissions/views/inpatient_admissions_view.dart';
 import '../controllers/inpatient_controller.dart';
-import 'inpatient_admissions_view.dart';
-import 'inpatient_beds_grid_view.dart';
-import 'inpatient_overview_view.dart';
-import 'inpatient_wards_view.dart';
 
 class InpatientView extends GetView<InpatientController> {
   final bool isEmbedded;
@@ -18,6 +23,26 @@ class InpatientView extends GetView<InpatientController> {
     // Ensure InpatientController is registered
     if (!Get.isRegistered<InpatientController>()) {
       Get.put(InpatientController());
+    }
+
+    // Ensure InpatientWardsController is registered
+    if (!Get.isRegistered<InpatientWardsController>()) {
+      Get.put(InpatientWardsController());
+    }
+
+    // Ensure InpatientOverviewController is registered
+    if (!Get.isRegistered<InpatientOverviewController>()) {
+      Get.put(InpatientOverviewController());
+    }
+
+    // Ensure InpatientBedsGridController is registered
+    if (!Get.isRegistered<InpatientBedsGridController>()) {
+      Get.put(InpatientBedsGridController());
+    }
+
+    // Ensure InpatientAdmissionsController is registered
+    if (!Get.isRegistered<InpatientAdmissionsController>()) {
+      Get.put(InpatientAdmissionsController());
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -36,7 +61,9 @@ class InpatientView extends GetView<InpatientController> {
 
       return RefreshIndicator(
         color: AppColors.primary,
-        onRefresh: controller.refreshAllData,
+        onRefresh: () async {
+          await controller.refreshActiveTabData();
+        },
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(
@@ -48,9 +75,9 @@ class InpatientView extends GetView<InpatientController> {
             const SizedBox(height: AppSpacing.lg),
             _buildStatsGrid(controller, isDark),
             const SizedBox(height: AppSpacing.lg),
-            _buildTabBar(controller, isDark),
-            const SizedBox(height: AppSpacing.md),
-            _buildActiveTabView(controller),
+            _buildToggleButtons(controller, isDark),
+            const SizedBox(height: AppSpacing.lg),
+            _buildActiveTabContent(controller),
           ],
         ),
       );
@@ -108,14 +135,14 @@ class InpatientView extends GetView<InpatientController> {
         : AppColors.lightTextSecondary;
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Inpatient',
+                'Inpatient Ward Control',
                 style: AppTextStyles.headlineSmall(textPrimary),
               ),
               const SizedBox(height: AppSpacing.xxs),
@@ -129,10 +156,13 @@ class InpatientView extends GetView<InpatientController> {
         const SizedBox(width: AppSpacing.md),
         ElevatedButton.icon(
           onPressed: () => Get.toNamed(Routes.INPATIENT_ADMIT),
-          icon: const Icon(Icons.add_rounded, size: AppSpacing.iconSM),
-          label: const Text('Admit'),
+          icon: const Icon(
+            Icons.person_add_alt_1_rounded,
+            size: AppSpacing.iconSM,
+          ),
+          label: const Text('Admit Patient'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
+            backgroundColor: AppColors.success,
             foregroundColor: AppColors.lightSurface,
             minimumSize: const Size(0, 42),
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
@@ -143,6 +173,101 @@ class InpatientView extends GetView<InpatientController> {
         ),
       ],
     );
+  }
+
+  Widget _buildToggleButtons(InpatientController controller, bool isDark) {
+    final activeTab = controller.activeTab;
+    final containerBg = isDark ? AppColors.darkSurface : Colors.grey[200];
+    final border = Border.all(
+      color: isDark ? AppColors.darkSurfaceVariant : Colors.grey[300]!,
+      width: 0.5,
+    );
+
+    Widget buildToggleItem(String title, int index) {
+      final isSelected = activeTab == index;
+      return Expanded(
+        child: GestureDetector(
+          onTap: () => controller.changeTab(index),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 2),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? (isDark ? AppColors.darkSurfaceVariant : Colors.white)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(6),
+              border: isSelected
+                  ? Border.all(
+                      color: isDark
+                          ? AppColors.darkSurfaceVariant
+                          : Colors.grey[300]!,
+                      width: 0.5,
+                    )
+                  : null,
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Center(
+              child: Text(
+                title,
+                style:
+                    AppTextStyles.bodyMedium(
+                      isSelected
+                          ? (isDark
+                                ? AppColors.darkTextPrimary
+                                : AppColors.lightTextPrimary)
+                          : (isDark
+                                ? AppColors.darkTextSecondary
+                                : AppColors.lightTextSecondary),
+                    ).copyWith(
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: containerBg,
+        borderRadius: BorderRadius.circular(8),
+        border: border,
+      ),
+      child: Row(
+        children: [
+          buildToggleItem('Overview', 0),
+          buildToggleItem('Wards', 1),
+          buildToggleItem('Beds Grid', 2),
+          buildToggleItem('Admissions', 3),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActiveTabContent(InpatientController controller) {
+    switch (controller.activeTab) {
+      case 0:
+        return const InpatientOverviewView(isEmbedded: true);
+      case 1:
+        return const InpatientWardsView(isEmbedded: true);
+      case 2:
+        return const InpatientBedsGridView(isEmbedded: true);
+      case 3:
+        return const InpatientAdmissionsView(isEmbedded: true);
+      default:
+        return const SizedBox.shrink();
+    }
   }
 
   Widget _buildStatsGrid(InpatientController controller, bool isDark) {
@@ -281,72 +406,6 @@ class InpatientView extends GetView<InpatientController> {
         ],
       ),
     );
-  }
-
-  Widget _buildTabBar(InpatientController controller, bool isDark) {
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
-    final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
-
-    final tabs = ['Overview', 'Wards', 'Beds Grid', 'Admissions'];
-
-    return Container(
-      height: 48,
-      padding: const EdgeInsets.all(AppSpacing.xxs),
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: AppDecorations.borderMD,
-        border: Border.all(
-          color: isDark
-              ? AppColors.darkSurfaceVariant
-              : AppColors.lightSurfaceVariant,
-        ),
-      ),
-      child: Row(
-        children: List.generate(tabs.length, (index) {
-          final isSelected = controller.activeTabIndex == index;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => controller.changeTab(index),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primary : Colors.transparent,
-                  borderRadius: AppDecorations.borderSM,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  tabs[index],
-                  style:
-                      AppTextStyles.labelMedium(
-                        isSelected ? AppColors.lightSurface : textSecondary,
-                      ).copyWith(
-                        fontWeight: isSelected
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                      ),
-                ),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-
-  Widget _buildActiveTabView(InpatientController controller) {
-    switch (controller.activeTabIndex) {
-      case 0:
-        return const InpatientOverviewView();
-      case 1:
-        return const InpatientWardsView();
-      case 2:
-        return const InpatientBedsGridView();
-      case 3:
-        return const InpatientAdmissionsView();
-      default:
-        return const SizedBox.shrink();
-    }
   }
 
   Widget _buildErrorState(

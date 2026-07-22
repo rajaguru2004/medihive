@@ -1,10 +1,13 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
+import 'package:dio/dio.dart';
 import 'package:get/get.dart';
-import '../../queue/controllers/queue_controller.dart';
+
+import 'package:medihive/app/theme/theme.dart';
+
 import '../../../models/patient_lookup.dart';
 import '../../../services/queue_service.dart';
-import 'package:medihive/app/theme/theme.dart';
+import '../../queue/controllers/queue_controller.dart';
 
 class AddToQueueController extends GetxController {
   final _queueService = Get.find<QueueService>();
@@ -59,7 +62,9 @@ class AddToQueueController extends GetxController {
       final res = await _queueService.fetchPatients(query: query);
       if (res.data != null && res.data['success'] == true) {
         final List<dynamic> rawList = res.data['data']['data'] ?? [];
-        patientsList = rawList.map((e) => PatientLookup.fromJson(e as Map<String, dynamic>)).toList();
+        patientsList = rawList
+            .map((e) => PatientLookup.fromJson(e as Map<String, dynamic>))
+            .toList();
       }
     } catch (e) {
       errorMessage = 'Failed to load patients list.';
@@ -188,7 +193,8 @@ class AddToQueueController extends GetxController {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(res.data['message'] ?? 'Could not add patient to queue.'),
+            content:
+                Text(res.data['message'] ?? 'Could not add patient to queue.'),
             backgroundColor: AppColors.error,
           ),
         );

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+
 import '../../../models/appointment_model.dart';
 import '../../../theme/theme.dart';
 import '../controllers/appointments_controller.dart';
@@ -63,16 +65,14 @@ class AppointmentsView extends GetView<AppointmentsController> {
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
-        backgroundColor: isDark
-            ? AppColors.darkSurface
-            : AppColors.lightSurface,
+        backgroundColor:
+            isDark ? AppColors.darkSurface : AppColors.lightSurface,
         elevation: 0,
         leading: IconButton(
           icon: Icon(
             Icons.arrow_back_ios_new_rounded,
-            color: isDark
-                ? AppColors.darkTextPrimary
-                : AppColors.lightTextPrimary,
+            color:
+                isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
             size: AppSpacing.iconMD,
           ),
           onPressed: () => Get.back(),
@@ -91,12 +91,10 @@ class AppointmentsView extends GetView<AppointmentsController> {
   // ─── Component Builders ───────────────────────────────────────────────────
 
   Widget _buildHeader(BuildContext context, bool isDark) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -127,9 +125,8 @@ class AppointmentsView extends GetView<AppointmentsController> {
                   'Coming Soon',
                   'Appointment booking is coming soon.',
                   snackPosition: SnackPosition.BOTTOM,
-                  backgroundColor: isDark
-                      ? AppColors.darkSurface
-                      : AppColors.lightSurface,
+                  backgroundColor:
+                      isDark ? AppColors.darkSurface : AppColors.lightSurface,
                   colorText: isDark
                       ? AppColors.darkTextPrimary
                       : AppColors.lightTextPrimary,
@@ -238,9 +235,8 @@ class AppointmentsView extends GetView<AppointmentsController> {
     required bool isDark,
     required String statusFilter,
   }) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
 
     return InkWell(
@@ -275,7 +271,8 @@ class AppointmentsView extends GetView<AppointmentsController> {
                 children: [
                   Text(
                     '$count',
-                    style: AppTextStyles.titleMedium(textPrimary).copyWith(fontSize: 18),
+                    style: AppTextStyles.titleMedium(textPrimary)
+                        .copyWith(fontSize: 18),
                   ),
                   Text(
                     label,
@@ -371,9 +368,8 @@ class AppointmentsView extends GetView<AppointmentsController> {
   // ─── Tab 1: Calendar View ──────────────────────────────────────────────────
 
   Widget _buildCalendarTabView(BuildContext context, bool isDark) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final formattedSelected = DateFormat(
       'EEEE, MMM d, yyyy',
     ).format(controller.calendarSelectedDate);
@@ -440,9 +436,8 @@ class AppointmentsView extends GetView<AppointmentsController> {
   // ─── Tab 2: All List View with Advanced Filtering ─────────────────────────
 
   Widget _buildAllListTabView(BuildContext context, bool isDark) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final divider = isDark ? AppColors.darkDivider : AppColors.lightDivider;
 
     return Column(
@@ -546,8 +541,8 @@ class AppointmentsView extends GetView<AppointmentsController> {
                   color: controller.selectedFilterDate != null
                       ? Colors.white
                       : (isDark
-                            ? AppColors.darkTextSecondary
-                            : AppColors.lightTextSecondary),
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightTextSecondary),
                 ),
                 label: Text(
                   controller.selectedFilterDate != null
@@ -559,8 +554,8 @@ class AppointmentsView extends GetView<AppointmentsController> {
                     controller.selectedFilterDate != null
                         ? Colors.white
                         : (isDark
-                              ? AppColors.darkTextPrimary
-                              : AppColors.lightTextPrimary),
+                            ? AppColors.darkTextPrimary
+                            : AppColors.lightTextPrimary),
                   ),
                 ),
                 onPressed: () async {
@@ -644,9 +639,8 @@ class AppointmentsView extends GetView<AppointmentsController> {
   // ─── Tab 3: Today's Schedule View ──────────────────────────────────────────
 
   Widget _buildTodayScheduleTabView(BuildContext context, bool isDark) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
 
     final upcoming = controller.todayCurrentAndUpcoming;
     final completed = controller.todayCompletedAndOthers;
@@ -759,9 +753,8 @@ class AppointmentsView extends GetView<AppointmentsController> {
     required ValueChanged<String?> onChanged,
     required bool isDark,
   }) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final divider = isDark ? AppColors.darkDivider : AppColors.lightDivider;
 
     return Container(
@@ -781,9 +774,8 @@ class AppointmentsView extends GetView<AppointmentsController> {
             size: 18,
           ),
           style: AppTextStyles.labelMedium(textPrimary),
-          dropdownColor: isDark
-              ? AppColors.darkSurface
-              : AppColors.lightSurface,
+          dropdownColor:
+              isDark ? AppColors.darkSurface : AppColors.lightSurface,
           borderRadius: AppDecorations.borderMD,
           onChanged: onChanged,
           items: items.map<DropdownMenuItem<String>>((String val) {
@@ -806,12 +798,10 @@ class AppointmentsView extends GetView<AppointmentsController> {
     AppointmentModel appt,
     bool isDark,
   ) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
     final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
 
     final Color statusColor = _getStatusColor(appt.status);
@@ -968,12 +958,10 @@ class AppointmentsView extends GetView<AppointmentsController> {
     AppointmentModel appt,
     bool isDark,
   ) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
     final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
     final formatDateTime = DateFormat(
       'EEEE, MMM d, yyyy',
@@ -1001,9 +989,8 @@ class AppointmentsView extends GetView<AppointmentsController> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? AppColors.darkDivider
-                        : AppColors.lightDivider,
+                    color:
+                        isDark ? AppColors.darkDivider : AppColors.lightDivider,
                     borderRadius: AppDecorations.borderFull,
                   ),
                 ),
@@ -1135,12 +1122,10 @@ class AppointmentsView extends GetView<AppointmentsController> {
     String value,
     bool isDark,
   ) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1325,14 +1310,12 @@ class AppointmentsView extends GetView<AppointmentsController> {
         return StatefulBuilder(
           builder: (context, setState) {
             final isDark = Theme.of(context).brightness == Brightness.dark;
-            final textPrimary = isDark
-                ? AppColors.darkTextPrimary
-                : AppColors.lightTextPrimary;
+            final textPrimary =
+                isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
 
             return AlertDialog(
-              backgroundColor: isDark
-                  ? AppColors.darkSurface
-                  : AppColors.lightSurface,
+              backgroundColor:
+                  isDark ? AppColors.darkSurface : AppColors.lightSurface,
               shape: RoundedRectangleBorder(
                 borderRadius: AppDecorations.borderLG,
               ),

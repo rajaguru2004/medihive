@@ -1,16 +1,19 @@
-// lib/app/modules/home/views/home_view.dart
+import 'package:flutter/material.dart';
 
 import 'package:fl_chart/fl_chart.dart';
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shimmer/shimmer.dart';
 
-import 'package:medihive/app/theme/theme.dart';
-import '../controllers/home_controller.dart';
-import '../../../models/dashboard_model.dart';
-import 'package:medihive/app/modules/queue/views/queue_view.dart';
 import 'package:medihive/app/modules/appointments/views/appointments_view.dart';
 import 'package:medihive/app/modules/inpatient/views/inpatient_view.dart';
+import 'package:medihive/app/modules/queue/views/queue_view.dart';
+import 'package:medihive/app/services/session_manager.dart';
+import 'package:medihive/app/theme/theme.dart';
+
+import '../../../models/dashboard_model.dart';
+import '../controllers/home_controller.dart';
+
+// lib/app/modules/home/views/home_view.dart
 
 class HomeView extends GetView<HomeController> {
   const HomeView({super.key});
@@ -46,9 +49,8 @@ class HomeView extends GetView<HomeController> {
         }
         return RefreshIndicator(
           color: AppColors.primary,
-          backgroundColor: isDark
-              ? AppColors.darkSurface
-              : AppColors.lightSurface,
+          backgroundColor:
+              isDark ? AppColors.darkSurface : AppColors.lightSurface,
           onRefresh: controller.onRefresh,
           child: ListView(
             padding: const EdgeInsets.symmetric(
@@ -88,9 +90,8 @@ class HomeView extends GetView<HomeController> {
   }
 
   PreferredSizeWidget _buildAppBar(BuildContext context, bool isDark) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
 
     return AppBar(
@@ -170,7 +171,7 @@ class HomeView extends GetView<HomeController> {
           child: PopupMenuButton<String>(
             onSelected: (value) {
               if (value == 'sign_out') {
-                Get.offAllNamed('/login');
+                SessionManager.to.logout();
               }
             },
             offset: const Offset(0, AppSpacing.massive),
@@ -353,9 +354,8 @@ class _StatsGrid extends GetView<HomeController> {
           description: 'Scheduled for today',
           color: AppColors.secondary,
           statusLabel: s.todayAppointments > 0 ? 'Scheduled' : 'None',
-          statusType: s.todayAppointments > 0
-              ? StatusType.success
-              : StatusType.neutral,
+          statusType:
+              s.todayAppointments > 0 ? StatusType.success : StatusType.neutral,
         ),
         _StatCardData(
           icon: Icons.currency_rupee_rounded,
@@ -366,7 +366,6 @@ class _StatsGrid extends GetView<HomeController> {
           statusLabel: 'Today',
           statusType: StatusType.info,
         ),
-
         _StatCardData(
           icon: Icons.queue_rounded,
           title: 'Queue Status',
@@ -374,9 +373,8 @@ class _StatsGrid extends GetView<HomeController> {
           description: 'Patients waiting to consult',
           color: AppColors.warning,
           statusLabel: s.queueWaiting > 0 ? 'Waiting' : 'Empty',
-          statusType: s.queueWaiting > 0
-              ? StatusType.warning
-              : StatusType.success,
+          statusType:
+              s.queueWaiting > 0 ? StatusType.warning : StatusType.success,
         ),
         _StatCardData(
           icon: Icons.bed_rounded,
@@ -385,9 +383,8 @@ class _StatsGrid extends GetView<HomeController> {
           description: '${s.availableBeds} beds currently free',
           color: AppColors.info,
           statusLabel: s.availableBeds > 0 ? 'Available' : 'Full',
-          statusType: s.availableBeds > 0
-              ? StatusType.success
-              : StatusType.error,
+          statusType:
+              s.availableBeds > 0 ? StatusType.success : StatusType.error,
         ),
         _StatCardData(
           icon: Icons.science_rounded,
@@ -396,9 +393,8 @@ class _StatsGrid extends GetView<HomeController> {
           description: 'Awaiting results',
           color: const Color(0xFFFF6B35),
           statusLabel: s.pendingLabOrders > 0 ? 'Pending' : 'Clear',
-          statusType: s.pendingLabOrders > 0
-              ? StatusType.warning
-              : StatusType.success,
+          statusType:
+              s.pendingLabOrders > 0 ? StatusType.warning : StatusType.success,
         ),
         _StatCardData(
           icon: Icons.medication_rounded,
@@ -457,12 +453,10 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return Container(
       decoration: BoxDecoration(
@@ -524,12 +518,10 @@ class _AppointmentBreakdownCard extends GetView<HomeController> {
   @override
   Widget build(BuildContext context) {
     final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return Obx(() {
       final s = controller.appointmentStatuses;
@@ -673,12 +665,10 @@ class _AppointmentPieChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return Stack(
       alignment: Alignment.center,
@@ -720,12 +710,10 @@ class _LegendRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pct = total > 0 ? (count / total * 100).toStringAsFixed(0) : '0';
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
@@ -765,12 +753,10 @@ class _QueueDistributionCard extends GetView<HomeController> {
   @override
   Widget build(BuildContext context) {
     final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return Obx(() {
       final queue = controller.queueByService;
@@ -855,12 +841,10 @@ class _QueueServiceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final surfaceVariant = isDark
-        ? AppColors.darkSurfaceVariant
-        : AppColors.lightSurfaceVariant;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final surfaceVariant =
+        isDark ? AppColors.darkSurfaceVariant : AppColors.lightSurfaceVariant;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
@@ -912,12 +896,10 @@ class _AlertRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
@@ -963,12 +945,10 @@ class _RecentPatientsCard extends GetView<HomeController> {
   @override
   Widget build(BuildContext context) {
     final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return Obx(() {
       final patients = controller.recentPatients;
@@ -1052,20 +1032,17 @@ class _PatientRow extends StatelessWidget {
       AppColors.info,
       const Color(0xFFFF6B35),
     ];
-    final idx = initials.isNotEmpty
-        ? initials.codeUnitAt(0) % colors.length
-        : 0;
+    final idx =
+        initials.isNotEmpty ? initials.codeUnitAt(0) % colors.length : 0;
     return colors[idx];
   }
 
   @override
   Widget build(BuildContext context) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
     final divider = isDark ? AppColors.darkDivider : AppColors.lightDivider;
     final avatarColor = _avatarColor(patient.initials);
 
@@ -1179,12 +1156,10 @@ class _UpcomingAppointmentsCard extends GetView<HomeController> {
   @override
   Widget build(BuildContext context) {
     final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return Obx(() {
       final appointments = controller.upcomingAppointments;
@@ -1269,24 +1244,20 @@ class _AppointmentRow extends StatelessWidget {
       AppColors.warning,
       AppColors.info,
     ];
-    final idx = initials.isNotEmpty
-        ? initials.codeUnitAt(0) % colors.length
-        : 0;
+    final idx =
+        initials.isNotEmpty ? initials.codeUnitAt(0) % colors.length : 0;
     return colors[idx];
   }
 
   @override
   Widget build(BuildContext context) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
     final divider = isDark ? AppColors.darkDivider : AppColors.lightDivider;
-    final surface = isDark
-        ? AppColors.darkSurfaceVariant
-        : AppColors.lightSurfaceVariant;
+    final surface =
+        isDark ? AppColors.darkSurfaceVariant : AppColors.lightSurfaceVariant;
 
     final initials = appointment.patient.initials;
     final avatarColor = _avatarColor(initials);
@@ -1473,9 +1444,8 @@ class _BottomNavState extends State<_BottomNav>
 
   OverlayEntry _createOverlayEntry() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
 
     return OverlayEntry(
       builder: (context) => Stack(
@@ -1487,8 +1457,7 @@ class _BottomNavState extends State<_BottomNav>
           ),
           Positioned(
             right: AppSpacing.md,
-            bottom:
-                kBottomNavigationBarHeight +
+            bottom: kBottomNavigationBarHeight +
                 MediaQuery.of(context).padding.bottom +
                 AppSpacing.sm,
             child: FadeTransition(
@@ -1787,9 +1756,8 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textSecondary = isDark
-        ? AppColors.darkTextTertiary
-        : AppColors.lightTextTertiary;
+    final textSecondary =
+        isDark ? AppColors.darkTextTertiary : AppColors.lightTextTertiary;
 
     return GestureDetector(
       onTap: onTap,
@@ -1836,9 +1804,8 @@ class _DashboardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final base = isDark
-        ? AppColors.darkSurfaceVariant
-        : AppColors.lightSurfaceVariant;
+    final base =
+        isDark ? AppColors.darkSurfaceVariant : AppColors.lightSurfaceVariant;
     final highlight = isDark ? AppColors.darkSurface : AppColors.lightSurface;
 
     return Shimmer.fromColors(
@@ -1911,12 +1878,10 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return Center(
       child: Padding(
@@ -1987,9 +1952,8 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textSecondary = isDark
-        ? AppColors.darkTextTertiary
-        : AppColors.lightTextTertiary;
+    final textSecondary =
+        isDark ? AppColors.darkTextTertiary : AppColors.lightTextTertiary;
     final iconColor = color ?? textSecondary;
 
     return Padding(

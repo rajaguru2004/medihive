@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+
 import 'package:get/get.dart';
 
 import 'app_colors.dart';
 import 'app_decorations.dart';
 import 'app_spacing.dart';
 import 'app_text_styles.dart';
-
 
 export 'app_colors.dart';
 export 'app_decorations.dart';
@@ -31,8 +31,7 @@ class AppThemeX {
   static BoxDecoration glassCard({BorderRadius? borderRadius}) =>
       AppDecorations.glassCard(isDark: isDark, borderRadius: borderRadius);
 
-  static BoxDecoration glassPill() =>
-      AppDecorations.glassPill(isDark: isDark);
+  static BoxDecoration glassPill() => AppDecorations.glassPill(isDark: isDark);
 }
 
 /// GetX controller — manages theme mode + persists preference.

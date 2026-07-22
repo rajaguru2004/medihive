@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:get/get.dart' hide Response;
+
 import '../network/app_dio_client.dart';
 import '../network/endpoints.dart';
 import '../network/token_manager.dart';

@@ -1,10 +1,12 @@
-// lib/app/modules/home/controllers/home_controller.dart
+import 'package:flutter/foundation.dart';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+
 import 'package:medihive/app/models/dashboard_model.dart';
 import 'package:medihive/app/services/home_service.dart';
+
+// lib/app/modules/home/controllers/home_controller.dart
 
 enum LoadState { idle, loading, success, error }
 
@@ -121,22 +123,28 @@ class HomeController extends GetxController {
     // Navigation stubs — connect to routes when modules are ready
     switch (action) {
       case 'add_patient':
-        Get.snackbar('Add Patient', 'Coming soon', snackPosition: SnackPosition.BOTTOM);
+        Get.snackbar('Add Patient', 'Coming soon',
+            snackPosition: SnackPosition.BOTTOM);
         break;
       case 'book_appointment':
-        Get.snackbar('Book Appointment', 'Coming soon', snackPosition: SnackPosition.BOTTOM);
+        Get.snackbar('Book Appointment', 'Coming soon',
+            snackPosition: SnackPosition.BOTTOM);
         break;
       case 'admit_patient':
-        Get.snackbar('Admit Patient', 'Coming soon', snackPosition: SnackPosition.BOTTOM);
+        Get.snackbar('Admit Patient', 'Coming soon',
+            snackPosition: SnackPosition.BOTTOM);
         break;
       case 'create_prescription':
-        Get.snackbar('Create Prescription', 'Coming soon', snackPosition: SnackPosition.BOTTOM);
+        Get.snackbar('Create Prescription', 'Coming soon',
+            snackPosition: SnackPosition.BOTTOM);
         break;
       case 'lab_orders':
-        Get.snackbar('Lab Orders', 'Coming soon', snackPosition: SnackPosition.BOTTOM);
+        Get.snackbar('Lab Orders', 'Coming soon',
+            snackPosition: SnackPosition.BOTTOM);
         break;
       case 'billing':
-        Get.snackbar('Billing', 'Coming soon', snackPosition: SnackPosition.BOTTOM);
+        Get.snackbar('Billing', 'Coming soon',
+            snackPosition: SnackPosition.BOTTOM);
         break;
     }
   }

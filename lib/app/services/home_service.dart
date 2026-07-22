@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:get/get.dart' hide Response;
+
 import '../network/app_dio_client.dart';
 
 class HomeService extends GetxService {

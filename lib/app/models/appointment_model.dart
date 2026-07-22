@@ -33,8 +33,10 @@ class AppointmentPatient {
   String get fullName => '$firstName $lastName'.trim();
 
   String get initials {
-    final f = firstName.trim().isNotEmpty ? firstName.trim()[0].toUpperCase() : '';
-    final l = lastName.trim().isNotEmpty ? lastName.trim()[0].toUpperCase() : '';
+    final f =
+        firstName.trim().isNotEmpty ? firstName.trim()[0].toUpperCase() : '';
+    final l =
+        lastName.trim().isNotEmpty ? lastName.trim()[0].toUpperCase() : '';
     return f.isNotEmpty || l.isNotEmpty ? '$f$l' : '?';
   }
 
@@ -78,7 +80,8 @@ class AppointmentModel {
   final String appointmentTime; // "14:30"
   final int durationMinutes;
   final String appointmentType; // "emergency", "new_patient", "follow_up"
-  final String status; // "scheduled", "confirmed", "checked_in", "in_progress", "completed", "cancelled", "no_show"
+  final String
+      status; // "scheduled", "confirmed", "checked_in", "in_progress", "completed", "cancelled", "no_show"
   final String chiefComplaint;
   final String notes;
   final DateTime? checkedInAt;
@@ -117,7 +120,8 @@ class AppointmentModel {
         patientId: json['patientId'] as String? ?? '',
         doctorId: json['doctorId'] as String? ?? '',
         appointmentDate: json['appointmentDate'] != null
-            ? DateTime.tryParse(json['appointmentDate'] as String) ?? DateTime.now()
+            ? DateTime.tryParse(json['appointmentDate'] as String) ??
+                DateTime.now()
             : DateTime.now(),
         appointmentTime: json['appointmentTime'] as String? ?? '00:00',
         durationMinutes: (json['durationMinutes'] as num?)?.toInt() ?? 15,
@@ -185,8 +189,18 @@ class AppointmentModel {
 
   String get formattedDate {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     final d = appointmentDate;

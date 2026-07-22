@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'package:get/get.dart';
 
 import '../../../models/appointment_model.dart';
@@ -15,12 +16,10 @@ class AdmitPatientView extends GetView<AdmitPatientController> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.darkBackground : AppColors.lightBackground;
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return PopScope(
       canPop: false,
@@ -34,9 +33,8 @@ class AdmitPatientView extends GetView<AdmitPatientController> {
       child: Scaffold(
         backgroundColor: bg,
         appBar: AppBar(
-          backgroundColor: isDark
-              ? AppColors.darkSurface
-              : AppColors.lightSurface,
+          backgroundColor:
+              isDark ? AppColors.darkSurface : AppColors.lightSurface,
           elevation: 0,
           leading: IconButton(
             icon: Icon(
@@ -271,9 +269,8 @@ class AdmitPatientView extends GetView<AdmitPatientController> {
   // ─── Component Builders ───────────────────────────────────────────────────
 
   Widget _buildSectionHeader(String title, bool isDark) {
-    final textColor = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
+    final textColor =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     return RichText(
       text: TextSpan(
         text: title.replaceAll('*', ''),
@@ -295,18 +292,19 @@ class AdmitPatientView extends GetView<AdmitPatientController> {
     final borderColor = isDark
         ? Colors.white.withValues(alpha: 0.12)
         : Colors.black.withValues(alpha: 0.08);
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return DropdownButtonFormField<PatientLookup>(
       initialValue: controller.selectedPatient,
+      isExpanded: true,
       hint: Text(
         'Choose a patient...',
         style: AppTextStyles.bodyMedium(textSecondary.withValues(alpha: 0.5)),
+        overflow: TextOverflow.ellipsis,
+        maxLines: 1,
       ),
       icon: const Icon(
         Icons.keyboard_arrow_down_rounded,
@@ -320,7 +318,11 @@ class AdmitPatientView extends GetView<AdmitPatientController> {
       ) {
         return DropdownMenuItem<PatientLookup>(
           value: patient,
-          child: Text('${patient.fullName} (${patient.mrn})'),
+          child: Text(
+            '${patient.fullName} (${patient.mrn})',
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
         );
       }).toList(),
       decoration: _getInputDecoration(isDark, borderColor),
@@ -331,12 +333,10 @@ class AdmitPatientView extends GetView<AdmitPatientController> {
     final borderColor = isDark
         ? Colors.white.withValues(alpha: 0.12)
         : Colors.black.withValues(alpha: 0.08);
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return DropdownButtonFormField<WardModel>(
       initialValue: controller.selectedWard,
@@ -364,22 +364,20 @@ class AdmitPatientView extends GetView<AdmitPatientController> {
     final borderColor = isDark
         ? Colors.white.withValues(alpha: 0.12)
         : Colors.black.withValues(alpha: 0.08);
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     final isEnabled =
         controller.selectedWard != null && !controller.isLoadingBeds;
     final hint = controller.selectedWard == null
         ? 'Choose Ward First'
         : (controller.isLoadingBeds
-              ? 'Loading beds...'
-              : (controller.beds.isEmpty
-                    ? 'No available beds in this ward'
-                    : 'Select available bed'));
+            ? 'Loading beds...'
+            : (controller.beds.isEmpty
+                ? 'No available beds in this ward'
+                : 'Select available bed'));
 
     return DropdownButtonFormField<BedModel>(
       initialValue: controller.selectedBed,
@@ -421,12 +419,10 @@ class AdmitPatientView extends GetView<AdmitPatientController> {
     final borderColor = isDark
         ? Colors.white.withValues(alpha: 0.12)
         : Colors.black.withValues(alpha: 0.08);
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return DropdownButtonFormField<String>(
       initialValue: controller.selectedAdmissionType,
@@ -460,12 +456,10 @@ class AdmitPatientView extends GetView<AdmitPatientController> {
     final borderColor = isDark
         ? Colors.white.withValues(alpha: 0.12)
         : Colors.black.withValues(alpha: 0.08);
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return DropdownButtonFormField<AppointmentDoctor>(
       initialValue: selectedValue,
@@ -483,9 +477,8 @@ class AdmitPatientView extends GetView<AdmitPatientController> {
       items: controller.doctors.map<DropdownMenuItem<AppointmentDoctor>>((
         AppointmentDoctor doc,
       ) {
-        final specialization = doc.specialization != null
-            ? ' (${doc.specialization})'
-            : '';
+        final specialization =
+            doc.specialization != null ? ' (${doc.specialization})' : '';
         return DropdownMenuItem<AppointmentDoctor>(
           value: doc,
           child: Text('${doc.fullName}$specialization'),
@@ -502,12 +495,10 @@ class AdmitPatientView extends GetView<AdmitPatientController> {
     final borderColor = isDark
         ? Colors.white.withValues(alpha: 0.12)
         : Colors.black.withValues(alpha: 0.08);
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return TextFormField(
       controller: controller.reasonController,
@@ -576,9 +567,8 @@ class AdmitPatientView extends GetView<AdmitPatientController> {
         ),
         const SizedBox(width: AppSpacing.md),
         ElevatedButton(
-          onPressed: controller.isSubmitting
-              ? null
-              : controller.submitAdmission,
+          onPressed:
+              controller.isSubmitting ? null : controller.submitAdmission,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.secondary,
             foregroundColor: AppColors.lightSurface,
@@ -617,11 +607,11 @@ class AdmitPatientView extends GetView<AdmitPatientController> {
       filled: true,
       fillColor: !isEnabled
           ? (isDark
-                ? Colors.white.withValues(alpha: 0.02)
-                : Colors.black.withValues(alpha: 0.03))
+              ? Colors.white.withValues(alpha: 0.02)
+              : Colors.black.withValues(alpha: 0.03))
           : (isDark
-                ? Colors.white.withValues(alpha: 0.06)
-                : Colors.white.withValues(alpha: 0.7)),
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.white.withValues(alpha: 0.7)),
       border: OutlineInputBorder(
         borderRadius: AppDecorations.borderMD,
         borderSide: BorderSide(color: borderColor),
@@ -660,18 +650,15 @@ class AdmitPatientView extends GetView<AdmitPatientController> {
       return true;
     }
 
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     final confirm = await Get.dialog<bool>(
       AlertDialog(
-        backgroundColor: isDark
-            ? AppColors.darkSurface
-            : AppColors.lightSurface,
+        backgroundColor:
+            isDark ? AppColors.darkSurface : AppColors.lightSurface,
         title: Text(
           'Discard Changes?',
           style: AppTextStyles.titleMedium(

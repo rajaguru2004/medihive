@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
@@ -23,8 +24,7 @@ abstract class AppTheme {
   // ─────────────────────────────────────────────────────────────────────────
   static ThemeData _build({required bool isDark}) {
     final bg = isDark ? AppColors.darkBackground : AppColors.lightBackground;
-    final surface =
-        isDark ? AppColors.darkSurface : AppColors.lightSurface;
+    final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
     final surfaceVariant =
         isDark ? AppColors.darkSurfaceVariant : AppColors.lightSurfaceVariant;
     final onBg =
@@ -33,8 +33,7 @@ abstract class AppTheme {
         isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final onSurfaceVariant =
         isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-    final divider =
-        isDark ? AppColors.darkDivider : AppColors.lightDivider;
+    final divider = isDark ? AppColors.darkDivider : AppColors.lightDivider;
 
     final colorScheme = ColorScheme(
       brightness: isDark ? Brightness.dark : Brightness.light,
@@ -44,7 +43,8 @@ abstract class AppTheme {
       primaryContainer: isDark
           ? AppColors.primaryDark.withValues(alpha: 0.3)
           : AppColors.primaryLight.withValues(alpha: 0.15),
-      onPrimaryContainer: isDark ? AppColors.primaryLight : AppColors.primaryDark,
+      onPrimaryContainer:
+          isDark ? AppColors.primaryLight : AppColors.primaryDark,
       // Secondary
       secondary: AppColors.secondary,
       onSecondary: Colors.white,
@@ -82,9 +82,9 @@ abstract class AppTheme {
       scrim: Colors.black,
       shadow: Colors.black,
       // Inverse
-      inverseSurface:
-          isDark ? AppColors.lightSurface : AppColors.darkSurface,
-      onInverseSurface: isDark ? AppColors.lightTextPrimary : AppColors.darkTextPrimary,
+      inverseSurface: isDark ? AppColors.lightSurface : AppColors.darkSurface,
+      onInverseSurface:
+          isDark ? AppColors.lightTextPrimary : AppColors.darkTextPrimary,
       inversePrimary: isDark ? AppColors.primaryLight : AppColors.primaryDark,
     );
 
@@ -129,9 +129,8 @@ abstract class AppTheme {
         titleTextStyle: AppTextStyles.titleLarge(onBg),
         iconTheme: IconThemeData(color: AppColors.primary, size: 24),
         actionsIconTheme: IconThemeData(color: AppColors.primary, size: 24),
-        systemOverlayStyle: isDark
-            ? SystemUiOverlayStyle.light
-            : SystemUiOverlayStyle.dark,
+        systemOverlayStyle:
+            isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
         surfaceTintColor: Colors.transparent,
         shadowColor: Colors.transparent,
       ),
@@ -157,9 +156,8 @@ abstract class AppTheme {
           disabledBackgroundColor: isDark
               ? AppColors.darkSurfaceVariant
               : AppColors.lightSurfaceVariant,
-          disabledForegroundColor: isDark
-              ? AppColors.darkTextDisabled
-              : AppColors.lightTextDisabled,
+          disabledForegroundColor:
+              isDark ? AppColors.darkTextDisabled : AppColors.lightTextDisabled,
           elevation: 0,
           shadowColor: Colors.transparent,
           textStyle: AppTextStyles.labelLarge(Colors.white),
@@ -247,12 +245,16 @@ abstract class AppTheme {
         prefixIconColor: WidgetStateColor.resolveWith(
           (states) => states.contains(WidgetState.focused)
               ? AppColors.primary
-              : (isDark ? AppColors.darkTextTertiary : AppColors.lightTextTertiary),
+              : (isDark
+                  ? AppColors.darkTextTertiary
+                  : AppColors.lightTextTertiary),
         ),
         suffixIconColor: WidgetStateColor.resolveWith(
           (states) => states.contains(WidgetState.focused)
               ? AppColors.primary
-              : (isDark ? AppColors.darkTextTertiary : AppColors.lightTextTertiary),
+              : (isDark
+                  ? AppColors.darkTextTertiary
+                  : AppColors.lightTextTertiary),
         ),
       ),
 
@@ -316,8 +318,9 @@ abstract class AppTheme {
 
       // ─── Chip ─────────────────────────────────────────────────────────────
       chipTheme: ChipThemeData(
-        backgroundColor:
-            isDark ? AppColors.darkSurfaceVariant : AppColors.lightSurfaceVariant,
+        backgroundColor: isDark
+            ? AppColors.darkSurfaceVariant
+            : AppColors.lightSurfaceVariant,
         selectedColor: AppColors.primary.withValues(alpha: 0.15),
         disabledColor: isDark
             ? AppColors.darkSurfaceVariant.withValues(alpha: 0.5)
@@ -333,7 +336,8 @@ abstract class AppTheme {
 
       // ─── Dialog ───────────────────────────────────────────────────────────
       dialogTheme: DialogThemeData(
-        backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+        backgroundColor:
+            isDark ? AppColors.darkSurface : AppColors.lightSurface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         shape: const RoundedRectangleBorder(
@@ -357,7 +361,8 @@ abstract class AppTheme {
         modalBackgroundColor:
             isDark ? AppColors.darkSurface : AppColors.lightSurface,
         modalElevation: 0,
-        dragHandleColor: isDark ? AppColors.darkDivider : AppColors.lightDivider,
+        dragHandleColor:
+            isDark ? AppColors.darkDivider : AppColors.lightDivider,
         dragHandleSize: const Size(40, 4),
       ),
 
@@ -373,13 +378,16 @@ abstract class AppTheme {
         thumbColor: WidgetStateProperty.resolveWith((states) =>
             states.contains(WidgetState.selected)
                 ? Colors.white
-                : (isDark ? AppColors.darkTextTertiary : AppColors.lightTextTertiary)),
+                : (isDark
+                    ? AppColors.darkTextTertiary
+                    : AppColors.lightTextTertiary)),
         trackColor: WidgetStateProperty.resolveWith((states) =>
             states.contains(WidgetState.selected)
                 ? AppColors.primary
-                : (isDark ? AppColors.darkSurfaceVariant : AppColors.lightSurfaceVariant)),
-        trackOutlineColor:
-            WidgetStateProperty.all(Colors.transparent),
+                : (isDark
+                    ? AppColors.darkSurfaceVariant
+                    : AppColors.lightSurfaceVariant)),
+        trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
       ),
 
       // ─── Checkbox ─────────────────────────────────────────────────────────
@@ -400,7 +408,9 @@ abstract class AppTheme {
         fillColor: WidgetStateProperty.resolveWith((states) =>
             states.contains(WidgetState.selected)
                 ? AppColors.primary
-                : (isDark ? AppColors.darkTextTertiary : AppColors.lightTextTertiary)),
+                : (isDark
+                    ? AppColors.darkTextTertiary
+                    : AppColors.lightTextTertiary)),
       ),
 
       // ─── Slider ───────────────────────────────────────────────────────────
@@ -456,14 +466,12 @@ abstract class AppTheme {
       listTileTheme: ListTileThemeData(
         tileColor: Colors.transparent,
         selectedTileColor: AppColors.primary.withValues(alpha: 0.08),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         shape: RoundedRectangleBorder(
           borderRadius: AppDecorations.borderMD,
         ),
-        iconColor: isDark
-            ? AppColors.darkTextSecondary
-            : AppColors.lightTextSecondary,
+        iconColor:
+            isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
         textColor: onBg,
         leadingAndTrailingTextStyle: AppTextStyles.labelMedium(
           isDark ? AppColors.darkTextTertiary : AppColors.lightTextTertiary,

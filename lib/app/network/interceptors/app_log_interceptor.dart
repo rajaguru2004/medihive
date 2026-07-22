@@ -1,5 +1,6 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+
+import 'package:dio/dio.dart';
 
 /// Logs every request URL + headers + body and every response/error body
 /// to the Flutter debug console.  Active **only** in debug builds.
@@ -30,7 +31,8 @@ class AppLogInterceptor extends Interceptor {
     if (kDebugMode) {
       debugPrint('\n╔══════════════════════════════════════════════');
       debugPrint('║  ✅ RESPONSE');
-      debugPrint('║  Status : ${response.statusCode} ${response.statusMessage}');
+      debugPrint(
+          '║  Status : ${response.statusCode} ${response.statusMessage}');
       debugPrint('║  URL    : ${response.requestOptions.uri}');
       _printBody('Data', response.data);
       debugPrint('╚══════════════════════════════════════════════\n');

@@ -1,6 +1,7 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 
 import '../../../network/token_manager.dart';
@@ -47,7 +48,8 @@ class LoginController extends GetxController {
         final tokenData = data['data'] as Map<String, dynamic>;
         final accessToken = tokenData['accessToken'] as String;
         final refreshToken = tokenData['refreshToken'] as String?;
-        TokenManager.setTokens(accessToken: accessToken, refreshToken: refreshToken);
+        TokenManager.setTokens(
+            accessToken: accessToken, refreshToken: refreshToken);
         if (kDebugMode) debugPrint('Login success — token: $accessToken');
         Get.offAllNamed(Routes.HOME);
       } else {

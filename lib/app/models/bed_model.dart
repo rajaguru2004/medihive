@@ -19,7 +19,8 @@ class SimpleWardModel {
     required this.isActive,
   });
 
-  factory SimpleWardModel.fromJson(Map<String, dynamic> json) => SimpleWardModel(
+  factory SimpleWardModel.fromJson(Map<String, dynamic> json) =>
+      SimpleWardModel(
         id: json['id'] as String? ?? '',
         organizationId: json['organizationId'] as String? ?? '',
         departmentId: json['departmentId'] as String?,

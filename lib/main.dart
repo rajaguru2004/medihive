@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+
 import 'package:get/get.dart';
 
 import 'app/bindings/initial_binding.dart';
 import 'app/routes/app_pages.dart';
 import 'app/services/auth_service.dart';
+import 'app/services/session_manager.dart';
 import 'app/theme/theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   Get.put(AuthService(), permanent: true);
+  Get.put(SessionManager(), permanent: true);
   runApp(const MediHiveApp());
 }
 

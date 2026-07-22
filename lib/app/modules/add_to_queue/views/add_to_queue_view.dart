@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+
 import 'package:get/get.dart';
+
 import 'package:medihive/app/theme/theme.dart';
+
 import '../controllers/add_to_queue_controller.dart';
 
 class AddToQueueView extends StatefulWidget {
@@ -17,12 +20,14 @@ class _AddToQueueViewState extends State<AddToQueueView> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.darkBackground : AppColors.lightBackground;
-    final textPrimary = isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
 
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
-        backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+        backgroundColor:
+            isDark ? AppColors.darkSurface : AppColors.lightSurface,
         elevation: 0,
         leading: IconButton(
           icon: Icon(
@@ -42,7 +47,8 @@ class _AddToQueueViewState extends State<AddToQueueView> {
             const SizedBox(width: AppSpacing.sm),
             Text(
               'Add to Queue',
-              style: AppTextStyles.titleLarge(textPrimary).copyWith(fontWeight: FontWeight.bold),
+              style: AppTextStyles.titleLarge(textPrimary)
+                  .copyWith(fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -122,25 +128,32 @@ class _AddToQueueViewState extends State<AddToQueueView> {
   // ─── Input Builders ────────────────────────────────────────────────────────
 
   Widget _buildSectionHeader(String title, bool isDark) {
-    final textColor = isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textColor =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     return Text(
       title,
-      style: AppTextStyles.labelMedium(textColor).copyWith(fontWeight: FontWeight.w600),
+      style: AppTextStyles.labelMedium(textColor)
+          .copyWith(fontWeight: FontWeight.w600),
     );
   }
 
-  Widget _buildSelectedPatientCard(AddToQueueController controller, bool isDark) {
-    final textPrimary = isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary = isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+  Widget _buildSelectedPatientCard(
+      AddToQueueController controller, bool isDark) {
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
     final cardBg = isDark ? AppColors.darkSurface : AppColors.lightSurface;
     final patient = controller.selectedPatient!;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.sm),
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: AppDecorations.borderMD,
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 1),
+        border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.3), width: 1),
       ),
       child: Row(
         children: [
@@ -159,7 +172,8 @@ class _AddToQueueViewState extends State<AddToQueueView> {
               children: [
                 Text(
                   patient.fullName,
-                  style: AppTextStyles.titleSmall(textPrimary).copyWith(fontWeight: FontWeight.bold),
+                  style: AppTextStyles.titleSmall(textPrimary)
+                      .copyWith(fontWeight: FontWeight.bold),
                 ),
                 Text(
                   patient.mrn,
@@ -169,7 +183,10 @@ class _AddToQueueViewState extends State<AddToQueueView> {
             ),
           ),
           IconButton(
-            icon: Icon(Icons.close_rounded, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+            icon: Icon(Icons.close_rounded,
+                color: isDark
+                    ? AppColors.darkTextSecondary
+                    : AppColors.lightTextSecondary),
             onPressed: () => controller.clearSelectedPatient(),
           ),
         ],
@@ -177,10 +194,15 @@ class _AddToQueueViewState extends State<AddToQueueView> {
     );
   }
 
-  Widget _buildPatientSearchField(AddToQueueController controller, bool isDark) {
-    final borderColor = isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.08);
-    final textPrimary = isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary = isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+  Widget _buildPatientSearchField(
+      AddToQueueController controller, bool isDark) {
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : Colors.black.withValues(alpha: 0.08);
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return Column(
       children: [
@@ -190,17 +212,22 @@ class _AddToQueueViewState extends State<AddToQueueView> {
           style: AppTextStyles.bodyMedium(textPrimary),
           decoration: InputDecoration(
             hintText: 'Search patient by name or MRN...',
-            hintStyle: AppTextStyles.bodyMedium(textSecondary.withValues(alpha: 0.5)),
+            hintStyle:
+                AppTextStyles.bodyMedium(textSecondary.withValues(alpha: 0.5)),
             filled: true,
-            fillColor: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.7),
-            prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primary, size: 18),
+            fillColor: isDark
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.white.withValues(alpha: 0.7),
+            prefixIcon: const Icon(Icons.search_rounded,
+                color: AppColors.primary, size: 18),
             suffixIcon: controller.isLoadingPatients
                 ? const Padding(
                     padding: EdgeInsets.all(AppSpacing.md),
                     child: SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: AppColors.primary),
                     ),
                   )
                 : null,
@@ -214,9 +241,11 @@ class _AddToQueueViewState extends State<AddToQueueView> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: AppDecorations.borderMD,
-              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+              borderSide:
+                  const BorderSide(color: AppColors.primary, width: 1.5),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+            contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg, vertical: AppSpacing.md),
           ),
         ),
         if (controller.patientsList.isNotEmpty) ...[
@@ -242,9 +271,14 @@ class _AddToQueueViewState extends State<AddToQueueView> {
                       style: AppTextStyles.labelMedium(AppColors.primary),
                     ),
                   ),
-                  title: Text(p.fullName, style: AppTextStyles.bodyMedium(textPrimary).copyWith(fontWeight: FontWeight.w600)),
-                  subtitle: Text(p.mrn, style: AppTextStyles.numeric(textSecondary, fontSize: 11)),
-                  trailing: Icon(Icons.keyboard_arrow_right_rounded, color: textSecondary, size: 18),
+                  title: Text(p.fullName,
+                      style: AppTextStyles.bodyMedium(textPrimary)
+                          .copyWith(fontWeight: FontWeight.w600)),
+                  subtitle: Text(p.mrn,
+                      style:
+                          AppTextStyles.numeric(textSecondary, fontSize: 11)),
+                  trailing: Icon(Icons.keyboard_arrow_right_rounded,
+                      color: textSecondary, size: 18),
                   onTap: () => controller.selectPatient(p),
                 );
               },
@@ -255,28 +289,37 @@ class _AddToQueueViewState extends State<AddToQueueView> {
     );
   }
 
-  Widget _buildServiceAreaDropdown(AddToQueueController controller, bool isDark) {
-    final borderColor = isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.08);
-    final textPrimary = isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+  Widget _buildServiceAreaDropdown(
+      AddToQueueController controller, bool isDark) {
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : Colors.black.withValues(alpha: 0.08);
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
 
     return DropdownButtonFormField<String>(
       initialValue: controller.selectedServiceArea,
-      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primary),
+      icon: const Icon(Icons.keyboard_arrow_down_rounded,
+          color: AppColors.primary),
       dropdownColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
       style: AppTextStyles.bodyMedium(textPrimary),
       onChanged: (val) {
         if (val != null) controller.selectServiceArea(val);
       },
-      items: controller.serviceAreas.map<DropdownMenuItem<String>>((String val) {
+      items:
+          controller.serviceAreas.map<DropdownMenuItem<String>>((String val) {
         return DropdownMenuItem<String>(
           value: val,
           child: Text(val),
         );
       }).toList(),
-      validator: (val) => val == null || val.isEmpty ? 'Service area is required' : null,
+      validator: (val) =>
+          val == null || val.isEmpty ? 'Service area is required' : null,
       decoration: InputDecoration(
         filled: true,
-        fillColor: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.7),
+        fillColor: isDark
+            ? Colors.white.withValues(alpha: 0.06)
+            : Colors.white.withValues(alpha: 0.7),
         border: OutlineInputBorder(
           borderRadius: AppDecorations.borderMD,
           borderSide: BorderSide(color: borderColor),
@@ -289,24 +332,32 @@ class _AddToQueueViewState extends State<AddToQueueView> {
           borderRadius: AppDecorations.borderMD,
           borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+        contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg, vertical: AppSpacing.md),
       ),
     );
   }
 
   Widget _buildServiceTypeField(AddToQueueController controller, bool isDark) {
-    final borderColor = isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.08);
-    final textPrimary = isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary = isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : Colors.black.withValues(alpha: 0.08);
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return TextFormField(
       controller: controller.serviceTypeController,
       style: AppTextStyles.bodyMedium(textPrimary),
       decoration: InputDecoration(
         hintText: 'e.g. consultation',
-        hintStyle: AppTextStyles.bodyMedium(textSecondary.withValues(alpha: 0.5)),
+        hintStyle:
+            AppTextStyles.bodyMedium(textSecondary.withValues(alpha: 0.5)),
         filled: true,
-        fillColor: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.7),
+        fillColor: isDark
+            ? Colors.white.withValues(alpha: 0.06)
+            : Colors.white.withValues(alpha: 0.7),
         border: OutlineInputBorder(
           borderRadius: AppDecorations.borderMD,
           borderSide: BorderSide(color: borderColor),
@@ -319,18 +370,23 @@ class _AddToQueueViewState extends State<AddToQueueView> {
           borderRadius: AppDecorations.borderMD,
           borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+        contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg, vertical: AppSpacing.md),
       ),
     );
   }
 
   Widget _buildPriorityDropdown(AddToQueueController controller, bool isDark) {
-    final borderColor = isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.08);
-    final textPrimary = isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : Colors.black.withValues(alpha: 0.08);
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
 
     return DropdownButtonFormField<String>(
       initialValue: controller.selectedPriority,
-      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primary),
+      icon: const Icon(Icons.keyboard_arrow_down_rounded,
+          color: AppColors.primary),
       dropdownColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
       style: AppTextStyles.bodyMedium(textPrimary),
       onChanged: (val) {
@@ -342,10 +398,13 @@ class _AddToQueueViewState extends State<AddToQueueView> {
           child: Text(val),
         );
       }).toList(),
-      validator: (val) => val == null || val.isEmpty ? 'Priority is required' : null,
+      validator: (val) =>
+          val == null || val.isEmpty ? 'Priority is required' : null,
       decoration: InputDecoration(
         filled: true,
-        fillColor: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.7),
+        fillColor: isDark
+            ? Colors.white.withValues(alpha: 0.06)
+            : Colors.white.withValues(alpha: 0.7),
         border: OutlineInputBorder(
           borderRadius: AppDecorations.borderMD,
           borderSide: BorderSide(color: borderColor),
@@ -358,24 +417,32 @@ class _AddToQueueViewState extends State<AddToQueueView> {
           borderRadius: AppDecorations.borderMD,
           borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+        contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg, vertical: AppSpacing.md),
       ),
     );
   }
 
   Widget _buildAssignedRoomField(AddToQueueController controller, bool isDark) {
-    final borderColor = isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.08);
-    final textPrimary = isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary = isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : Colors.black.withValues(alpha: 0.08);
+    final textPrimary =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return TextFormField(
       controller: controller.assignedRoomController,
       style: AppTextStyles.bodyMedium(textPrimary),
       decoration: InputDecoration(
         hintText: 'e.g. Room 3',
-        hintStyle: AppTextStyles.bodyMedium(textSecondary.withValues(alpha: 0.5)),
+        hintStyle:
+            AppTextStyles.bodyMedium(textSecondary.withValues(alpha: 0.5)),
         filled: true,
-        fillColor: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.7),
+        fillColor: isDark
+            ? Colors.white.withValues(alpha: 0.06)
+            : Colors.white.withValues(alpha: 0.7),
         border: OutlineInputBorder(
           borderRadius: AppDecorations.borderMD,
           borderSide: BorderSide(color: borderColor),
@@ -388,12 +455,14 @@ class _AddToQueueViewState extends State<AddToQueueView> {
           borderRadius: AppDecorations.borderMD,
           borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+        contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg, vertical: AppSpacing.md),
       ),
     );
   }
 
-  Widget _buildActionsRow(AddToQueueController controller, bool isDark, GlobalKey<FormState> formKey) {
+  Widget _buildActionsRow(AddToQueueController controller, bool isDark,
+      GlobalKey<FormState> formKey) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
@@ -402,24 +471,32 @@ class _AddToQueueViewState extends State<AddToQueueView> {
           onPressed: () => Get.back(),
           style: OutlinedButton.styleFrom(
             minimumSize: const Size(120, 52),
-            side: BorderSide(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl, vertical: AppSpacing.md),
-            shape: RoundedRectangleBorder(borderRadius: AppDecorations.borderMD),
+            side: BorderSide(
+                color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xxl, vertical: AppSpacing.md),
+            shape:
+                RoundedRectangleBorder(borderRadius: AppDecorations.borderMD),
           ),
           child: Text(
             'Cancel',
-            style: AppTextStyles.labelLarge(isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary),
+            style: AppTextStyles.labelLarge(isDark
+                ? AppColors.darkTextPrimary
+                : AppColors.lightTextPrimary),
           ),
         ),
         const SizedBox(width: AppSpacing.md),
         // Add to Queue Button
         ElevatedButton.icon(
-          onPressed: controller.isSaving ? null : () => controller.submit(formKey.currentState, context),
+          onPressed: controller.isSaving
+              ? null
+              : () => controller.submit(formKey.currentState, context),
           icon: controller.isSaving
               ? const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                      color: Colors.white, strokeWidth: 2),
                 )
               : const Icon(Icons.add_circle_outline_rounded, size: 18),
           label: const Text('Add to Queue'),
@@ -427,8 +504,10 @@ class _AddToQueueViewState extends State<AddToQueueView> {
             minimumSize: const Size(160, 52),
             backgroundColor: AppColors.secondary,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl, vertical: AppSpacing.md),
-            shape: RoundedRectangleBorder(borderRadius: AppDecorations.borderMD),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xxl, vertical: AppSpacing.md),
+            shape:
+                RoundedRectangleBorder(borderRadius: AppDecorations.borderMD),
           ),
         ),
       ],
