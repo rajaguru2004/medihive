@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 
 import 'package:get/get.dart';
 
@@ -127,7 +128,11 @@ class PreTriageController extends GetxController {
     isLoading.value = true;
     try {
       final response = await _service.deleteScreening(item.id);
-      if (response.data != null && response.data['success'] == true) {
+      if (response.statusCode == 200 ||
+          response.statusCode == 204 ||
+          (response.data != null &&
+              response.data is Map &&
+              response.data['success'] == true)) {
         screenings.removeWhere((e) => e.id == item.id);
         calculateStats();
         Get.snackbar(
@@ -139,9 +144,10 @@ class PreTriageController extends GetxController {
           borderRadius: AppDecorations.radiusMD,
         );
       } else {
+        final errorMsg = (response.data is Map) ? response.data['message'] : null;
         Get.snackbar(
           'Error',
-          response.data['message'] ?? 'Failed to delete screening',
+          errorMsg ?? 'Failed to delete screening',
           backgroundColor: AppColors.error.withValues(alpha: 0.9),
           colorText: AppColors.lightSurface,
           margin: const EdgeInsets.all(AppSpacing.md),
@@ -149,9 +155,13 @@ class PreTriageController extends GetxController {
         );
       }
     } catch (e) {
+      String msg = 'An error occurred while deleting the screening';
+      if (e is DioException) {
+        msg = e.response?.data?['message'] as String? ?? e.message ?? msg;
+      }
       Get.snackbar(
         'Error',
-        'An error occurred while deleting the screening',
+        msg,
         backgroundColor: AppColors.error.withValues(alpha: 0.9),
         colorText: AppColors.lightSurface,
         margin: const EdgeInsets.all(AppSpacing.md),

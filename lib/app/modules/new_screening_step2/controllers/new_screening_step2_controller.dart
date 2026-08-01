@@ -108,6 +108,9 @@ class NewScreeningStep2Controller extends GetxController {
             Get.find<PreTriageController>().fetchScreenings();
           }
 
+          // Return to Pre-Triage main screen
+          Get.until((route) => route.settings.name == Routes.PRE_TRIAGE);
+
           Get.snackbar(
             'Success',
             'Screening created successfully',
@@ -116,9 +119,6 @@ class NewScreeningStep2Controller extends GetxController {
             margin: const EdgeInsets.all(AppSpacing.md),
             borderRadius: AppDecorations.radiusMD,
           );
-
-          // Return to Pre-Triage main screen
-          Get.until((route) => route.settings.name == Routes.PRE_TRIAGE);
         } else {
           Get.snackbar(
             'Error',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 
 import 'package:get/get.dart';
 
@@ -21,7 +22,7 @@ class EditScreeningController extends GetxController {
   final lastNameCtrl = TextEditingController();
   final ageCtrl = TextEditingController();
   final phoneCtrl = TextEditingController();
-  final RxString selectedGender = 'Female'.obs;
+  final RxnString selectedGender = RxnString();
   final chiefComplaintCtrl = TextEditingController();
   final briefHistoryCtrl = TextEditingController();
   final temperatureCtrl = TextEditingController();
@@ -65,12 +66,14 @@ class EditScreeningController extends GetxController {
     bpDiastolicCtrl.text =
         item.bpDiastolic != null ? '${item.bpDiastolic}' : '';
 
-    if (item.gender != null && item.gender!.isNotEmpty) {
+    if (item.gender != null && item.gender!.trim().isNotEmpty) {
       final matchedGender = genders.firstWhere(
-        (g) => g.toLowerCase() == item.gender!.toLowerCase(),
-        orElse: () => 'Female',
+        (g) => g.toLowerCase() == item.gender!.trim().toLowerCase(),
+        orElse: () => '',
       );
-      selectedGender.value = matchedGender;
+      if (matchedGender.isNotEmpty) {
+        selectedGender.value = matchedGender;
+      }
     }
 
     if (item.route != null && item.route!.isNotEmpty) {
@@ -131,7 +134,7 @@ class EditScreeningController extends GetxController {
           age: ageCtrl.text.trim().isNotEmpty
               ? int.tryParse(ageCtrl.text.trim())
               : null,
-          gender: selectedGender.value.toLowerCase(),
+          gender: selectedGender.value?.toLowerCase(),
           phone:
               phoneCtrl.text.trim().isNotEmpty ? phoneCtrl.text.trim() : null,
           chiefComplaint: chiefComplaintCtrl.text.trim(),
@@ -146,10 +149,15 @@ class EditScreeningController extends GetxController {
           status: status,
         );
 
-        if (response.data != null && response.data['success'] == true) {
+        final bool isSuccess = (response.statusCode != null && response.statusCode! >= 200 && response.statusCode! < 300) ||
+                               (response.data is Map && response.data['success'] == true);
+
+        if (isSuccess) {
           if (Get.isRegistered<PreTriageController>()) {
             Get.find<PreTriageController>().fetchScreenings();
           }
+
+          Get.back(); // Return to Pre-Triage list
 
           Get.snackbar(
             'Success',
@@ -159,12 +167,11 @@ class EditScreeningController extends GetxController {
             margin: const EdgeInsets.all(AppSpacing.md),
             borderRadius: AppDecorations.radiusMD,
           );
-
-          Get.back(); // Return to Pre-Triage list
         } else {
+          final errorMsg = (response.data is Map) ? response.data['message'] : null;
           Get.snackbar(
             'Error',
-            response.data['message'] ?? 'Failed to update screening',
+            errorMsg ?? 'Failed to update screening',
             backgroundColor: AppColors.error.withValues(alpha: 0.9),
             colorText: AppColors.lightSurface,
             margin: const EdgeInsets.all(AppSpacing.md),
@@ -172,9 +179,18 @@ class EditScreeningController extends GetxController {
           );
         }
       } catch (e) {
+        String errorMsg = 'An error occurred while updating the screening';
+        if (e is DioException) {
+          final resData = e.response?.data;
+          if (resData is Map && resData['message'] != null) {
+            errorMsg = resData['message'].toString();
+          } else if (e.message != null) {
+            errorMsg = e.message!;
+          }
+        }
         Get.snackbar(
           'Error',
-          'An error occurred while updating the screening',
+          errorMsg,
           backgroundColor: AppColors.error.withValues(alpha: 0.9),
           colorText: AppColors.lightSurface,
           margin: const EdgeInsets.all(AppSpacing.md),

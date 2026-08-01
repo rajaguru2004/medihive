@@ -8,6 +8,8 @@ import '../modules/admit_patient/bindings/admit_patient_binding.dart';
 import '../modules/admit_patient/views/admit_patient_view.dart';
 import '../modules/appointments/bindings/appointments_binding.dart';
 import '../modules/appointments/views/appointments_view.dart';
+import '../modules/consultations/bindings/consultations_binding.dart';
+import '../modules/consultations/views/consultations_view.dart';
 import '../modules/discharge_patient/bindings/discharge_patient_binding.dart';
 import '../modules/discharge_patient/views/discharge_patient_view.dart';
 import '../modules/edit_screening/bindings/edit_screening_binding.dart';
@@ -62,10 +64,8 @@ class AppPages {
     ),
     GetPage(
       name: _Paths.CONSULTATIONS,
-      page: () => const PlaceholderView(
-        title: 'Consultations',
-        icon: Icons.medical_services_outlined,
-      ),
+      page: () => const ConsultationsView(),
+      binding: ConsultationsBinding(),
       transition: Transition.cupertino,
     ),
     GetPage(

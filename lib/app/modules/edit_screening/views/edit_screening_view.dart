@@ -110,7 +110,7 @@ class EditScreeningView extends GetView<EditScreeningController> {
                           isDark: isDark,
                           validator: (val) {
                             if (val == null || val.trim().isEmpty) {
-                              return 'Required';
+                              return null;
                             }
                             final parsed = int.tryParse(val.trim());
                             if (parsed == null || parsed <= 0) {
@@ -407,6 +407,10 @@ class EditScreeningView extends GetView<EditScreeningController> {
             () => DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: controller.selectedGender.value,
+                hint: Text(
+                  'Select gender',
+                  style: AppTextStyles.bodyMedium(textSecondary),
+                ),
                 icon: const Icon(Icons.keyboard_arrow_down_rounded,
                     color: AppColors.primary),
                 dropdownColor:

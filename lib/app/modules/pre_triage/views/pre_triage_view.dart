@@ -180,39 +180,35 @@ class PreTriageView extends GetView<PreTriageController> {
         crossAxisCount: 2,
         crossAxisSpacing: AppSpacing.md,
         mainAxisSpacing: AppSpacing.md,
-        childAspectRatio: 1.6,
+        childAspectRatio: 2.2,
         children: [
           _buildStatCard(
-            context: context,
-            title: 'Total Screenings',
-            count: '$total',
-            subtitle: 'All records',
+            title: 'TOTAL SCREENINGS',
+            value: '$total',
+            icon: Icons.assignment_rounded,
+            color: AppColors.primary,
             isDark: isDark,
-            badgeColor: AppColors.primary,
           ),
           _buildStatCard(
-            context: context,
-            title: 'In Screening',
-            count: '$screening',
-            subtitle: 'Awaiting routing',
+            title: 'IN SCREENING',
+            value: '$screening',
+            icon: Icons.pending_actions_rounded,
+            color: AppColors.primary,
             isDark: isDark,
-            badgeColor: AppColors.primary, // Blue
           ),
           _buildStatCard(
-            context: context,
-            title: 'Routed',
-            count: '$routed',
-            subtitle: 'Sent to care units',
+            title: 'ROUTED',
+            value: '$routed',
+            icon: Icons.alt_route_rounded,
+            color: AppColors.warning,
             isDark: isDark,
-            badgeColor: AppColors.warning, // Orange/Warning
           ),
           _buildStatCard(
-            context: context,
-            title: 'Registered',
-            count: '$registered',
-            subtitle: 'Converted to patient',
+            title: 'REGISTERED',
+            value: '$registered',
+            icon: Icons.how_to_reg_rounded,
+            color: AppColors.secondary,
             isDark: isDark,
-            badgeColor: AppColors.secondary, // Green/Success
           ),
         ],
       );
@@ -220,14 +216,13 @@ class PreTriageView extends GetView<PreTriageController> {
   }
 
   Widget _buildStatCard({
-    required BuildContext context,
     required String title,
-    required String count,
-    required String subtitle,
+    required String value,
+    required IconData icon,
+    required Color color,
     required bool isDark,
-    required Color badgeColor,
   }) {
-    final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
+    final cardBg = isDark ? AppColors.darkSurface : AppColors.lightSurface;
     final textPrimary = isDark
         ? AppColors.darkTextPrimary
         : AppColors.lightTextPrimary;
@@ -236,50 +231,62 @@ class PreTriageView extends GetView<PreTriageController> {
         : AppColors.lightTextSecondary;
 
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.zero,
-        boxShadow: AppDecorations.elevation1(isDark),
-        border: Border.all(color: badgeColor.withValues(alpha: 0.15), width: 1),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: AppDecorations.borderMD,
+        border: Border.all(
+          color: isDark
+              ? AppColors.darkSurfaceVariant
+              : AppColors.lightSurfaceVariant,
+          width: 0.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: isDark ? 0.15 : 0.08),
+              borderRadius: AppDecorations.borderSM,
+            ),
+            child: Icon(icon, color: color, size: AppSpacing.iconSM),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
                   title,
-                  style: AppTextStyles.labelMedium(textSecondary),
+                  style: AppTextStyles.labelSmall(
+                    textSecondary,
+                  ).copyWith(fontWeight: FontWeight.bold, letterSpacing: 0.2),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: badgeColor,
-                  shape: BoxShape.circle,
+                const SizedBox(height: AppSpacing.xxs),
+                Text(
+                  value,
+                  style: AppTextStyles.titleMedium(
+                    textPrimary,
+                  ).copyWith(fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
-          ),
-
-          Text(
-            count,
-            style: AppTextStyles.headlineSmall(
-              textPrimary,
-            ).copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: AppSpacing.xxs),
-          Text(
-            subtitle,
-            style: AppTextStyles.bodySmall(textSecondary),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+              ],
+            ),
           ),
         ],
       ),
@@ -714,39 +721,143 @@ class PreTriageView extends GetView<PreTriageController> {
         : AppColors.lightTextSecondary;
 
     Get.dialog(
-      AlertDialog(
-        backgroundColor: isDark
-            ? AppColors.darkSurface
-            : AppColors.lightSurface,
-        shape: RoundedRectangleBorder(borderRadius: AppDecorations.borderMD),
-        title: Text(
-          'Delete Screening?',
-          style: AppTextStyles.titleLarge(AppColors.error),
+      Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: AppDecorations.borderXL,
         ),
-        content: Text(
-          'This action cannot be undone.',
-          style: AppTextStyles.bodyMedium(textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: Text('Cancel', style: AppTextStyles.labelLarge(textPrimary)),
-          ),
-          ElevatedButton(
-            onPressed: () => controller.deleteScreeningItem(item),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: AppDecorations.borderSM,
+        backgroundColor:
+            isDark ? AppColors.darkSurface : AppColors.lightSurface,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Stack(
+            children: [
+              Positioned(
+                top: AppSpacing.sm,
+                right: AppSpacing.sm,
+                child: IconButton(
+                  onPressed: () => Get.back(),
+                  icon: Icon(
+                    Icons.close,
+                    color: textSecondary.withValues(alpha: 0.6),
+                    size: 20,
+                  ),
+                ),
               ),
-            ),
-            child: Text(
-              'Delete',
-              style: AppTextStyles.labelLarge(Colors.white),
-            ),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.xxl,
+                  vertical: AppSpacing.xxl,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.delete_outline_rounded,
+                        color: AppColors.error,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Text(
+                      'Delete Screening?',
+                      style: AppTextStyles.titleLarge(textPrimary).copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    RichText(
+                      text: TextSpan(
+                        style: AppTextStyles.bodyMedium(textSecondary).copyWith(
+                          height: 1.4,
+                        ),
+                        children: [
+                          const TextSpan(
+                            text: 'Are you sure you want to delete the screening for ',
+                          ),
+                          TextSpan(
+                            text: item.fullName,
+                            style: AppTextStyles.bodyMedium(textPrimary).copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const TextSpan(
+                            text: '? This action cannot be undone.',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 40,
+                            child: OutlinedButton(
+                              onPressed: () => Get.back(),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                minimumSize: const Size(0, 40),
+                                side: BorderSide(
+                                  color: isDark
+                                      ? AppColors.darkDivider
+                                      : AppColors.lightDivider,
+                                  width: 1.0,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: AppDecorations.borderSM,
+                                ),
+                              ),
+                              child: Text(
+                                'Cancel',
+                                style: AppTextStyles.labelLarge(textPrimary),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: SizedBox(
+                            height: 40,
+                            child: ElevatedButton.icon(
+                              onPressed: () => controller.deleteScreeningItem(item),
+                              icon: const Icon(
+                                Icons.delete_outline_rounded,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                              label: Text(
+                                'Delete',
+                                style: AppTextStyles.labelLarge(Colors.white),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                minimumSize: const Size(0, 40),
+                                backgroundColor: AppColors.error,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: AppDecorations.borderSM,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -846,6 +957,8 @@ class PreTriageView extends GetView<PreTriageController> {
                             child: OutlinedButton(
                               onPressed: () => Get.back(),
                               style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                minimumSize: const Size(0, 40),
                                 side: BorderSide(
                                   color: isDark
                                       ? AppColors.darkDivider
@@ -882,6 +995,8 @@ class PreTriageView extends GetView<PreTriageController> {
                                 style: AppTextStyles.labelLarge(Colors.white),
                               ),
                               style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                minimumSize: const Size(0, 40),
                                 backgroundColor: AppColors.secondary,
                                 foregroundColor: Colors.white,
                                 elevation: 0,
