@@ -11,6 +11,11 @@ abstract final class ScreeningKeys {
   static const nameField = Key('screening_name');
   static const ageField = Key('screening_age');
   static const sexPicker = Key('screening_sex');
+
+  /// One per segment of [sexPicker]. A segmented control is three targets in
+  /// one widget, and a test that taps it by position breaks the day a site
+  /// adds a fourth.
+  static Key sexOption(String value) => Key('screening_sex_$value');
   static const phoneField = Key('screening_phone');
   static const mrnField = Key('screening_mrn');
   static const step1Next = Key('screening_step1_next');

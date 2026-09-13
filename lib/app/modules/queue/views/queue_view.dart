@@ -183,6 +183,7 @@ class _BoardSummary extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           SecondaryBar(
+            key: QueueKeys.callNext,
             label: 'Call next',
             icon: Icons.campaign_outlined,
             onPressed: controller.waitingCount == 0 ? null : controller.callNext,

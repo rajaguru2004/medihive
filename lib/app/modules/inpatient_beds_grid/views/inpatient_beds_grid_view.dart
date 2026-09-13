@@ -171,6 +171,7 @@ class _StateFilters extends StatelessWidget {
           if (i > 0) const SizedBox(width: 8),
           Expanded(
             child: _StateChip(
+              key: InpatientKeys.bedStateFilter(BedState.values[i].name),
               state: BedState.values[i],
               count: controller.countOf(BedState.values[i]),
               selected: controller.stateFilter.value == BedState.values[i],
@@ -185,6 +186,7 @@ class _StateFilters extends StatelessWidget {
 
 class _StateChip extends StatelessWidget {
   const _StateChip({
+    super.key,
     required this.state,
     required this.count,
     required this.selected,

@@ -77,11 +77,11 @@ class InpatientView extends GetView<InpatientController> {
                             : null,
                       ),
                       VitalTile(
-                        label: 'Admitted today',
+                        label: 'Admitted',
                         value: '${stats.todayAdmissions}',
                       ),
                       VitalTile(
-                        label: 'Discharged today',
+                        label: 'Discharged',
                         value: '${stats.todayDischarges}',
                       ),
                     ],

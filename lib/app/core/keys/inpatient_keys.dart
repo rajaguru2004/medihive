@@ -27,6 +27,10 @@ abstract final class InpatientKeys {
   static const bedsEmpty = Key('inpatient_beds_empty');
   static Key bed(String id) => Key('inpatient_bed_$id');
 
+  /// One per `BedState`, keyed by its enum name. The counts on the bed map are
+  /// also its filters, so this names a control rather than a statistic.
+  static Key bedStateFilter(String state) => Key('inpatient_bed_filter_$state');
+
   // ── Admissions ────────────────────────────────────────────────────────────
   static const admissions = Key('inpatient_admissions_screen');
   static const admissionsList = Key('inpatient_admissions_list');

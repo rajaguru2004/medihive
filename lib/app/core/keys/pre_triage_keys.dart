@@ -16,6 +16,11 @@ abstract final class PreTriageKeys {
   // ── Detail ────────────────────────────────────────────────────────────────
   static const detail = Key('pre_triage_detail_screen');
   static const detailVitals = Key('pre_triage_detail_vitals');
+
+  /// The banner that says, in words, that one of the observations is outside
+  /// its range. Keyed separately from [detailVitals] because the tiles' colour
+  /// and the sentence are two different promises to the reader.
+  static const detailFlag = Key('pre_triage_detail_flag');
   static const detailEdit = Key('pre_triage_detail_edit');
   static const detailConvert = Key('pre_triage_detail_convert');
   static const detailError = Key('pre_triage_detail_error');

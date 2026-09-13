@@ -61,6 +61,7 @@ class NewScreeningStep1View extends GetView<NewScreeningStep1Controller> {
                                     selected: controller.sex.value ??
                                         NewScreeningStep1Controller.sexes.last,
                                     labelOf: (value) => value,
+                                    keyOf: ScreeningKeys.sexOption,
                                     onSelected: (value) =>
                                         controller.sex.value = value,
                                   ),

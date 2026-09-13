@@ -59,7 +59,7 @@ class ConsultationsView extends GetView<ConsultationsController> {
                   columns: 3,
                   tiles: [
                     VitalTile(
-                      label: 'Still waiting',
+                      label: 'Waiting',
                       value: '${controller.waiting.length}',
                       tone: controller.waiting.length >= 10
                           ? AppColors.acuityUrgent

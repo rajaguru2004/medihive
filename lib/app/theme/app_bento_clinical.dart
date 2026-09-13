@@ -310,6 +310,16 @@ class VitalsGrid extends StatelessWidget {
   const VitalsGrid({super.key, required this.tiles, this.columns});
 
   final List<VitalTile> tiles;
+
+  /// Three across is the phone default and it sets a hard ceiling on the
+  /// label: the overline is 11pt with open tracking, so anything past about
+  /// **twelve characters ellipsises** on a 411dp screen. "Admitted today"
+  /// becomes "ADMITTED TO…", which is not a label.
+  ///
+  /// Shorten the label rather than widening the grid — a column heading is
+  /// scaffolding, and the reading underneath it is what the reader came for.
+  /// Drop to two columns only for a compound value like a blood pressure,
+  /// which is wide in the *figure* rather than the label.
   final int? columns;
 
   int _columnsFor(BuildContext context) {
