@@ -1,97 +1,101 @@
-import 'package:flutter/foundation.dart';
-
-import 'package:dio/dio.dart';
-import 'package:get/get.dart' hide Response;
+import 'package:get/get.dart';
 
 import '../../../data/models/admission_model.dart';
+import '../../../data/services/data_bus.dart';
 import '../../../data/services/inpatient_service.dart';
+import '../../../data/utils/legacy_envelope.dart';
+import '../../../data/utils/load_state.dart';
 
-class InpatientAdmissionsController extends GetxController {
+/// Every admission, live and closed.
+class InpatientAdmissionsController extends GetxController with LoadStateMixin {
+  static InpatientAdmissionsController get to =>
+      Get.find<InpatientAdmissionsController>();
+
   final _service = Get.find<InpatientService>();
 
-  // State fields
-  bool isLoading = false;
-  String errorMessage = '';
-  List<AdmissionModel> admissions = [];
+  final admissions = <AdmissionModel>[].obs;
+  final query = ''.obs;
+  final statusFilter = allStatuses.obs;
 
-  // Filters / Search
-  String admissionsSearchQuery = '';
-  String selectedAdmissionStatusFilter =
-      'Active'; // 'All', 'Active', 'Discharged'
+  static const allStatuses = 'All';
+
+  List<String> get statuses => [
+        allStatuses,
+        ...{
+          for (final a in admissions)
+            if (a.status.trim().isNotEmpty) a.status.trim(),
+        }.toList()
+          ..sort(),
+      ];
+
+  int get activeCount =>
+      admissions.where((a) => a.status.trim().toLowerCase() == 'active').length;
+
+  List<AdmissionModel> get displayed {
+    final text = query.value.trim().toLowerCase();
+
+    final rows = admissions.where((a) {
+      if (statusFilter.value != allStatuses &&
+          a.status.trim().toLowerCase() !=
+              statusFilter.value.trim().toLowerCase()) {
+        return false;
+      }
+      if (text.isNotEmpty) {
+        final haystack = [
+          a.patient.fullName,
+          a.patient.mrn,
+          a.admissionReason,
+          a.bed.bedNumber,
+          a.bed.ward?.name ?? '',
+        ].join(' ').toLowerCase();
+        if (!haystack.contains(text)) return false;
+      }
+      return true;
+    }).toList();
+
+    // Live admissions first, then newest. A discharged patient is history; a
+    // live one is somebody in a bed right now.
+    rows.sort((a, b) {
+      final aLive = a.status.trim().toLowerCase() == 'active';
+      final bLive = b.status.trim().toLowerCase() == 'active';
+      if (aLive != bLive) return aLive ? -1 : 1;
+      return b.admissionDate.compareTo(a.admissionDate);
+    });
+    return rows;
+  }
+
+  bool get isFiltered =>
+      query.value.trim().isNotEmpty || statusFilter.value != allStatuses;
 
   @override
-  void onInit() {
-    super.onInit();
-    refreshAllData();
-  }
-
-  // Fetch admissions data
-  Future<void> refreshAllData() async {
-    isLoading = true;
-    errorMessage = '';
-    update();
-
-    try {
-      final res = await _service.fetchAdmissions();
-      if (res.data != null && res.data['success'] == true) {
-        final List<dynamic> admissionsList = res.data['data'] ?? [];
-        final List<AdmissionModel> parsedAdmissions = [];
-        for (final item in admissionsList) {
-          if (item is Map<String, dynamic>) {
-            parsedAdmissions.add(AdmissionModel.fromJson(item));
-          }
-        }
-        admissions = parsedAdmissions;
-      }
-    } on DioException catch (e) {
-      errorMessage = e.message ?? 'Network error. Please try again.';
-      debugPrint('[InpatientAdmissionsController] DioException: ${e.message}');
-    } catch (e) {
-      errorMessage = 'Failed to load inpatient details. Please try again.';
-      debugPrint('[InpatientAdmissionsController] Error: $e');
-    } finally {
-      isLoading = false;
-      update();
+  void onReady() {
+    super.onReady();
+    load();
+    if (Get.isRegistered<DataBus>()) {
+      ever<int>(DataBus.to.tick('admissions'), (_) {
+        if (!isLoading) load(silent: true);
+      });
     }
   }
 
-  // Change Admission Status Filter
-  void changeAdmissionStatusFilter(String filter) {
-    selectedAdmissionStatusFilter = filter;
-    update();
-  }
+  Future<void> load({bool silent = false}) => runGuarded(
+        () async {
+          final response = await _service.fetchAdmissions();
+          admissions.assignAll(
+            envelopeRows(response.data).map(AdmissionModel.fromJson).toList(),
+          );
+        },
+        fallback: "Couldn't load admissions.",
+        silent: silent,
+      );
 
-  // Set Search Queries
-  void updateAdmissionsSearch(String query) {
-    admissionsSearchQuery = query;
-    update();
-  }
+  Future<void> reload() => load(silent: true);
 
-  // Get filtered admission list for Admissions tab (status filter + query filter)
-  List<AdmissionModel> get filteredAllAdmissions {
-    final query = admissionsSearchQuery.trim().toLowerCase();
-    final filter = selectedAdmissionStatusFilter;
-    final List<AdmissionModel> result = [];
-    for (final admission in admissions) {
-      bool matchesStatus = true;
-      if (filter == 'Active') {
-        matchesStatus = admission.status.toLowerCase() == 'admitted';
-      } else if (filter == 'Discharged') {
-        matchesStatus = admission.status.toLowerCase() == 'discharged';
-      }
+  void search(String text) => query.value = text;
+  void filterByStatus(String status) => statusFilter.value = status;
 
-      if (matchesStatus) {
-        if (query.isEmpty) {
-          result.add(admission);
-        } else {
-          final name = admission.patient.fullName.toLowerCase();
-          final mrn = admission.patient.mrn.toLowerCase();
-          if (name.contains(query) || mrn.contains(query)) {
-            result.add(admission);
-          }
-        }
-      }
-    }
-    return result;
+  void clearFilters() {
+    query.value = '';
+    statusFilter.value = allStatuses;
   }
 }

@@ -1,692 +1,402 @@
 import 'package:flutter/material.dart';
-
 import 'package:get/get.dart';
 
-import '../../../theme/theme.dart';
+import '../../../core/keys/app_keys.dart';
+import '../../../data/models/bed_model.dart';
+import '../../../data/utils/formatters.dart';
 import '../../../routes/app_pages.dart';
+import '../../../theme/theme.dart';
 import '../controllers/inpatient_beds_grid_controller.dart';
 
+/// One ward's beds, as a map.
+///
+/// A grid rather than a list, because a ward *is* a floor plan and the
+/// question — where is there a free bed — is a spatial one. Each tile carries
+/// its state as a fill, a glyph and a word, so it survives a colour-blind
+/// reader and a screen seen from across a corridor.
 class InpatientBedsGridView extends GetView<InpatientBedsGridController> {
-  final bool isEmbedded;
-  const InpatientBedsGridView({super.key, this.isEmbedded = false});
+  const InpatientBedsGridView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    if (isEmbedded && !Get.isRegistered<InpatientBedsGridController>()) {
-      Get.put(InpatientBedsGridController());
-    }
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? AppColors.darkBackground : AppColors.lightBackground;
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-
-    if (isEmbedded) {
-      return GetBuilder<InpatientBedsGridController>(
-        builder: (controller) => _buildViewContent(
-            context, controller, isDark, textPrimary, textSecondary),
-      );
-    }
-
     return Scaffold(
-      backgroundColor: bg,
-      appBar: AppBar(
-        backgroundColor:
-            isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: textPrimary,
-            size: AppSpacing.iconMD,
-          ),
-          onPressed: () => Get.back(),
-        ),
-        title: Text(
-          'Beds Grid',
-          style: AppTextStyles.titleMedium(textPrimary),
-        ),
-      ),
-      body: SafeArea(
-        child: GetBuilder<InpatientBedsGridController>(
-          builder: (controller) {
-            return RefreshIndicator(
-              color: AppColors.primary,
-              onRefresh: controller.refreshAllData,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.lg,
-                  vertical: AppSpacing.lg,
-                ),
-                children: [
-                  _buildViewContent(
-                      context, controller, isDark, textPrimary, textSecondary),
-                ],
+      // PreferredSize because the header's subtitle is reactive and `Obx`
+      // is not a `PreferredSizeWidget`. The height is DetailHeader's own.
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(60),
+        child: Obx(
+          () => DetailHeader(
+            title: 'Bed map',
+            subtitle: controller.selectedWard?.name,
+            action: CircleIconButton(
+              key: InpatientKeys.addBed,
+              icon: Icons.add_rounded,
+              tooltip: 'Add bed',
+              onTap: () => Get.toNamed<void>(
+                Routes.INPATIENT_ADD_BED,
+                arguments: {'wardId': controller.selectedWardId.value},
               ),
-            );
-          },
+            ),
+          ),
         ),
       ),
+      body: Obx(() {
+        if (controller.isLoading && controller.rxFirstLoad.value) {
+          return const BentoScreen(
+            slivers: [
+              BentoSection(top: BentoSpace.page, child: BentoSkeleton(rows: 4)),
+            ],
+          );
+        }
+
+        final beds = controller.displayed;
+
+        return BentoScreen(
+          key: InpatientKeys.beds,
+          onRefresh: controller.reload,
+          slivers: [
+            if (controller.hasLoadError)
+              BentoSection(
+                top: BentoSpace.page,
+                child: ErrorRetryBanner(
+                  message: controller.rxLoadError.value!,
+                  onRetry: controller.load,
+                ),
+              ),
+
+            // ── Ward picker ───────────────────────────────────────────────
+            if (controller.activeWards.length > 1)
+              BentoSection(
+                top: controller.hasLoadError ? 0 : BentoSpace.page,
+                bottom: BentoSpace.header,
+                child: BentoPicker(
+                  label: 'Ward',
+                  value: controller.selectedWard?.name,
+                  placeholder: 'Choose a ward',
+                  onTap: () => _openWardPicker(context, controller),
+                ),
+              ),
+
+            // ── State counts, doubling as filters ─────────────────────────
+            if (controller.beds.isNotEmpty)
+              BentoSection(
+                top: controller.activeWards.length > 1
+                    ? 0
+                    : (controller.hasLoadError ? 0 : BentoSpace.page),
+                bottom: BentoSpace.header,
+                child: _StateFilters(controller: controller),
+              ),
+
+            // ── The map ───────────────────────────────────────────────────
+            if (beds.isEmpty)
+              BentoSection(
+                top: BentoSpace.page,
+                child: EmptyState(
+                  key: InpatientKeys.bedsEmpty,
+                  icon: Icons.bed_outlined,
+                  title: controller.stateFilter.value != null
+                      ? 'No ${controller.stateFilter.value!.label.toLowerCase()} beds'
+                      : controller.selectedWard == null
+                          ? 'Choose a ward'
+                          : 'No beds in this ward yet',
+                  message: controller.stateFilter.value != null
+                      ? null
+                      : 'Beds added to this ward appear here as a map.',
+                  actionLabel: controller.stateFilter.value != null
+                      ? 'Show all beds'
+                      : 'Add bed',
+                  onAction: controller.stateFilter.value != null
+                      ? () => controller.filterByState(null)
+                      : () => Get.toNamed<void>(
+                            Routes.INPATIENT_ADD_BED,
+                            arguments: {
+                              'wardId': controller.selectedWardId.value,
+                            },
+                          ),
+                ),
+              )
+            else
+              BentoSection(
+                child: BedGrid(
+                  key: InpatientKeys.bedGrid,
+                  tiles: [
+                    for (final bed in beds)
+                      BedTile(
+                        key: InpatientKeys.bed(bed.id),
+                        number: bed.bedNumber,
+                        state: BedState.resolve(bed.status),
+                        occupant: controller.showNames
+                            ? controller.occupantOf(bed)?.patient.fullName
+                            : null,
+                        onTap: () => _openBedSheet(context, bed, controller),
+                      ),
+                  ],
+                ),
+              ),
+
+            if (beds.isNotEmpty)
+              const BentoSection(
+                child: Padding(
+                  key: InpatientKeys.bedLegend,
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  child: _BedLegend(),
+                ),
+              ),
+          ],
+        );
+      }),
     );
   }
+}
 
-  Widget _buildViewContent(
-    BuildContext context,
-    InpatientBedsGridController controller,
-    bool isDark,
-    Color textPrimary,
-    Color textSecondary,
-  ) {
-    if (controller.isLoading && controller.wards.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
-      );
-    }
+// ── Filters ─────────────────────────────────────────────────────────────────
 
-    if (controller.errorMessage.isNotEmpty && controller.wards.isEmpty) {
-      return _buildErrorState(context, controller, isDark);
-    }
+/// The four bed states as counts that are also filters.
+///
+/// A count somebody wants to act on should be the thing they tap. Two separate
+/// controls — a stat row and a filter row saying the same four words — is the
+/// version of this screen that was there before.
+class _StateFilters extends StatelessWidget {
+  const _StateFilters({required this.controller});
 
-    final activeWards = controller.activeWards;
-    final selectedWard = controller.selectedWardDetails;
-    final bedsList = controller.filteredBeds;
+  final InpatientBedsGridController controller;
 
-    if (activeWards.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
-        child: Center(
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (var i = 0; i < BedState.values.length; i++) ...[
+          if (i > 0) const SizedBox(width: 8),
+          Expanded(
+            child: _StateChip(
+              state: BedState.values[i],
+              count: controller.countOf(BedState.values[i]),
+              selected: controller.stateFilter.value == BedState.values[i],
+              onTap: () => controller.filterByState(BedState.values[i]),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _StateChip extends StatelessWidget {
+  const _StateChip({
+    required this.state,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final BedState state;
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = state.color;
+    final ink = semanticInk(context, tint);
+
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(BentoRadius.control),
+        child: AnimatedContainer(
+          duration: motionDuration(context),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          decoration: BoxDecoration(
+            color: tint.withValues(alpha: selected ? 0.2 : 0.09),
+            borderRadius: BorderRadius.circular(BentoRadius.control),
+            border: Border.all(
+              color: tint.withValues(alpha: selected ? 0.7 : 0.24),
+              // A selected chip gains a heavier edge as well as a stronger
+              // fill, so selection survives on a screen nobody can see colour
+              // on.
+              width: selected ? 1.5 : 1,
+            ),
+          ),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.bed_rounded,
-                size: AppSpacing.iconXL,
-                color: textSecondary.withValues(alpha: 0.5),
-              ),
-              const SizedBox(height: AppSpacing.sm),
               Text(
-                'No active wards found. Please activate/add a ward first.',
-                style: AppTextStyles.bodyMedium(textSecondary),
-                textAlign: TextAlign.center,
+                '$count',
+                style: AppFonts.numeric(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: ink,
+                  height: 1.0,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                state.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppFonts.text(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: ink,
+                  height: 1.0,
+                ),
               ),
             ],
           ),
         ),
-      );
-    }
+      ),
+    );
+  }
+}
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+class _BedLegend extends StatelessWidget {
+  const _BedLegend();
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 14,
+      runSpacing: 8,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Beds Allocation Grid',
-              style: AppTextStyles.titleMedium(textPrimary).copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            ElevatedButton.icon(
-              onPressed: () => Get.toNamed(
-                Routes.INPATIENT_ADD_BED,
-                arguments: {'wardId': controller.selectedWardId},
-              ),
-              icon: const Icon(Icons.add, size: AppSpacing.iconSM),
-              label: const Text('Add bed'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.success,
-                foregroundColor: AppColors.lightSurface,
-                minimumSize: const Size(0, 40),
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppDecorations.borderMD,
+        for (final state in BedState.values)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(state.icon, size: 13, color: semanticInk(context, state.color)),
+              const SizedBox(width: 5),
+              Text(
+                state.label,
+                style: AppFonts.text(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: secondaryLabelColor(context),
+                  height: 1.0,
                 ),
-                elevation: 0,
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.md),
-
-        // Dropdowns Filter Row
-        Row(
-          children: [
-            // Ward Dropdown
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Select Ward',
-                    style: AppTextStyles.labelSmall(textSecondary),
-                  ),
-                  const SizedBox(height: AppSpacing.xxs),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? AppColors.darkSurface
-                          : AppColors.lightSurface,
-                      borderRadius: AppDecorations.borderMD,
-                      border: Border.all(
-                        color: isDark
-                            ? AppColors.darkSurfaceVariant
-                            : AppColors.lightSurfaceVariant,
-                      ),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: controller.selectedWardId,
-                        isExpanded: true,
-                        dropdownColor: isDark
-                            ? AppColors.darkSurface
-                            : AppColors.lightSurface,
-                        items: [
-                          for (final w in activeWards)
-                            DropdownMenuItem(
-                              value: w.id,
-                              child: Text(
-                                '${w.name} (${w.code})',
-                                style: AppTextStyles.bodyMedium(textPrimary),
-                              ),
-                            )
-                        ],
-                        onChanged: controller.changeSelectedWard,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            // Status Dropdown
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Status Filter',
-                    style: AppTextStyles.labelSmall(textSecondary),
-                  ),
-                  const SizedBox(height: AppSpacing.xxs),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? AppColors.darkSurface
-                          : AppColors.lightSurface,
-                      borderRadius: AppDecorations.borderMD,
-                      border: Border.all(
-                        color: isDark
-                            ? AppColors.darkSurfaceVariant
-                            : AppColors.lightSurfaceVariant,
-                      ),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: controller.selectedBedStatusFilter,
-                        isExpanded: true,
-                        dropdownColor: isDark
-                            ? AppColors.darkSurface
-                            : AppColors.lightSurface,
-                        items: const [
-                          DropdownMenuItem(
-                              value: 'All Beds', child: Text('All Beds')),
-                          DropdownMenuItem(
-                              value: 'Available', child: Text('Available')),
-                          DropdownMenuItem(
-                              value: 'Occupied', child: Text('Occupied')),
-                          DropdownMenuItem(
-                              value: 'Maintenance', child: Text('Maintenance')),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) {
-                            controller.changeBedStatusFilter(val);
-                          }
-                        },
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.md),
-
-        // Live ward details banner
-        if (selectedWard != null) ...[
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? AppColors.darkSurface.withValues(alpha: 0.5)
-                  : AppColors.lightSurfaceVariant.withValues(alpha: 0.5),
-              borderRadius: AppDecorations.borderMD,
-              border: Border.all(
-                color: isDark
-                    ? AppColors.darkSurfaceVariant
-                    : AppColors.lightSurfaceVariant,
-              ),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildSmallStat(
-                      label: 'Ward Type',
-                      value: selectedWard.type.toUpperCase(),
-                      isDark: isDark,
-                    ),
-                    _buildSmallStat(
-                      label: 'Total Capacity',
-                      value: '${selectedWard.capacity} Beds',
-                      isDark: isDark,
-                    ),
-                    _buildSmallStat(
-                      label: 'Current Occupancy',
-                      value:
-                          '${selectedWard.occupiedBeds} Beds (${selectedWard.occupancyRate.toStringAsFixed(0)}%)',
-                      isDark: isDark,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-        ],
-
-        if (bedsList.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
-            child: Center(
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.single_bed_rounded,
-                    size: AppSpacing.iconXL,
-                    color: textSecondary.withValues(alpha: 0.5),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    'No beds match the selected filters',
-                    style: AppTextStyles.bodyMedium(textSecondary),
-                  ),
-                ],
-              ),
-            ),
-          )
-        else
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: AppSpacing.md,
-              mainAxisSpacing: AppSpacing.md,
-              childAspectRatio: 0.65,
-            ),
-            itemCount: bedsList.length,
-            itemBuilder: (context, index) {
-              final bed = bedsList[index];
-              final isOccupied = bed.status.toLowerCase() == 'occupied';
-              final isMaintenance = bed.status.toLowerCase() == 'maintenance';
-              final isAvailable = bed.status.toLowerCase() == 'available';
-
-              StatusType badgeType = StatusType.neutral;
-              if (isOccupied) badgeType = StatusType.success;
-              if (isMaintenance) badgeType = StatusType.warning;
-              if (isAvailable) badgeType = StatusType.success;
-
-              final rawType = bed.type.toLowerCase();
-              final displayType = rawType == 'icu'
-                  ? 'Icu'
-                  : (rawType.isNotEmpty
-                      ? '${rawType[0].toUpperCase()}${rawType.substring(1)}'
-                      : 'Standard');
-
-              final occupant = controller.bedOccupants[bed.id];
-              final patientName = occupant?.fullName ?? 'Admitted Patient';
-              final patientMRN = occupant != null ? 'MRN: ${occupant.mrn}' : 'Active Admission';
-
-              return Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                  color:
-                      isDark ? AppColors.darkSurface : AppColors.lightSurface,
-                  borderRadius: AppDecorations.borderLG,
-                  border: Border.all(
-                    color: isDark
-                        ? AppColors.darkSurfaceVariant
-                        : AppColors.lightSurfaceVariant,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Bed Name & Status Badge
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.single_bed_rounded,
-                                color: AppColors.primary,
-                                size: AppSpacing.iconSM),
-                            const SizedBox(width: AppSpacing.xxs),
-                            Text(
-                              bed.bedNumber,
-                              style: AppTextStyles.titleMedium(textPrimary)
-                                  .copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        StatusBadge(
-                          label: bed.status.toUpperCase(),
-                          type: badgeType,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-
-                    // Bed Type row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'BED TYPE',
-                          style: AppTextStyles.labelSmall(textSecondary).copyWith(
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        Text(
-                          displayType,
-                          style: AppTextStyles.bodyMedium(textPrimary).copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-
-                    // Occupant / Details Panel
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (isOccupied) ...[
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(AppSpacing.sm),
-                              decoration: BoxDecoration(
-                                color: AppColors.success.withValues(alpha: 0.08),
-                                borderRadius: AppDecorations.borderSM,
-                                border: Border.all(
-                                  color: AppColors.success.withValues(alpha: 0.15),
-                                  width: 0.5,
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.person_outline_rounded,
-                                        color: AppColors.success,
-                                        size: 14,
-                                      ),
-                                      const SizedBox(width: AppSpacing.xs),
-                                      Text(
-                                        'CURRENT OCCUPANT',
-                                        style: AppTextStyles.labelSmall(AppColors.success).copyWith(
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: AppSpacing.xs),
-                                  Text(
-                                    patientName,
-                                    style: AppTextStyles.bodyMedium(textPrimary).copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    patientMRN,
-                                    style: AppTextStyles.bodySmall(textSecondary),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ] else if (isMaintenance) ...[
-                            const Spacer(),
-                            Center(
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.error_outline_rounded,
-                                    color: AppColors.warning,
-                                    size: 14,
-                                  ),
-                                  const SizedBox(width: AppSpacing.xs),
-                                  Text(
-                                    'Under maintenance',
-                                    style: AppTextStyles.bodySmall(AppColors.warning).copyWith(
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const Spacer(),
-                          ] else ...[
-                            const Spacer(),
-                            Center(
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.check_circle_outline_rounded,
-                                    color: AppColors.success,
-                                    size: 14,
-                                  ),
-                                  const SizedBox(width: AppSpacing.xs),
-                                  Text(
-                                    'Available for use',
-                                    style: AppTextStyles.bodySmall(AppColors.success).copyWith(
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const Spacer(),
-                          ],
-                        ],
-                      ),
-                    ),
-
-                    // Action Panel
-                    const SizedBox(height: AppSpacing.sm),
-                    Row(
-                      children: [
-                        if (isOccupied) ...[
-                          Expanded(
-                            child: _buildActionButton(
-                              label: 'Available',
-                              icon: Icons.check_circle_outline_rounded,
-                              color: AppColors.success,
-                              onPressed: () => controller.updateBedStatus(
-                                  bed.id, 'available'),
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: _buildActionButton(
-                              label: 'Maintain',
-                              icon: Icons.build_outlined,
-                              color: AppColors.warning,
-                              onPressed: () => controller.updateBedStatus(
-                                  bed.id, 'maintenance'),
-                            ),
-                          ),
-                        ] else if (isMaintenance) ...[
-                          Expanded(
-                            child: _buildActionButton(
-                              label: 'Available',
-                              icon: Icons.check_circle_outline_rounded,
-                              color: AppColors.success,
-                              onPressed: () => controller.updateBedStatus(
-                                  bed.id, 'available'),
-                            ),
-                          ),
-                        ] else ...[
-                          Expanded(
-                            child: _buildActionButton(
-                              label: 'Maintain',
-                              icon: Icons.build_outlined,
-                              color: AppColors.warning,
-                              onPressed: () => controller.updateBedStatus(
-                                  bed.id, 'maintenance'),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            },
+            ],
           ),
       ],
     );
   }
+}
 
-  Widget _buildSmallStat({
-    required String label,
-    required String value,
-    required bool isDark,
-  }) {
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+// ── Sheets ──────────────────────────────────────────────────────────────────
 
-    return Expanded(
+Future<void> _openWardPicker(
+  BuildContext context,
+  InpatientBedsGridController controller,
+) {
+  return Get.bottomSheet<void>(
+    SheetShell(
+      title: 'Ward',
+      scrollable: true,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(label, style: AppTextStyles.labelSmall(textSecondary)),
-          const SizedBox(height: AppSpacing.xxs),
-          Text(
-            value,
-            style: AppTextStyles.labelMedium(textPrimary)
-                .copyWith(fontWeight: FontWeight.bold),
-          ),
+          for (final ward in controller.activeWards)
+            SheetRow(
+              icon: Icons.meeting_room_outlined,
+              label: ward.name,
+              sublabel: '${ward.availableBeds} free of ${ward.capacity}',
+              selected: ward.id == controller.selectedWardId.value,
+              onTap: () {
+                Get.back<void>();
+                controller.selectWard(ward.id);
+              },
+            ),
         ],
       ),
-    );
-  }
+    ),
+    isScrollControlled: true,
+  );
+}
 
-  Widget _buildActionButton({
-    required String label,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onPressed,
-  }) {
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 14),
-      label: Text(label),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: color,
-        side: BorderSide(color: color.withValues(alpha: 0.35)),
-        shape: const RoundedRectangleBorder(
-          borderRadius: AppDecorations.borderSM,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-        textStyle: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-        ),
-        minimumSize: const Size(0, 36),
-      ),
-    );
-  }
+Future<void> _openBedSheet(
+  BuildContext context,
+  BedModel bed,
+  InpatientBedsGridController controller,
+) {
+  final state = BedState.resolve(bed.status);
+  final occupant = controller.occupantOf(bed);
 
-  Widget _buildErrorState(
-    BuildContext context,
-    InpatientBedsGridController controller,
-    bool isDark,
-  ) {
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xxl),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline_rounded,
-              color: AppColors.error,
-              size: AppSpacing.iconXL * 1.5,
+  return Get.bottomSheet<void>(
+    SheetShell(
+      title: 'Bed ${bed.bedNumber}',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (occupant != null) ...[
+            PatientIdentityBand(
+              name: controller.showNames
+                  ? occupant.patient.fullName
+                  : 'Occupied',
+              mrn: controller.showNames ? occupant.patient.mrn : null,
+              sex: controller.showNames ? occupant.patient.gender : null,
+              extra: 'Day ${Formatters.lengthOfStayDays(occupant.admissionDate) + 1}'
+                  ' · admitted ${Formatters.dateMedium(occupant.admissionDate)}',
             ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              'Error Loading Data',
-              style: AppTextStyles.titleLarge(textPrimary),
+            if (occupant.admissionReason.trim().isNotEmpty) ...[
+              const SizedBox(height: 12),
+              FactRow(label: 'Reason', value: occupant.admissionReason),
+            ],
+            const SizedBox(height: BentoSpace.section),
+            SheetRow(
+              icon: Icons.logout_rounded,
+              label: 'Discharge',
+              sublabel: 'Frees this bed',
+              onTap: () {
+                Get.back<void>();
+                Get.toNamed<void>(
+                  Routes.DISCHARGE_PATIENT,
+                  arguments: {'admissionId': occupant.id},
+                );
+              },
             ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              controller.errorMessage,
-              style: AppTextStyles.bodyMedium(textSecondary),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            ElevatedButton.icon(
-              onPressed: controller.refreshAllData,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Try Again'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.lightSurface,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.xl,
-                  vertical: AppSpacing.md,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppDecorations.borderMD,
-                ),
+          ] else ...[
+            FactRow(label: 'State', value: state.label),
+            if (bed.type.trim().isNotEmpty)
+              FactRow(label: 'Type', value: bed.type),
+            const SizedBox(height: BentoSpace.section),
+            if (state == BedState.vacant)
+              SheetRow(
+                icon: Icons.local_hotel_outlined,
+                label: 'Admit a patient here',
+                onTap: () {
+                  Get.back<void>();
+                  Get.toNamed<void>(
+                    Routes.INPATIENT_ADMIT,
+                    arguments: {
+                      'bedId': bed.id,
+                      'wardId': controller.selectedWardId.value,
+                    },
+                  );
+                },
               ),
-            ),
+            // Only the states this bed can actually move to. Offering
+            // "occupied" as a manual state is how a bed ends up marked full
+            // with nobody in it.
+            for (final next in const [
+              BedState.vacant,
+              BedState.reserved,
+              BedState.blocked,
+            ])
+              if (next != state)
+                SheetRow(
+                  icon: next.icon,
+                  label: 'Mark ${next.label.toLowerCase()}',
+                  onTap: () {
+                    Get.back<void>();
+                    controller.setBedState(bed, next);
+                  },
+                ),
           ],
-        ),
+        ],
       ),
-    );
-  }
+    ),
+    isScrollControlled: true,
+  );
 }

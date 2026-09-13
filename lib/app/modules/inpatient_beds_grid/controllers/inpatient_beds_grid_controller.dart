@@ -1,229 +1,179 @@
-import 'package:flutter/foundation.dart';
-
-import 'package:dio/dio.dart';
-import 'package:get/get.dart' hide Response;
+import 'package:get/get.dart';
 
 import '../../../data/models/admission_model.dart';
 import '../../../data/models/bed_model.dart';
 import '../../../data/models/ward_model.dart';
+import '../../../data/services/data_bus.dart';
 import '../../../data/services/inpatient_service.dart';
+import '../../../data/services/settings_service.dart';
+import '../../../data/utils/error_handler.dart';
+import '../../../data/utils/legacy_envelope.dart';
+import '../../../data/utils/load_state.dart';
+import '../../../theme/theme.dart';
 
-class InpatientBedsGridController extends GetxController {
+/// The bed map for one ward.
+///
+/// Beds and admissions are fetched together and joined here rather than on the
+/// server, because the two routes are the ones that exist — and because a bed
+/// tile has to name its occupant, which the bed row alone does not carry.
+class InpatientBedsGridController extends GetxController with LoadStateMixin {
+  static InpatientBedsGridController get to =>
+      Get.find<InpatientBedsGridController>();
+
   final _service = Get.find<InpatientService>();
 
-  // State fields
-  bool isLoading = false;
-  String errorMessage = '';
-  List<WardModel> wards = [];
-  List<BedModel> beds = []; // Beds for the currently selected ward
-  Map<String, AdmissionPatient> bedOccupants = {}; // Map bed ID to current occupant patient info
+  final wards = <WardModel>[].obs;
+  final beds = <BedModel>[].obs;
+  final selectedWardId = RxnString();
+  final stateFilter = Rxn<BedState>();
 
-  String? selectedWardId;
-  String selectedBedStatusFilter =
-      'All Beds'; // 'All Beds', 'Available', 'Occupied', 'Maintenance'
+  /// Admission by bed id, so a tile can name who is in it.
+  final _occupants = <String, AdmissionModel>{}.obs;
+
+  List<WardModel> get activeWards => wards.where((w) => w.isActive).toList();
+
+  WardModel? get selectedWard => wards
+      .firstWhereOrNull((w) => w.id == selectedWardId.value);
+
+  /// Whether patient names may be drawn on this board.
+  ///
+  /// A bed map is often shown on a screen visible from a corridor or a waiting
+  /// area, so the site can turn identifying text off and keep the map.
+  bool get showNames => SettingsService.to.settings.showPatientNames;
+
+  AdmissionModel? occupantOf(BedModel bed) => _occupants[bed.id];
+
+  List<BedModel> get displayed {
+    final rows = stateFilter.value == null
+        ? beds.toList()
+        : beds
+            .where((b) => BedState.resolve(b.status) == stateFilter.value)
+            .toList();
+
+    // Bed number order, numerically where the numbers are numbers: "10" must
+    // come after "9", and a lexicographic sort puts it after "1".
+    rows.sort((a, b) {
+      final na = int.tryParse(a.bedNumber.replaceAll(RegExp(r'\D'), ''));
+      final nb = int.tryParse(b.bedNumber.replaceAll(RegExp(r'\D'), ''));
+      if (na != null && nb != null && na != nb) return na.compareTo(nb);
+      return a.bedNumber.compareTo(b.bedNumber);
+    });
+    return rows;
+  }
+
+  int countOf(BedState state) =>
+      beds.where((b) => BedState.resolve(b.status) == state).length;
 
   @override
-  void onInit() {
-    super.onInit();
-    refreshAllData();
-  }
-
-  // Fetch wards and beds
-  Future<void> refreshAllData() async {
-    isLoading = true;
-    errorMessage = '';
-    update();
-
-    try {
-      final wardsRes = await _service.fetchWards();
-
-      if (wardsRes.data != null && wardsRes.data['success'] == true) {
-        final List<dynamic> wardsList = wardsRes.data['data'] ?? [];
-        final List<WardModel> parsedWards = [];
-        for (final item in wardsList) {
-          if (item is Map<String, dynamic>) {
-            parsedWards.add(WardModel.fromJson(item));
-          }
-        }
-        wards = parsedWards;
-      }
-
-      // Check selected ward
-      _syncSelectedWard();
-
-      // Fetch active admissions to map current occupants
-      bedOccupants.clear();
-      try {
-        final admissionsRes = await _service.fetchAdmissions();
-        if (admissionsRes.data != null && admissionsRes.data['success'] == true) {
-          final List<dynamic> admissionsList = admissionsRes.data['data'] ?? [];
-          for (final item in admissionsList) {
-            if (item is Map<String, dynamic>) {
-              final adm = AdmissionModel.fromJson(item);
-              if (adm.status.toLowerCase() == 'admitted') {
-                bedOccupants[adm.bedId] = adm.patient;
-              }
-            }
-          }
-        }
-      } catch (e) {
-        debugPrint('[InpatientBedsGridController] Error loading admissions: $e');
-      }
-
-      if (selectedWardId != null) {
-        await _fetchBedsForSelectedWardQuietly();
-      } else {
-        beds = [];
-      }
-    } on DioException catch (e) {
-      errorMessage = e.message ?? 'Network error. Please try again.';
-      debugPrint('[InpatientBedsGridController] DioException: ${e.message}');
-    } catch (e) {
-      errorMessage = 'Failed to load inpatient details. Please try again.';
-      debugPrint('[InpatientBedsGridController] Error: $e');
-    } finally {
-      isLoading = false;
-      update();
+  void onReady() {
+    super.onReady();
+    final wardId = (Get.arguments as Map?)?['wardId'];
+    if (wardId is String && wardId.isNotEmpty) selectedWardId.value = wardId;
+    load();
+    if (Get.isRegistered<DataBus>()) {
+      ever<int>(DataBus.to.tick('beds'), (_) {
+        if (!isLoading) load(silent: true);
+      });
     }
   }
 
-  // Update Bed Status
-  Future<void> updateBedStatus(String bedId, String status) async {
-    isLoading = true;
-    update();
+  Future<void> load({bool silent = false}) => runGuarded(
+        () async {
+          final wardsResponse = await _service.fetchWards();
+          wards.assignAll(
+            envelopeRows(wardsResponse.data).map(WardModel.fromJson).toList(),
+          );
 
-    try {
-      final res = await _service.updateBedStatus(bedId, status);
-      if (res.data != null && res.data['success'] == true) {
-        Get.snackbar(
-          'Success',
-          'Bed status updated to $status.',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-        // Refresh all data to sync state
-        await refreshAllData();
-      } else {
-        final msg = res.data != null ? res.data['message'] as String? : null;
-        Get.snackbar(
-          'Error',
-          msg ?? 'Failed to update bed status.',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-        isLoading = false;
-        update();
-      }
-    } catch (e) {
-      Get.snackbar(
-        'Error',
-        'An error occurred: $e',
-        snackPosition: SnackPosition.BOTTOM,
+          // Default to the first ward with beds in it rather than simply the
+          // first: opening a bed map on an empty ward looks like a failure.
+          if (selectedWard == null) {
+            final preferred = activeWards
+                    .firstWhereOrNull((w) => w.capacity > 0) ??
+                activeWards.firstOrNull;
+            selectedWardId.value = preferred?.id;
+          }
+
+          await _loadBedsAndOccupants();
+        },
+        fallback: "Couldn't load the bed map.",
+        silent: silent,
       );
-      isLoading = false;
-      update();
-    }
+
+  Future<void> reload() => load(silent: true);
+
+  Future<void> selectWard(String? wardId) async {
+    selectedWardId.value = wardId;
+    stateFilter.value = null;
+    await runGuarded(
+      _loadBedsAndOccupants,
+      fallback: "Couldn't load that ward's beds.",
+      silent: true,
+    );
   }
 
-  // Select Ward & load beds
-  Future<void> changeSelectedWard(String? wardId) async {
-    selectedWardId = wardId;
-    if (wardId != null) {
-      isLoading = true;
-      update();
-      try {
-        await _fetchBedsForSelectedWardQuietly();
-      } catch (e) {
-        debugPrint('[InpatientBedsGridController] Error changing ward: $e');
-      } finally {
-        isLoading = false;
-        update();
+  void filterByState(BedState? state) =>
+      stateFilter.value = stateFilter.value == state ? null : state;
+
+  Future<void> setBedState(BedModel bed, BedState state) async {
+    // The API's vocabulary, which is not the enum's: `available`, not
+    // `vacant`, and `maintenance` for anything out of service.
+    final wire = switch (state) {
+      BedState.vacant => 'available',
+      BedState.occupied => 'occupied',
+      BedState.reserved => 'reserved',
+      BedState.blocked => 'maintenance',
+    };
+
+    try {
+      final response = await _service.updateBedStatus(bed.id, wire);
+      if (!envelopeOk(response.data, statusCode: response.statusCode)) {
+        showBentoToast(
+          envelopeMessage(response.data) ??
+              "Couldn't update bed ${bed.bedNumber}.",
+          tone: ToastTone.failure,
+        );
+        return;
       }
-    } else {
-      beds = [];
-      update();
+
+      showBentoToast('Bed ${bed.bedNumber} is now ${state.label.toLowerCase()}.');
+      if (Get.isRegistered<DataBus>()) DataBus.to.changedBed();
+      await load(silent: true);
+    } catch (e) {
+      showBentoToast(
+        parseErrorMessage(e, "Couldn't update bed ${bed.bedNumber}."),
+        tone: ToastTone.failure,
+      );
     }
   }
 
-  // Change Bed Status Filter
-  void changeBedStatusFilter(String filter) {
-    selectedBedStatusFilter = filter;
-    update();
-  }
-
-  // Helper: Synchronize selected ward ID based on available active wards list
-  void _syncSelectedWard() {
-    final activeWardsList = activeWards;
-    if (activeWardsList.isEmpty) {
-      selectedWardId = null;
+  Future<void> _loadBedsAndOccupants() async {
+    final wardId = selectedWardId.value;
+    if (wardId == null || wardId.isEmpty) {
+      beds.clear();
+      _occupants.clear();
       return;
     }
 
-    // Check if current selection is still active
-    bool stillActive = false;
-    for (final w in activeWardsList) {
-      if (w.id == selectedWardId) {
-        stillActive = true;
-        break;
-      }
-    }
+    final results = await Future.wait([
+      _service.fetchBeds(wardId: wardId),
+      _service.fetchAdmissions(),
+    ]);
 
-    if (!stillActive) {
-      // Default to the first active ward
-      selectedWardId = activeWardsList[0].id;
-    }
-  }
+    beds.assignAll(
+      envelopeRows(results[0].data).map(BedModel.fromJson).toList(),
+    );
 
-  // Fetch beds quietly (does not handle loader state itself)
-  Future<void> _fetchBedsForSelectedWardQuietly() async {
-    if (selectedWardId == null) return;
-    final res =
-        await _service.fetchBeds(wardId: selectedWardId!, status: 'all');
-    if (res.data != null && res.data['success'] == true) {
-      final List<dynamic> bedsList = res.data['data'] ?? [];
-      final List<BedModel> parsedBeds = [];
-      for (final item in bedsList) {
-        if (item is Map<String, dynamic>) {
-          parsedBeds.add(BedModel.fromJson(item));
-        }
-      }
-      beds = parsedBeds;
-    }
-  }
-
-  // Get active wards only
-  List<WardModel> get activeWards {
-    final List<WardModel> result = [];
-    for (final w in wards) {
-      if (w.isActive) {
-        result.add(w);
-      }
-    }
-    return result;
-  }
-
-  // Get selected ward details if available
-  WardModel? get selectedWardDetails {
-    if (selectedWardId == null) return null;
-    for (final w in wards) {
-      if (w.id == selectedWardId) {
-        return w;
-      }
-    }
-    return null;
-  }
-
-  // Get filtered bed list for Beds Grid
-  List<BedModel> get filteredBeds {
-    final List<BedModel> result = [];
-    final filter = selectedBedStatusFilter;
-    for (final bed in beds) {
-      bool matchesStatus = true;
-      if (filter != 'All Beds') {
-        matchesStatus = bed.status.toLowerCase() == filter.toLowerCase();
-      }
-      if (matchesStatus) {
-        result.add(bed);
-      }
-    }
-    return result;
+    _occupants
+      ..clear()
+      ..addEntries(
+        envelopeRows(results[1].data)
+            .map(AdmissionModel.fromJson)
+            // Only live admissions claim a bed. A discharged one still names
+            // the bed it was in, and letting it through paints an occupant
+            // onto a bed that is free.
+            .where((a) => a.status.trim().toLowerCase() == 'active')
+            .where((a) => a.bedId.isNotEmpty)
+            .map((a) => MapEntry(a.bedId, a)),
+      );
   }
 }

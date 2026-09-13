@@ -1,16 +1,23 @@
-import 'package:flutter/foundation.dart';
-
-import 'package:dio/dio.dart';
-import 'package:get/get.dart' hide Response;
+import 'package:get/get.dart';
 
 import '../../../data/models/ward_model.dart';
+import '../../../data/services/data_bus.dart';
 import '../../../data/services/inpatient_service.dart';
-import '../../inpatient_admissions/controllers/inpatient_admissions_controller.dart';
-import '../../inpatient_beds_grid/controllers/inpatient_beds_grid_controller.dart';
-import '../../inpatient_overview/controllers/inpatient_overview_controller.dart';
-import '../../inpatient_wards/controllers/inpatient_wards_controller.dart';
+import '../../../data/utils/error_handler.dart';
+import '../../../data/utils/load_state.dart';
+import '../../../theme/theme.dart';
 
+/// The estate's headline numbers.
 class InpatientStats {
+  const InpatientStats({
+    this.totalBeds = 0,
+    this.occupiedBeds = 0,
+    this.availableBeds = 0,
+    this.todayAdmissions = 0,
+    this.todayDischarges = 0,
+    this.occupancyRate = 0,
+  });
+
   final int totalBeds;
   final int occupiedBeds;
   final int availableBeds;
@@ -18,165 +25,124 @@ class InpatientStats {
   final int todayDischarges;
   final double occupancyRate;
 
-  InpatientStats({
-    required this.totalBeds,
-    required this.occupiedBeds,
-    required this.availableBeds,
-    required this.todayAdmissions,
-    required this.todayDischarges,
-    required this.occupancyRate,
-  });
+  /// Beds accounted for by neither of the two counts the server sends.
+  ///
+  /// Reserved and blocked beds are the difference, and a ward board that
+  /// silently folds them into "available" is a board that offers a bed nobody
+  /// can use.
+  int get otherBeds {
+    final rest = totalBeds - occupiedBeds - availableBeds;
+    return rest > 0 ? rest : 0;
+  }
 
   factory InpatientStats.fromJson(Map<String, dynamic> json) => InpatientStats(
-        totalBeds: json['totalBeds'] as int? ?? 0,
-        occupiedBeds: json['occupiedBeds'] as int? ?? 0,
-        availableBeds: json['availableBeds'] as int? ?? 0,
-        todayAdmissions: json['todayAdmissions'] as int? ?? 0,
-        todayDischarges: json['todayDischarges'] as int? ?? 0,
-        occupancyRate: (json['occupancyRate'] as num?)?.toDouble() ?? 0.0,
+        totalBeds: (json['totalBeds'] as num?)?.toInt() ?? 0,
+        occupiedBeds: (json['occupiedBeds'] as num?)?.toInt() ?? 0,
+        availableBeds: (json['availableBeds'] as num?)?.toInt() ?? 0,
+        todayAdmissions: (json['todayAdmissions'] as num?)?.toInt() ?? 0,
+        todayDischarges: (json['todayDischarges'] as num?)?.toInt() ?? 0,
+        occupancyRate: (json['occupancyRate'] as num?)?.toDouble() ?? 0,
       );
 }
 
-class InpatientController extends GetxController {
+/// The inpatient estate: capacity, wards, and the way into the bed map.
+///
+/// The previous version of this controller drove four sub-screens by asking
+/// each of their controllers to refresh whenever its own tab changed. That is
+/// backwards — a parent reaching into four children is how one tab switch
+/// costs four requests — so each sub-screen now owns its own data and hears
+/// about changes through the `DataBus`.
+class InpatientController extends GetxController with LoadStateMixin {
+  static InpatientController get to => Get.find<InpatientController>();
+
   final _service = Get.find<InpatientService>();
 
-  // State fields
-  bool isLoading = false;
-  String errorMessage = '';
-  InpatientStats? stats;
-  List<WardModel> wards = [];
+  final stats = const InpatientStats().obs;
+  final wards = <WardModel>[].obs;
 
-  // Active Tab state: 0: Overview, 1: Wards, 2: Beds Grid, 3: Admissions
-  int activeTab = 0;
+  List<WardModel> get activeWards =>
+      wards.where((w) => w.isActive).toList();
 
-  void changeTab(int index) {
-    activeTab = index;
-    update();
-  }
+  /// Wards at or over capacity. What a bed manager is looking for.
+  List<WardModel> get fullWards =>
+      activeWards.where((w) => w.availableBeds <= 0).toList();
 
   @override
-  void onInit() {
-    super.onInit();
-    refreshActiveTabData();
-  }
-
-  // Refresh active tab's specific data alongside main stats
-  Future<void> refreshActiveTabData() async {
-    await refreshAllData();
-
-    switch (activeTab) {
-      case 0:
-        if (Get.isRegistered<InpatientOverviewController>()) {
-          await Get.find<InpatientOverviewController>().refreshData();
-        }
-        break;
-      case 1:
-        if (Get.isRegistered<InpatientWardsController>()) {
-          await Get.find<InpatientWardsController>().refreshAllData();
-        }
-        break;
-      case 2:
-        if (Get.isRegistered<InpatientBedsGridController>()) {
-          await Get.find<InpatientBedsGridController>().refreshAllData();
-        }
-        break;
-      case 3:
-        if (Get.isRegistered<InpatientAdmissionsController>()) {
-          await Get.find<InpatientAdmissionsController>().refreshAllData();
-        }
-        break;
+  void onReady() {
+    super.onReady();
+    load();
+    if (Get.isRegistered<DataBus>()) {
+      for (final entity in const ['beds', 'wards', 'admissions']) {
+        ever<int>(DataBus.to.tick(entity), (_) {
+          if (!isLoading) load(silent: true);
+        });
+      }
     }
   }
 
-  // Fetch stats and wards data
-  Future<void> refreshAllData() async {
-    isLoading = true;
-    errorMessage = '';
-    update();
+  Future<void> load({bool silent = false}) => runGuarded(
+        () async {
+          final results = await Future.wait([
+            _service.fetchStats(),
+            _service.fetchWards(),
+          ]);
 
-    try {
-      // Parallel fetch stats and wards
-      final results = await Future.wait([
-        _service.fetchStats(),
-        _service.fetchWards(),
-      ]);
-
-      final statsRes = results[0];
-      final wardsRes = results[1];
-
-      if (statsRes.data != null && statsRes.data['success'] == true) {
-        stats = InpatientStats.fromJson(
-            statsRes.data['data'] as Map<String, dynamic>);
-      }
-
-      if (wardsRes.data != null && wardsRes.data['success'] == true) {
-        final List<dynamic> wardsList = wardsRes.data['data'] ?? [];
-        final List<WardModel> parsedWards = [];
-        for (final item in wardsList) {
-          if (item is Map<String, dynamic>) {
-            parsedWards.add(WardModel.fromJson(item));
+          final statsBody = results[0].data;
+          if (statsBody is Map && statsBody['success'] == true) {
+            final payload = statsBody['data'];
+            if (payload is Map) {
+              stats.value =
+                  InpatientStats.fromJson(payload.cast<String, dynamic>());
+            }
           }
-        }
-        wards = parsedWards;
-      }
-    } on DioException catch (e) {
-      errorMessage = e.message ?? 'Network error. Please try again.';
-      debugPrint('[InpatientController] DioException: ${e.message}');
-    } catch (e) {
-      errorMessage = 'Failed to load inpatient details. Please try again.';
-      debugPrint('[InpatientController] Error: $e');
-    } finally {
-      isLoading = false;
-      update();
-    }
-  }
 
-  // Deactivate ward
-  Future<void> deactivateWard(String wardId) async {
-    isLoading = true;
-    update();
-
-    try {
-      final res = await _service.updateWardStatus(wardId, false);
-      if (res.data != null && res.data['success'] == true) {
-        Get.snackbar(
-          'Success',
-          'Ward deactivated successfully.',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-        // Refresh all data to sync state
-        await refreshAllData();
-      } else {
-        final msg = res.data != null ? res.data['message'] as String? : null;
-        Get.snackbar(
-          'Error',
-          msg ?? 'Failed to deactivate ward.',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-        isLoading = false;
-        update();
-      }
-    } catch (e) {
-      Get.snackbar(
-        'Error',
-        'An error occurred: $e',
-        snackPosition: SnackPosition.BOTTOM,
+          final wardsBody = results[1].data;
+          if (wardsBody is Map && wardsBody['success'] == true) {
+            final rows = wardsBody['data'];
+            if (rows is List) {
+              wards.assignAll(
+                rows
+                    .whereType<Map>()
+                    .map((e) => WardModel.fromJson(e.cast<String, dynamic>()))
+                    .toList(),
+              );
+            }
+          }
+        },
+        fallback: "Couldn't load the ward estate.",
+        silent: silent,
       );
-      isLoading = false;
-      update();
-    }
-  }
 
-  // ─── Filtered Getters ───
+  Future<void> reload() => load(silent: true);
 
-  // Get active wards only
-  List<WardModel> get activeWards {
-    final List<WardModel> result = [];
-    for (final w in wards) {
-      if (w.isActive) {
-        result.add(w);
+  /// Takes a ward out of service.
+  ///
+  /// Not a delete: an inactive ward keeps its history, its beds and its past
+  /// admissions, and a bed manager reactivates it when the refurbishment is
+  /// done.
+  Future<void> deactivateWard(WardModel ward) async {
+    try {
+      final response = await _service.updateWardStatus(ward.id, false);
+      final body = response.data;
+      final envelope = body is Map ? body.cast<String, dynamic>() : null;
+
+      if (envelope?['success'] != true) {
+        showBentoToast(
+          envelope?['message'] as String? ??
+              "Couldn't take ${ward.name} out of service.",
+          tone: ToastTone.failure,
+        );
+        return;
       }
+
+      showBentoToast('${ward.name} is out of service.');
+      if (Get.isRegistered<DataBus>()) DataBus.to.changedBed();
+      await load(silent: true);
+    } catch (e) {
+      showBentoToast(
+        parseErrorMessage(e, "Couldn't take ${ward.name} out of service."),
+        tone: ToastTone.failure,
+      );
     }
-    return result;
   }
 }

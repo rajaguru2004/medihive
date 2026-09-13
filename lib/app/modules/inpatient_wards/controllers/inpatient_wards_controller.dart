@@ -1,104 +1,87 @@
-import 'package:flutter/foundation.dart';
-
-import 'package:dio/dio.dart';
-import 'package:get/get.dart' hide Response;
+import 'package:get/get.dart';
 
 import '../../../data/models/ward_model.dart';
+import '../../../data/services/data_bus.dart';
 import '../../../data/services/inpatient_service.dart';
-import '../../inpatient/controllers/inpatient_controller.dart';
+import '../../../data/utils/error_handler.dart';
+import '../../../data/utils/legacy_envelope.dart';
+import '../../../data/utils/load_state.dart';
+import '../../../theme/theme.dart';
 
-class InpatientWardsController extends GetxController {
+/// Every ward, including the ones out of service.
+///
+/// The overview shows only active wards because that is what a bed manager
+/// plans against; this screen is where the estate is *managed*, so an inactive
+/// ward has to be visible to be brought back.
+class InpatientWardsController extends GetxController with LoadStateMixin {
+  static InpatientWardsController get to =>
+      Get.find<InpatientWardsController>();
+
   final _service = Get.find<InpatientService>();
 
-  // State fields
-  bool isLoading = false;
-  String errorMessage = '';
-  List<WardModel> wards = [];
+  final wards = <WardModel>[].obs;
+  final showInactive = false.obs;
+
+  List<WardModel> get displayed {
+    final rows =
+        showInactive.value ? wards.toList() : wards.where((w) => w.isActive).toList();
+    // Fullest first: the ward with no beds left is the one somebody is about
+    // to have a problem with.
+    rows.sort((a, b) => a.availableBeds.compareTo(b.availableBeds));
+    return rows;
+  }
+
+  int get inactiveCount => wards.where((w) => !w.isActive).length;
 
   @override
-  void onInit() {
-    super.onInit();
-    refreshAllData();
-  }
-
-  // Fetch wards data
-  Future<void> refreshAllData() async {
-    isLoading = true;
-    errorMessage = '';
-    update();
-
-    try {
-      final res = await _service.fetchWards();
-      if (res.data != null && res.data['success'] == true) {
-        final List<dynamic> wardsList = res.data['data'] ?? [];
-        final List<WardModel> parsedWards = [];
-        for (final item in wardsList) {
-          if (item is Map<String, dynamic>) {
-            parsedWards.add(WardModel.fromJson(item));
-          }
-        }
-        wards = parsedWards;
-      }
-    } on DioException catch (e) {
-      errorMessage = e.message ?? 'Network error. Please try again.';
-      debugPrint('[InpatientWardsController] DioException: ${e.message}');
-    } catch (e) {
-      errorMessage = 'Failed to load inpatient details. Please try again.';
-      debugPrint('[InpatientWardsController] Error: $e');
-    } finally {
-      isLoading = false;
-      update();
+  void onReady() {
+    super.onReady();
+    load();
+    if (Get.isRegistered<DataBus>()) {
+      ever<int>(DataBus.to.tick('wards'), (_) {
+        if (!isLoading) load(silent: true);
+      });
     }
   }
 
-  // Deactivate ward
-  Future<void> deactivateWard(String wardId) async {
-    isLoading = true;
-    update();
-
-    try {
-      final res = await _service.updateWardStatus(wardId, false);
-      if (res.data != null && res.data['success'] == true) {
-        Get.snackbar(
-          'Success',
-          'Ward deactivated successfully.',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-        // Refresh local data
-        await refreshAllData();
-        // Also refresh inpatient stats if registered
-        if (Get.isRegistered<InpatientController>()) {
-          Get.find<InpatientController>().refreshAllData();
-        }
-      } else {
-        final msg = res.data != null ? res.data['message'] as String? : null;
-        Get.snackbar(
-          'Error',
-          msg ?? 'Failed to deactivate ward.',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-        isLoading = false;
-        update();
-      }
-    } catch (e) {
-      Get.snackbar(
-        'Error',
-        'An error occurred: $e',
-        snackPosition: SnackPosition.BOTTOM,
+  Future<void> load({bool silent = false}) => runGuarded(
+        () async {
+          final response = await _service.fetchWards();
+          wards.assignAll(
+            envelopeRows(response.data).map(WardModel.fromJson).toList(),
+          );
+        },
+        fallback: "Couldn't load the wards.",
+        silent: silent,
       );
-      isLoading = false;
-      update();
-    }
-  }
 
-  // Get active wards only
-  List<WardModel> get activeWards {
-    final List<WardModel> result = [];
-    for (final w in wards) {
-      if (w.isActive) {
-        result.add(w);
+  Future<void> reload() => load(silent: true);
+
+  void toggleInactive() => showInactive.toggle();
+
+  Future<void> setActive(WardModel ward, {required bool active}) async {
+    try {
+      final response = await _service.updateWardStatus(ward.id, active);
+      if (!envelopeOk(response.data, statusCode: response.statusCode)) {
+        showBentoToast(
+          envelopeMessage(response.data) ?? "Couldn't update ${ward.name}.",
+          tone: ToastTone.failure,
+        );
+        return;
       }
+
+      showBentoToast(
+        active
+            ? '${ward.name} is back in service.'
+            : '${ward.name} is out of service.',
+      );
+      if (Get.isRegistered<DataBus>()) DataBus.to.changedBed();
+      await load(silent: true);
+    } catch (e) {
+      showBentoToast(
+        parseErrorMessage(e, "Couldn't update ${ward.name}."),
+        tone: ToastTone.failure,
+      );
     }
-    return result;
   }
 }

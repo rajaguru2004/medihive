@@ -1,79 +1,88 @@
-import 'package:flutter/foundation.dart';
+import 'package:get/get.dart';
 
-import 'package:dio/dio.dart';
-import 'package:get/get.dart' hide Response;
-
+import '../../../core/app_clock.dart';
 import '../../../data/models/admission_model.dart';
+import '../../../data/services/data_bus.dart';
 import '../../../data/services/inpatient_service.dart';
+import '../../../data/utils/formatters.dart';
+import '../../../data/utils/legacy_envelope.dart';
+import '../../../data/utils/load_state.dart';
 
-class InpatientOverviewController extends GetxController {
+/// Who is in a bed right now.
+///
+/// The admissions screen is the register; this is the ward round — live
+/// admissions only, longest stay first, because length of stay is the thing a
+/// consultant scans a list like this for.
+class InpatientOverviewController extends GetxController with LoadStateMixin {
+  static InpatientOverviewController get to =>
+      Get.find<InpatientOverviewController>();
+
   final _service = Get.find<InpatientService>();
 
-  // State fields
-  bool isLoading = false;
-  String errorMessage = '';
-  List<AdmissionModel> admissions = [];
-  String overviewSearchQuery = '';
+  final admissions = <AdmissionModel>[].obs;
+  final query = ''.obs;
+
+  List<AdmissionModel> get active =>
+      admissions.where((a) => a.status.trim().toLowerCase() == 'active').toList();
+
+  List<AdmissionModel> get displayed {
+    final text = query.value.trim().toLowerCase();
+
+    final rows = active.where((a) {
+      if (text.isEmpty) return true;
+      final haystack = [
+        a.patient.fullName,
+        a.patient.mrn,
+        a.bed.bedNumber,
+        a.bed.ward?.name ?? '',
+      ].join(' ').toLowerCase();
+      return haystack.contains(text);
+    }).toList();
+
+    rows.sort((a, b) => a.admissionDate.compareTo(b.admissionDate));
+    return rows;
+  }
+
+  /// Stays past a week. Not an alarm — a prompt to check whether a discharge
+  /// plan exists.
+  int get longStayCount => active
+      .where((a) => Formatters.lengthOfStayDays(a.admissionDate) >= 7)
+      .length;
+
+  /// Admitted since midnight.
+  int get admittedToday {
+    final today = AppClock.now();
+    return active.where((a) {
+      final date = a.admissionDate.toLocal();
+      return date.year == today.year &&
+          date.month == today.month &&
+          date.day == today.day;
+    }).length;
+  }
 
   @override
-  void onInit() {
-    super.onInit();
-    refreshData();
-  }
-
-  // Fetch only active admissions data
-  Future<void> refreshData() async {
-    isLoading = true;
-    errorMessage = '';
-    update();
-
-    try {
-      final res = await _service.fetchAdmissions();
-      if (res.data != null && res.data['success'] == true) {
-        final List<dynamic> admissionsList = res.data['data'] ?? [];
-        final List<AdmissionModel> parsedAdmissions = [];
-        for (final item in admissionsList) {
-          if (item is Map<String, dynamic>) {
-            parsedAdmissions.add(AdmissionModel.fromJson(item));
-          }
-        }
-        admissions = parsedAdmissions;
-      }
-    } on DioException catch (e) {
-      errorMessage = e.message ?? 'Network error. Please try again.';
-      debugPrint('[InpatientOverviewController] DioException: ${e.message}');
-    } catch (e) {
-      errorMessage = 'Failed to load inpatient details. Please try again.';
-      debugPrint('[InpatientOverviewController] Error: $e');
-    } finally {
-      isLoading = false;
-      update();
+  void onReady() {
+    super.onReady();
+    load();
+    if (Get.isRegistered<DataBus>()) {
+      ever<int>(DataBus.to.tick('admissions'), (_) {
+        if (!isLoading) load(silent: true);
+      });
     }
   }
 
-  // Update Search Query
-  void updateOverviewSearch(String query) {
-    overviewSearchQuery = query;
-    update();
-  }
+  Future<void> load({bool silent = false}) => runGuarded(
+        () async {
+          final response = await _service.fetchAdmissions();
+          admissions.assignAll(
+            envelopeRows(response.data).map(AdmissionModel.fromJson).toList(),
+          );
+        },
+        fallback: "Couldn't load the ward round.",
+        silent: silent,
+      );
 
-  // Get filtered patient list for Overview tab (admitted status only + query filter)
-  List<AdmissionModel> get filteredActiveAdmissions {
-    final query = overviewSearchQuery.trim().toLowerCase();
-    final List<AdmissionModel> result = [];
-    for (final admission in admissions) {
-      if (admission.status.toLowerCase() == 'admitted') {
-        if (query.isEmpty) {
-          result.add(admission);
-        } else {
-          final name = admission.patient.fullName.toLowerCase();
-          final mrn = admission.patient.mrn.toLowerCase();
-          if (name.contains(query) || mrn.contains(query)) {
-            result.add(admission);
-          }
-        }
-      }
-    }
-    return result;
-  }
+  Future<void> reload() => load(silent: true);
+
+  void search(String text) => query.value = text;
 }

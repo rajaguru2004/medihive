@@ -1,407 +1,168 @@
 import 'package:flutter/material.dart';
-
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
 
+import '../../../core/keys/app_keys.dart';
+import '../../../data/models/admission_model.dart';
+import '../../../data/utils/formatters.dart';
 import '../../../routes/app_pages.dart';
 import '../../../theme/theme.dart';
 import '../controllers/inpatient_admissions_controller.dart';
 
+/// The admissions register: everyone who has been in a bed, live first.
 class InpatientAdmissionsView extends GetView<InpatientAdmissionsController> {
-  final bool isEmbedded;
-  const InpatientAdmissionsView({super.key, this.isEmbedded = false});
+  const InpatientAdmissionsView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    if (isEmbedded && !Get.isRegistered<InpatientAdmissionsController>()) {
-      Get.put(InpatientAdmissionsController());
-    }
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-    final bg = isDark ? AppColors.darkBackground : AppColors.lightBackground;
-
-    if (isEmbedded) {
-      return GetBuilder<InpatientAdmissionsController>(
-        builder: (controller) => _buildViewContent(
-            context, controller, isDark, textPrimary, textSecondary),
-      );
-    }
-
     return Scaffold(
-      backgroundColor: bg,
-      appBar: AppBar(
-        backgroundColor:
-            isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: textPrimary,
-            size: AppSpacing.iconMD,
-          ),
-          onPressed: () => Get.back(),
-        ),
-        title: Text(
-          'Inpatient Admissions',
-          style: AppTextStyles.titleMedium(textPrimary),
+      appBar: DetailHeader(
+        title: 'Admissions',
+        action: CircleIconButton(
+          icon: Icons.add_rounded,
+          tooltip: 'Admit patient',
+          onTap: () => Get.toNamed<void>(Routes.INPATIENT_ADMIT),
         ),
       ),
-      body: SafeArea(
-        child: GetBuilder<InpatientAdmissionsController>(
-          builder: (controller) {
-            return RefreshIndicator(
-              color: AppColors.primary,
-              onRefresh: controller.refreshAllData,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.lg,
-                  vertical: AppSpacing.lg,
-                ),
-                children: [
-                  _buildViewContent(
-                      context, controller, isDark, textPrimary, textSecondary),
-                ],
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
+      body: Obx(() {
+        if (controller.isLoading && controller.rxFirstLoad.value) {
+          return const BentoScreen(
+            slivers: [
+              BentoSection(top: BentoSpace.page, child: BentoSkeleton(rows: 5)),
+            ],
+          );
+        }
 
-  Widget _buildViewContent(
-    BuildContext context,
-    InpatientAdmissionsController controller,
-    bool isDark,
-    Color textPrimary,
-    Color textSecondary,
-  ) {
-    if (controller.isLoading && controller.admissions.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
-      );
-    }
+        final rows = controller.displayed;
 
-    if (controller.errorMessage.isNotEmpty && controller.admissions.isEmpty) {
-      return _buildErrorState(context, controller, isDark);
-    }
-
-    final admissionsList = controller.filteredAllAdmissions;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Patient Admissions History',
-          style: AppTextStyles.titleMedium(textPrimary).copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        // Search Input
-        TextField(
-          onChanged: controller.updateAdmissionsSearch,
-          decoration: InputDecoration(
-            hintText: 'Search patient by name or MRN...',
-            prefixIcon:
-                const Icon(Icons.search_rounded, size: AppSpacing.iconMD),
-            filled: true,
-            fillColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-            contentPadding: const EdgeInsets.symmetric(
-              vertical: AppSpacing.sm,
-              horizontal: AppSpacing.md,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: AppDecorations.borderMD,
-              borderSide: BorderSide(
-                color: isDark
-                    ? AppColors.darkSurfaceVariant
-                    : AppColors.lightSurfaceVariant,
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: AppDecorations.borderMD,
-              borderSide: BorderSide(
-                color: isDark
-                    ? AppColors.darkSurfaceVariant
-                    : AppColors.lightSurfaceVariant,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: AppDecorations.borderMD,
-              borderSide:
-                  const BorderSide(color: AppColors.primary, width: 1.5),
-            ),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        // Status Dropdown selector
-        Row(
-          children: [
-            Text(
-              'Status:',
-              style: AppTextStyles.bodyMedium(textSecondary),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-                decoration: BoxDecoration(
-                  color:
-                      isDark ? AppColors.darkSurface : AppColors.lightSurface,
-                  borderRadius: AppDecorations.borderMD,
-                  border: Border.all(
-                    color: isDark
-                        ? AppColors.darkSurfaceVariant
-                        : AppColors.lightSurfaceVariant,
-                  ),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: controller.selectedAdmissionStatusFilter,
-                    dropdownColor:
-                        isDark ? AppColors.darkSurface : AppColors.lightSurface,
-                    isExpanded: true,
-                    items: const [
-                      DropdownMenuItem(
-                          value: 'All', child: Text('All Admissions')),
-                      DropdownMenuItem(
-                          value: 'Active', child: Text('Active Admissions')),
-                      DropdownMenuItem(
-                          value: 'Discharged',
-                          child: Text('Discharged Admissions')),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        controller.changeAdmissionStatusFilter(val);
-                      }
-                    },
-                  ),
+        return BentoScreen(
+          key: InpatientKeys.admissions,
+          onRefresh: controller.reload,
+          slivers: [
+            if (controller.hasLoadError)
+              BentoSection(
+                top: BentoSpace.page,
+                child: ErrorRetryBanner(
+                  message: controller.rxLoadError.value!,
+                  onRetry: controller.load,
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.md),
-
-        if (admissionsList.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
-            child: Center(
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.history_edu_rounded,
-                    size: AppSpacing.iconXL,
-                    color: textSecondary.withValues(alpha: 0.5),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    'No admissions found matching filters',
-                    style: AppTextStyles.bodyMedium(textSecondary),
-                  ),
-                ],
+            BentoSection(
+              top: controller.hasLoadError ? 0 : BentoSpace.page,
+              bottom: BentoSpace.header,
+              child: SearchField(
+                hint: 'Patient, MRN, ward or bed',
+                onChanged: controller.search,
               ),
             ),
-          )
-        else
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: admissionsList.length,
-            itemBuilder: (context, index) {
-              final admission = admissionsList[index];
-              final isActive = admission.status.toLowerCase() == 'admitted';
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: AppSpacing.md),
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                  color:
-                      isDark ? AppColors.darkSurface : AppColors.lightSurface,
-                  borderRadius: AppDecorations.borderLG,
-                  border: Border.all(
-                    color: isDark
-                        ? AppColors.darkSurfaceVariant
-                        : AppColors.lightSurfaceVariant,
-                  ),
+            SliverToBoxAdapter(
+              child: FilterChips<String>(
+                key: InpatientKeys.admissionsFilters,
+                options: controller.statuses,
+                selected: controller.statusFilter.value,
+                labelOf: CaseStatus.labelOf,
+                onSelected: controller.filterByStatus,
+              ),
+            ),
+            if (rows.isEmpty)
+              BentoSection(
+                top: BentoSpace.section,
+                child: EmptyState(
+                  key: InpatientKeys.admissionsEmpty,
+                  icon: Icons.assignment_ind_outlined,
+                  title: controller.isFiltered
+                      ? 'Nothing matches'
+                      : 'No admissions yet',
+                  message: controller.isFiltered
+                      ? null
+                      : 'Patients admitted into a bed appear here.',
+                  actionLabel:
+                      controller.isFiltered ? 'Clear filters' : 'Admit patient',
+                  onAction: controller.isFiltered
+                      ? controller.clearFilters
+                      : () => Get.toNamed<void>(Routes.INPATIENT_ADMIT),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Patient Name, MRN & Status Badge
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            admission.patient.fullName,
-                            style:
-                                AppTextStyles.titleMedium(textPrimary).copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        StatusBadge(
-                          label: admission.status.toUpperCase(),
-                          type: isActive
-                              ? StatusType.success
-                              : StatusType.neutral,
+              )
+            else
+              BentoSection(
+                top: BentoSpace.header,
+                child: BentoCard(
+                  key: InpatientKeys.admissionsList,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: BentoSpace.listCardPad,
+                  ),
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < rows.length; i++) ...[
+                        if (i > 0) const Hairline(indent: BentoSpace.listPad),
+                        AdmissionRow(
+                          key: InpatientKeys.admission(rows[i].id),
+                          admission: rows[i],
                         ),
                       ],
-                    ),
-                    Text(
-                      'MRN: ${admission.patient.mrn}',
-                      style: AppTextStyles.bodySmall(textSecondary),
-                    ),
-                    const Divider(height: AppSpacing.lg),
-
-                    // Detail Rows
-                    _buildDetailRow(
-                      label: 'Admission Date',
-                      value: DateFormat('dd/MM/yyyy HH:mm')
-                          .format(admission.admissionDate.toLocal()),
-                      isDark: isDark,
-                    ),
-                    _buildDetailRow(
-                      label: 'Ward & Bed',
-                      value:
-                          '${admission.bed.ward?.name ?? 'ICU'} - Bed ${admission.bed.bedNumber}',
-                      isDark: isDark,
-                    ),
-                    _buildDetailRow(
-                      label: 'Admission Type',
-                      value: admission.admissionType.toUpperCase(),
-                      isDark: isDark,
-                    ),
-                    _buildDetailRow(
-                      label: 'Doctor',
-                      value: 'Assigned Doctor',
-                      isDark: isDark,
-                    ),
-                    _buildDetailRow(
-                      label: 'Discharge Date',
-                      value: admission.dischargeDate != null
-                          ? DateFormat('dd/MM/yyyy HH:mm')
-                              .format(admission.dischargeDate!.toLocal())
-                          : 'Active',
-                      isDark: isDark,
-                    ),
-
-                    if (isActive) ...[
-                      const SizedBox(height: AppSpacing.md),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () => Get.toNamed(Routes.DISCHARGE_PATIENT,
-                              arguments: admission),
-                          icon: const Icon(Icons.logout_rounded,
-                              size: AppSpacing.iconSM),
-                          label: const Text('Discharge'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.error,
-                            foregroundColor: AppColors.lightSurface,
-                            padding: const EdgeInsets.symmetric(
-                                vertical: AppSpacing.xs),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: AppDecorations.borderMD,
-                            ),
-                          ),
-                        ),
-                      ),
                     ],
-                  ],
-                ),
-              );
-            },
-          ),
-      ],
-    );
-  }
-
-  Widget _buildDetailRow({
-    required String label,
-    required String value,
-    required bool isDark,
-  }) {
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: AppTextStyles.bodyMedium(textSecondary)),
-          Text(value,
-              style: AppTextStyles.bodyMedium(textPrimary)
-                  .copyWith(fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorState(
-    BuildContext context,
-    InpatientAdmissionsController controller,
-    bool isDark,
-  ) {
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xxl),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline_rounded,
-              color: AppColors.error,
-              size: AppSpacing.iconXL * 1.5,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              'Error Loading Data',
-              style: AppTextStyles.titleLarge(textPrimary),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              controller.errorMessage,
-              style: AppTextStyles.bodyMedium(textSecondary),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            ElevatedButton.icon(
-              onPressed: controller.refreshAllData,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Try Again'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.lightSurface,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.xl,
-                  vertical: AppSpacing.md,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppDecorations.borderMD,
+                  ),
                 ),
               ),
-            ),
           ],
-        ),
+        );
+      }),
+    );
+  }
+}
+
+/// One admission. Shared with the ward round, so an admission reads the same
+/// on both screens.
+class AdmissionRow extends StatelessWidget {
+  const AdmissionRow({super.key, required this.admission, this.onTap});
+
+  final AdmissionModel admission;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final live = admission.status.trim().toLowerCase() == 'active';
+    final ward = admission.bed.ward?.name ?? '';
+    final where = [
+      if (ward.isNotEmpty) ward,
+      if (admission.bed.bedNumber.trim().isNotEmpty)
+        'bed ${admission.bed.bedNumber}',
+    ].join(' · ');
+
+    return BentoRow(
+      title: admission.patient.fullName.trim().isEmpty
+          ? 'Patient ${admission.patient.mrn}'
+          : admission.patient.fullName,
+      subtitle: where.isEmpty ? admission.admissionReason : where,
+      icon: Icons.person_outline_rounded,
+      showChevron: onTap != null,
+      onTap: onTap ??
+          () => Get.toNamed<void>(
+                Routes.DISCHARGE_PATIENT,
+                arguments: {'admissionId': admission.id},
+              ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: BentoSpace.listPad,
+        vertical: 12,
+      ),
+      trailing: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          StatusPill(status: admission.status, compact: true),
+          const SizedBox(height: 4),
+          Text(
+            // Day count for a live admission; the discharge date for a closed
+            // one. Both answer "when", for the state the record is actually in.
+            live
+                ? 'Day ${Formatters.lengthOfStayDays(admission.admissionDate) + 1}'
+                : Formatters.dateMedium(
+                    admission.dischargeDate ?? admission.admissionDate,
+                  ),
+            style: Theme.of(context).brightness == Brightness.dark
+                ? AppTextStyles.darkCaption1()
+                : AppTextStyles.lightCaption1(),
+          ),
+        ],
       ),
     );
   }
