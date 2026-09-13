@@ -1,696 +1,405 @@
 import 'package:flutter/material.dart';
-
 import 'package:get/get.dart';
 
-import '../../../data/models/appointment_model.dart';
-import '../../../data/models/bed_model.dart';
-import '../../../data/models/patient_lookup.dart';
-import '../../../data/models/ward_model.dart';
+import '../../../core/keys/app_keys.dart';
+import '../../../data/utils/formatters.dart';
 import '../../../theme/theme.dart';
 import '../controllers/admit_patient_controller.dart';
 
+/// Admit a patient.
+///
+/// The fields are in the order the decision is made — who, where, why, who is
+/// responsible — and the bed picker stays shut until a ward is chosen, because
+/// a bed list with no ward above it is a list somebody picks the wrong row
+/// from.
 class AdmitPatientView extends GetView<AdmitPatientController> {
   const AdmitPatientView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? AppColors.darkBackground : AppColors.lightBackground;
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+    return Scaffold(
+      appBar: const DetailHeader(title: 'Admit patient'),
+      body: BentoGround(
+        child: SafeArea(
+          child: Obx(() {
+            if (controller.isLoading && controller.rxFirstLoad.value) {
+              return const Padding(
+                padding: EdgeInsets.all(BentoSpace.page),
+                child: BentoSkeleton(rows: 5),
+              );
+            }
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
-        final shouldPop = await _showDiscardConfirmation(context, isDark);
-        if (shouldPop) {
-          Get.back();
-        }
-      },
-      child: Scaffold(
-        backgroundColor: bg,
-        appBar: AppBar(
-          backgroundColor:
-              isDark ? AppColors.darkSurface : AppColors.lightSurface,
-          elevation: 0,
-          leading: IconButton(
-            icon: Icon(
-              Icons.close_rounded,
-              color: textPrimary,
-              size: AppSpacing.iconLG,
-            ),
-            onPressed: () async {
-              final shouldPop = await _showDiscardConfirmation(context, isDark);
-              if (shouldPop) {
-                Get.back();
-              }
-            },
-          ),
-          title: Row(
-            children: [
-              const Icon(
-                Icons.person_add_alt_1_rounded,
-                color: AppColors.secondary,
-                size: AppSpacing.iconLG,
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                'Admit Patient',
-                style: AppTextStyles.titleLarge(
-                  textPrimary,
-                ).copyWith(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-        ),
-        body: SafeArea(
-          child: GetBuilder<AdmitPatientController>(
-            builder: (controller) {
-              if (controller.isLoadingPatients ||
-                  controller.isLoadingWards ||
-                  controller.isLoadingDoctors) {
-                return const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
-                );
-              }
-
-              return LayoutBuilder(
-                builder: (context, constraints) {
-                  // Determine if we are on a desktop/wide screen or mobile
-                  final isWide = constraints.maxWidth > 600;
-
-                  return SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.xl,
-                      vertical: AppSpacing.xl,
-                    ),
-                    child: Center(
-                      child: Container(
-                        constraints: BoxConstraints(
-                          maxWidth: isWide ? 650 : double.infinity,
-                        ),
-                        decoration: isWide
-                            ? BoxDecoration(
-                                color: isDark
-                                    ? AppColors.darkSurface
-                                    : AppColors.lightSurface,
-                                borderRadius: AppDecorations.borderLG,
-                                boxShadow: AppDecorations.elevation2(isDark),
-                              )
-                            : null,
-                        padding: isWide
-                            ? const EdgeInsets.all(AppSpacing.xxl)
-                            : EdgeInsets.zero,
+            return Form(
+              key: controller.formKey,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(BentoSpace.page),
+                      child: MaxWidthBody(
+                        maxWidth: 520,
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          key: AdmitPatientKeys.screen,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Text(
-                              'Complete the form to assign a bed and doctors for the inpatient admission.',
-                              style: AppTextStyles.bodyMedium(textSecondary),
+                            Obx(() {
+                              final error = controller.errorMessage.value ??
+                                  controller.rxLoadError.value;
+                              if (error == null) {
+                                return const SizedBox.shrink();
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 14),
+                                child: NoticeBanner(
+                                  key: AdmitPatientKeys.error,
+                                  message: error,
+                                  icon: Icons.error_outline_rounded,
+                                  tint: AppColors.error,
+                                ),
+                              );
+                            }),
+
+                            // ── Who ─────────────────────────────────────
+                            FormCard(
+                              title: 'Patient',
+                              children: [
+                                Obx(
+                                  () => BentoPicker(
+                                    key: AdmitPatientKeys.patientPicker,
+                                    label: 'Patient',
+                                    required: true,
+                                    value: controller.patient.value?.fullName,
+                                    placeholder: 'Search by name or MRN',
+                                    onTap: () =>
+                                        _openPatientPicker(context, controller),
+                                  ),
+                                ),
+                                Obx(() {
+                                  final patient = controller.patient.value;
+                                  if (patient == null) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  // Shown back, so the person filling the form
+                                  // can check they picked the right record
+                                  // before committing a bed to it.
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: InsetSurface(
+                                      padding: const EdgeInsets.all(14),
+                                      child: PatientIdentityBand(
+                                        name: patient.fullName,
+                                        mrn: patient.mrn,
+                                        age: Formatters.age(
+                                          patient.dateOfBirth,
+                                        ),
+                                        sex: patient.gender,
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ],
                             ),
-                            const SizedBox(height: AppSpacing.xxl),
 
-                            // 1. Select Patient Dropdown
-                            _buildSectionHeader('Select Patient *', isDark),
-                            const SizedBox(height: AppSpacing.sm),
-                            _buildPatientDropdown(controller, isDark),
-                            const SizedBox(height: AppSpacing.xl),
+                            const SizedBox(height: BentoSpace.section),
 
-                            // 2. Select Ward & Assign Bed (Row on wide, Column on mobile)
-                            if (isWide)
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _buildSectionHeader(
-                                          'Select Ward *',
-                                          isDark,
-                                        ),
-                                        const SizedBox(height: AppSpacing.sm),
-                                        _buildWardDropdown(controller, isDark),
-                                      ],
-                                    ),
+                            // ── Where ───────────────────────────────────
+                            FormCard(
+                              title: 'Bed',
+                              children: [
+                                Obx(
+                                  () => BentoPicker(
+                                    key: AdmitPatientKeys.wardPicker,
+                                    label: 'Ward',
+                                    required: true,
+                                    value: controller.ward.value?.name,
+                                    placeholder: 'Choose a ward',
+                                    onTap: () =>
+                                        _openWardPicker(controller),
                                   ),
-                                  const SizedBox(width: AppSpacing.lg),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _buildSectionHeader(
-                                          'Assign Bed *',
-                                          isDark,
-                                        ),
-                                        const SizedBox(height: AppSpacing.sm),
-                                        _buildBedDropdown(controller, isDark),
-                                      ],
-                                    ),
+                                ),
+                                Obx(
+                                  () => BentoPicker(
+                                    key: AdmitPatientKeys.bedPicker,
+                                    label: 'Bed',
+                                    required: true,
+                                    value: controller.bed.value == null
+                                        ? null
+                                        : 'Bed ${controller.bed.value!.bedNumber}',
+                                    placeholder: controller.ward.value == null
+                                        ? 'Choose a ward first'
+                                        : controller.isLoadingBeds.value
+                                            ? 'Loading beds…'
+                                            : controller.vacantBeds.isEmpty
+                                                ? 'No free beds in this ward'
+                                                : 'Choose a free bed',
+                                    onTap: () {
+                                      if (controller.ward.value == null) return;
+                                      if (controller.isLoadingBeds.value) return;
+                                      _openBedPicker(controller);
+                                    },
                                   ),
-                                ],
-                              )
-                            else ...[
-                              _buildSectionHeader('Select Ward *', isDark),
-                              const SizedBox(height: AppSpacing.sm),
-                              _buildWardDropdown(controller, isDark),
-                              const SizedBox(height: AppSpacing.xl),
-                              _buildSectionHeader('Assign Bed *', isDark),
-                              const SizedBox(height: AppSpacing.sm),
-                              _buildBedDropdown(controller, isDark),
-                            ],
-                            const SizedBox(height: AppSpacing.xl),
-
-                            // 3. Admission Type & Admitting Doctor (Row on wide, Column on mobile)
-                            if (isWide)
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _buildSectionHeader(
-                                          'Admission Type *',
-                                          isDark,
-                                        ),
-                                        const SizedBox(height: AppSpacing.sm),
-                                        _buildAdmissionTypeDropdown(
-                                          controller,
-                                          isDark,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: AppSpacing.lg),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _buildSectionHeader(
-                                          'Admitting Doctor *',
-                                          isDark,
-                                        ),
-                                        const SizedBox(height: AppSpacing.sm),
-                                        _buildDoctorDropdown(
-                                          controller: controller,
-                                          selectedValue: controller
-                                              .selectedAdmittingDoctor,
-                                          hintText: 'Select Admitting Doctor',
-                                          onChanged:
-                                              controller.selectAdmittingDoctor,
-                                          isDark: isDark,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              )
-                            else ...[
-                              _buildSectionHeader('Admission Type *', isDark),
-                              const SizedBox(height: AppSpacing.sm),
-                              _buildAdmissionTypeDropdown(controller, isDark),
-                              const SizedBox(height: AppSpacing.xl),
-                              _buildSectionHeader('Admitting Doctor *', isDark),
-                              const SizedBox(height: AppSpacing.sm),
-                              _buildDoctorDropdown(
-                                controller: controller,
-                                selectedValue:
-                                    controller.selectedAdmittingDoctor,
-                                hintText: 'Select Admitting Doctor',
-                                onChanged: controller.selectAdmittingDoctor,
-                                isDark: isDark,
-                              ),
-                            ],
-                            const SizedBox(height: AppSpacing.xl),
-
-                            // 4. Attending Doctor
-                            _buildSectionHeader('Attending Doctor *', isDark),
-                            const SizedBox(height: AppSpacing.sm),
-                            _buildDoctorDropdown(
-                              controller: controller,
-                              selectedValue: controller.selectedAttendingDoctor,
-                              hintText: 'Select Attending Doctor',
-                              onChanged: controller.selectAttendingDoctor,
-                              isDark: isDark,
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: AppSpacing.xl),
 
-                            // 5. Admission Reason
-                            _buildSectionHeader('Admission Reason *', isDark),
-                            const SizedBox(height: AppSpacing.sm),
-                            _buildAdmissionReasonField(controller, isDark),
-                            const SizedBox(height: AppSpacing.xxl * 1.5),
+                            const SizedBox(height: BentoSpace.section),
 
-                            // 6. Action Buttons
-                            _buildActionButtons(controller, isDark),
+                            // ── Why and who ─────────────────────────────
+                            FormCard(
+                              title: 'Admission',
+                              children: [
+                                Obx(
+                                  () => BentoPicker(
+                                    key: AdmitPatientKeys.acuityPicker,
+                                    label: 'Type',
+                                    value: controller.admissionType.value,
+                                    onTap: () => _openTypePicker(controller),
+                                  ),
+                                ),
+                                BentoInput(
+                                  fieldKey: AdmitPatientKeys.reasonField,
+                                  label: 'Reason',
+                                  controller: controller.reasonController,
+                                  required: true,
+                                  maxLines: 3,
+                                  hint: 'The presenting problem, in a line',
+                                ),
+                                Obx(
+                                  () => BentoPicker(
+                                    key: AdmitPatientKeys.consultantPicker,
+                                    label: 'Consultant',
+                                    value: controller
+                                        .attendingDoctor.value?.fullName,
+                                    placeholder: 'Who is responsible',
+                                    onTap: () => _openDoctorPicker(controller),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ),
                     ),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ─── Component Builders ───────────────────────────────────────────────────
-
-  Widget _buildSectionHeader(String title, bool isDark) {
-    final textColor =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    return RichText(
-      text: TextSpan(
-        text: title.replaceAll('*', ''),
-        style: AppTextStyles.labelMedium(
-          textColor,
-        ).copyWith(fontWeight: FontWeight.w600),
-        children: [
-          if (title.contains('*'))
-            const TextSpan(
-              text: ' *',
-              style: TextStyle(color: AppColors.error),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPatientDropdown(AdmitPatientController controller, bool isDark) {
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.black.withValues(alpha: 0.08);
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-
-    return DropdownButtonFormField<PatientLookup>(
-      initialValue: controller.selectedPatient,
-      isExpanded: true,
-      hint: Text(
-        'Choose a patient...',
-        style: AppTextStyles.bodyMedium(textSecondary.withValues(alpha: 0.5)),
-        overflow: TextOverflow.ellipsis,
-        maxLines: 1,
-      ),
-      icon: const Icon(
-        Icons.keyboard_arrow_down_rounded,
-        color: AppColors.primary,
-      ),
-      dropdownColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-      style: AppTextStyles.bodyMedium(textPrimary),
-      onChanged: controller.selectPatient,
-      items: controller.patients.map<DropdownMenuItem<PatientLookup>>((
-        PatientLookup patient,
-      ) {
-        return DropdownMenuItem<PatientLookup>(
-          value: patient,
-          child: Text(
-            '${patient.fullName} (${patient.mrn})',
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-          ),
-        );
-      }).toList(),
-      decoration: _getInputDecoration(isDark, borderColor),
-    );
-  }
-
-  Widget _buildWardDropdown(AdmitPatientController controller, bool isDark) {
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.black.withValues(alpha: 0.08);
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-
-    return DropdownButtonFormField<WardModel>(
-      initialValue: controller.selectedWard,
-      hint: Text(
-        'Select Ward',
-        style: AppTextStyles.bodyMedium(textSecondary.withValues(alpha: 0.5)),
-      ),
-      icon: const Icon(
-        Icons.keyboard_arrow_down_rounded,
-        color: AppColors.primary,
-      ),
-      dropdownColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-      style: AppTextStyles.bodyMedium(textPrimary),
-      onChanged: controller.selectWard,
-      items: controller.wards.map<DropdownMenuItem<WardModel>>((
-        WardModel ward,
-      ) {
-        return DropdownMenuItem<WardModel>(value: ward, child: Text(ward.name));
-      }).toList(),
-      decoration: _getInputDecoration(isDark, borderColor),
-    );
-  }
-
-  Widget _buildBedDropdown(AdmitPatientController controller, bool isDark) {
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.black.withValues(alpha: 0.08);
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-
-    final isEnabled =
-        controller.selectedWard != null && !controller.isLoadingBeds;
-    final hint = controller.selectedWard == null
-        ? 'Choose Ward First'
-        : (controller.isLoadingBeds
-            ? 'Loading beds...'
-            : (controller.beds.isEmpty
-                ? 'No available beds in this ward'
-                : 'Select available bed'));
-
-    return DropdownButtonFormField<BedModel>(
-      initialValue: controller.selectedBed,
-      hint: Text(
-        hint,
-        style: AppTextStyles.bodyMedium(
-          textSecondary.withValues(alpha: isEnabled ? 0.5 : 0.3),
-        ),
-      ),
-      icon: Icon(
-        Icons.keyboard_arrow_down_rounded,
-        color: isEnabled
-            ? AppColors.primary
-            : textSecondary.withValues(alpha: 0.3),
-      ),
-      dropdownColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-      style: AppTextStyles.bodyMedium(textPrimary),
-      onChanged: isEnabled ? controller.selectBed : null,
-      items: isEnabled
-          ? controller.beds.map<DropdownMenuItem<BedModel>>((BedModel bed) {
-              return DropdownMenuItem<BedModel>(
-                value: bed,
-                child: Text('Bed ${bed.bedNumber} (${bed.type.toUpperCase()})'),
-              );
-            }).toList()
-          : null,
-      decoration: _getInputDecoration(
-        isDark,
-        borderColor,
-        isEnabled: isEnabled,
-      ),
-    );
-  }
-
-  Widget _buildAdmissionTypeDropdown(
-    AdmitPatientController controller,
-    bool isDark,
-  ) {
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.black.withValues(alpha: 0.08);
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-
-    return DropdownButtonFormField<String>(
-      initialValue: controller.selectedAdmissionType,
-      hint: Text(
-        'Routine Admission',
-        style: AppTextStyles.bodyMedium(textSecondary.withValues(alpha: 0.5)),
-      ),
-      icon: const Icon(
-        Icons.keyboard_arrow_down_rounded,
-        color: AppColors.primary,
-      ),
-      dropdownColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-      style: AppTextStyles.bodyMedium(textPrimary),
-      onChanged: controller.selectAdmissionType,
-      items: controller.admissionTypes.map<DropdownMenuItem<String>>((
-        String type,
-      ) {
-        return DropdownMenuItem<String>(value: type, child: Text(type));
-      }).toList(),
-      decoration: _getInputDecoration(isDark, borderColor),
-    );
-  }
-
-  Widget _buildDoctorDropdown({
-    required AdmitPatientController controller,
-    required AppointmentDoctor? selectedValue,
-    required String hintText,
-    required ValueChanged<AppointmentDoctor?> onChanged,
-    required bool isDark,
-  }) {
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.black.withValues(alpha: 0.08);
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-
-    return DropdownButtonFormField<AppointmentDoctor>(
-      initialValue: selectedValue,
-      hint: Text(
-        hintText,
-        style: AppTextStyles.bodyMedium(textSecondary.withValues(alpha: 0.5)),
-      ),
-      icon: const Icon(
-        Icons.keyboard_arrow_down_rounded,
-        color: AppColors.primary,
-      ),
-      dropdownColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-      style: AppTextStyles.bodyMedium(textPrimary),
-      onChanged: onChanged,
-      items: controller.doctors.map<DropdownMenuItem<AppointmentDoctor>>((
-        AppointmentDoctor doc,
-      ) {
-        final specialization =
-            doc.specialization != null ? ' (${doc.specialization})' : '';
-        return DropdownMenuItem<AppointmentDoctor>(
-          value: doc,
-          child: Text('${doc.fullName}$specialization'),
-        );
-      }).toList(),
-      decoration: _getInputDecoration(isDark, borderColor),
-    );
-  }
-
-  Widget _buildAdmissionReasonField(
-    AdmitPatientController controller,
-    bool isDark,
-  ) {
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.black.withValues(alpha: 0.08);
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-
-    return TextFormField(
-      controller: controller.reasonController,
-      maxLines: 4,
-      style: AppTextStyles.bodyMedium(textPrimary),
-      decoration: InputDecoration(
-        hintText: 'Document symptoms, diagnosis, and medical reason...',
-        hintStyle: AppTextStyles.bodyMedium(
-          textSecondary.withValues(alpha: 0.5),
-        ),
-        filled: true,
-        fillColor: isDark
-            ? Colors.white.withValues(alpha: 0.06)
-            : Colors.white.withValues(alpha: 0.7),
-        border: OutlineInputBorder(
-          borderRadius: AppDecorations.borderMD,
-          borderSide: BorderSide(color: borderColor),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: AppDecorations.borderMD,
-          borderSide: BorderSide(color: borderColor),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: AppDecorations.borderMD,
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg,
-          vertical: AppSpacing.md,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionButtons(AdmitPatientController controller, bool isDark) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        OutlinedButton(
-          onPressed: () async {
-            final shouldPop = await _showDiscardConfirmation(
-              Get.context!,
-              isDark,
-            );
-            if (shouldPop) {
-              Get.back();
-            }
-          },
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size(100, 48),
-            shape: RoundedRectangleBorder(
-              borderRadius: AppDecorations.borderMD,
-            ),
-            side: BorderSide(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.12)
-                  : Colors.black.withValues(alpha: 0.08),
-            ),
-          ),
-          child: Text(
-            'Cancel',
-            style: AppTextStyles.labelMedium(
-              isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-            ).copyWith(fontWeight: FontWeight.w600),
-          ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        ElevatedButton(
-          onPressed:
-              controller.isSubmitting ? null : controller.submitAdmission,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.secondary,
-            foregroundColor: AppColors.lightSurface,
-            minimumSize: const Size(140, 48),
-            shape: RoundedRectangleBorder(
-              borderRadius: AppDecorations.borderMD,
-            ),
-            elevation: 0,
-          ),
-          child: controller.isSubmitting
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
                   ),
-                )
-              : Text(
-                  'Admit Patient',
-                  style: AppTextStyles.labelMedium(
-                    Colors.white,
-                  ).copyWith(fontWeight: FontWeight.bold),
-                ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      BentoSpace.page,
+                      0,
+                      BentoSpace.page,
+                      BentoSpace.page,
+                    ),
+                    child: MaxWidthBody(
+                      maxWidth: 520,
+                      child: Obx(
+                        () => PrimaryBar(
+                          key: AdmitPatientKeys.submit,
+                          label: 'Admit patient',
+                          busy: controller.isSubmitting.value,
+                          onPressed: controller.submit,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
         ),
-      ],
-    );
-  }
-
-  InputDecoration _getInputDecoration(
-    bool isDark,
-    Color borderColor, {
-    bool isEnabled = true,
-  }) {
-    return InputDecoration(
-      filled: true,
-      fillColor: !isEnabled
-          ? (isDark
-              ? Colors.white.withValues(alpha: 0.02)
-              : Colors.black.withValues(alpha: 0.03))
-          : (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.white.withValues(alpha: 0.7)),
-      border: OutlineInputBorder(
-        borderRadius: AppDecorations.borderMD,
-        borderSide: BorderSide(color: borderColor),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: AppDecorations.borderMD,
-        borderSide: BorderSide(color: borderColor),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: AppDecorations.borderMD,
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-      ),
-      disabledBorder: OutlineInputBorder(
-        borderRadius: AppDecorations.borderMD,
-        borderSide: BorderSide(color: borderColor.withValues(alpha: 0.5)),
-      ),
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.md,
       ),
     );
   }
+}
 
-  Future<bool> _showDiscardConfirmation(
-    BuildContext context,
-    bool isDark,
-  ) async {
-    // If nothing has been selected/entered, we can discard immediately
-    if (controller.selectedPatient == null &&
-        controller.selectedWard == null &&
-        controller.selectedBed == null &&
-        controller.selectedAdmissionType == null &&
-        controller.selectedAdmittingDoctor == null &&
-        controller.selectedAttendingDoctor == null &&
-        controller.reasonController.text.isEmpty) {
-      return true;
-    }
+// ── Pickers ─────────────────────────────────────────────────────────────────
 
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+Future<void> _openPatientPicker(
+  BuildContext context,
+  AdmitPatientController controller,
+) {
+  final query = ''.obs;
 
-    final confirm = await Get.dialog<bool>(
-      AlertDialog(
-        backgroundColor:
-            isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        title: Text(
-          'Discard Changes?',
-          style: AppTextStyles.titleMedium(
-            textPrimary,
-          ).copyWith(fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          'Are you sure you want to discard this admission form?',
-          style: AppTextStyles.bodyMedium(textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(result: false),
-            child: Text(
-              'Cancel',
-              style: AppTextStyles.labelMedium(
-                AppColors.primary,
-              ).copyWith(fontWeight: FontWeight.w600),
-            ),
+  return Get.bottomSheet<void>(
+    SheetShell(
+      title: 'Patient',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SearchField(
+            hint: 'Name or MRN',
+            onChanged: (value) => query.value = value,
           ),
-          TextButton(
-            onPressed: () => Get.back(result: true),
-            child: Text(
-              'Discard',
-              style: AppTextStyles.labelMedium(
-                AppColors.error,
-              ).copyWith(fontWeight: FontWeight.w600),
-            ),
+          const SizedBox(height: 12),
+          // Bounded, so a site with four thousand patients does not build four
+          // thousand rows into a sheet.
+          Flexible(
+            child: Obx(() {
+              final text = query.value.trim().toLowerCase();
+              final rows = controller.patients
+                  .where(
+                    (p) => text.isEmpty ||
+                        '${p.fullName} ${p.mrn}'.toLowerCase().contains(text),
+                  )
+                  .take(40)
+                  .toList();
+
+              if (rows.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: EmptyState(
+                    compact: true,
+                    icon: Icons.person_search_outlined,
+                    title: 'No patient matches that',
+                  ),
+                );
+              }
+
+              return ListView.separated(
+                shrinkWrap: true,
+                itemCount: rows.length,
+                separatorBuilder: (_, _) => const Hairline(),
+                itemBuilder: (context, i) => SheetRow(
+                  icon: Icons.person_outline_rounded,
+                  label: rows[i].fullName,
+                  sublabel: [
+                    if (rows[i].mrn.isNotEmpty) 'MRN ${rows[i].mrn}',
+                    Formatters.age(rows[i].dateOfBirth),
+                    if (rows[i].gender?.isNotEmpty ?? false) rows[i].gender!,
+                  ].where((s) => s != '—').join(' · '),
+                  selected: controller.patient.value?.id == rows[i].id,
+                  onTap: () {
+                    controller.patient.value = rows[i];
+                    Get.back<void>();
+                  },
+                ),
+              );
+            }),
           ),
         ],
       ),
-    );
-    return confirm ?? false;
-  }
+    ),
+    isScrollControlled: true,
+  );
+}
+
+Future<void> _openWardPicker(AdmitPatientController controller) {
+  return Get.bottomSheet<void>(
+    SheetShell(
+      title: 'Ward',
+      scrollable: true,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final ward in controller.activeWards)
+            SheetRow(
+              icon: Icons.meeting_room_outlined,
+              label: ward.name,
+              sublabel: ward.availableBeds > 0
+                  ? '${ward.availableBeds} free of ${ward.capacity}'
+                  : 'Full',
+              selected: controller.ward.value?.id == ward.id,
+              onTap: () {
+                Get.back<void>();
+                controller.selectWard(ward);
+              },
+            ),
+        ],
+      ),
+    ),
+    isScrollControlled: true,
+  );
+}
+
+Future<void> _openBedPicker(AdmitPatientController controller) {
+  return Get.bottomSheet<void>(
+    SheetShell(
+      title: 'Bed',
+      scrollable: true,
+      child: Obx(
+        () => Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (controller.vacantBeds.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: EmptyState(
+                  compact: true,
+                  icon: Icons.bed_outlined,
+                  title: 'No free beds in this ward',
+                  message: 'Try another ward, or free a bed by discharging '
+                      'or transferring.',
+                ),
+              )
+            else
+              for (final bed in controller.vacantBeds)
+                SheetRow(
+                  icon: BedState.vacant.icon,
+                  label: 'Bed ${bed.bedNumber}',
+                  sublabel: bed.type.isEmpty ? null : bed.type,
+                  selected: controller.bed.value?.id == bed.id,
+                  onTap: () {
+                    controller.bed.value = bed;
+                    Get.back<void>();
+                  },
+                ),
+          ],
+        ),
+      ),
+    ),
+    isScrollControlled: true,
+  );
+}
+
+Future<void> _openTypePicker(AdmitPatientController controller) {
+  return Get.bottomSheet<void>(
+    SheetShell(
+      title: 'Admission type',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final type in AdmitPatientController.admissionTypes)
+            SheetRow(
+              icon: Icons.assignment_outlined,
+              label: type,
+              selected: controller.admissionType.value == type,
+              onTap: () {
+                controller.admissionType.value = type;
+                Get.back<void>();
+              },
+            ),
+        ],
+      ),
+    ),
+    isScrollControlled: true,
+  );
+}
+
+Future<void> _openDoctorPicker(AdmitPatientController controller) {
+  return Get.bottomSheet<void>(
+    SheetShell(
+      title: 'Consultant',
+      scrollable: true,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final doctor in controller.doctors)
+            SheetRow(
+              icon: Icons.badge_outlined,
+              label: doctor.fullName,
+              sublabel: doctor.specialization,
+              selected: controller.attendingDoctor.value?.id == doctor.id,
+              onTap: () {
+                controller.attendingDoctor.value = doctor;
+                Get.back<void>();
+              },
+            ),
+        ],
+      ),
+    ),
+    isScrollControlled: true,
+  );
 }

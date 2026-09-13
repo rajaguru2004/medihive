@@ -1,12 +1,15 @@
 import 'package:dio/dio.dart';
 import 'package:get/get.dart' hide Response;
 
-import '../network/app_dio_client.dart';
+import '../network/dio_client.dart';
 import '../network/endpoints.dart';
 
 class PreTriageService extends GetxService {
   static PreTriageService get to => Get.find();
-  final _dio = AppDioClient.instance;
+  /// The one client. Constructing a bare `Dio()` here would skip the
+  /// bearer header, the 401 teardown and the logger — see
+  /// `.agents/RULES.md` §3.
+  DioClient get _dio => Get.find<DioClient>();
 
   /// Fetch all pre-triage screenings with optional pagination and queries
   Future<Response> fetchScreenings({
@@ -28,14 +31,14 @@ class PreTriageService extends GetxService {
       query['status'] = status;
     }
     return _dio.get(
-      Endpoints.preTriage,
+      Endpoints.preTriage.list,
       queryParameters: query,
     );
   }
 
   /// Fetch a single pre-triage screening by ID
   Future<Response> fetchScreeningById(String id) {
-    return _dio.get(Endpoints.preTriageById(id));
+    return _dio.get(Endpoints.preTriage.byId(id));
   }
 
   /// Create a new pre-triage screening
@@ -54,20 +57,20 @@ class PreTriageService extends GetxService {
     String? routedTo,
   }) {
     return _dio.post(
-      Endpoints.preTriage,
+      Endpoints.preTriage.list,
       data: {
         'firstName': firstName,
-        if (lastName != null) 'lastName': lastName,
-        if (age != null) 'age': age,
-        if (gender != null) 'gender': gender,
-        if (phone != null) 'phone': phone,
+        'lastName': ?lastName,
+        'age': ?age,
+        'gender': ?gender,
+        'phone': ?phone,
         'chiefComplaint': chiefComplaint,
-        if (briefHistory != null) 'briefHistory': briefHistory,
-        if (temperature != null) 'temperature': temperature,
-        if (pulse != null) 'pulseRate': pulse,
-        if (bpSystolic != null) 'bloodPressureSystolic': bpSystolic,
-        if (bpDiastolic != null) 'bloodPressureDiastolic': bpDiastolic,
-        if (routedTo != null) 'routedTo': routedTo,
+        'briefHistory': ?briefHistory,
+        'temperature': ?temperature,
+        'pulseRate': ?pulse,
+        'bloodPressureSystolic': ?bpSystolic,
+        'bloodPressureDiastolic': ?bpDiastolic,
+        'routedTo': ?routedTo,
       },
     );
   }
@@ -90,7 +93,7 @@ class PreTriageService extends GetxService {
     String? status,
   }) {
     return _dio.patch(
-      Endpoints.preTriageById(id),
+      Endpoints.preTriage.byId(id),
       data: {
         'firstName': firstName,
         'lastName': lastName,
@@ -104,7 +107,7 @@ class PreTriageService extends GetxService {
         'bloodPressureSystolic': bpSystolic,
         'bloodPressureDiastolic': bpDiastolic,
         'routedTo': routedTo,
-        if (status != null) 'status': status,
+        'status': ?status,
       },
     );
   }
@@ -118,6 +121,6 @@ class PreTriageService extends GetxService {
 
   /// Delete a pre-triage screening
   Future<Response> deleteScreening(String id) {
-    return _dio.delete(Endpoints.preTriageById(id));
+    return _dio.delete(Endpoints.preTriage.byId(id));
   }
 }

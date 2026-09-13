@@ -1,12 +1,16 @@
 import 'package:dio/dio.dart';
 import 'package:get/get.dart' hide Response;
 
-import '../network/app_dio_client.dart';
+import '../network/dio_client.dart';
 import '../network/endpoints.dart';
+import '../utils/legacy_envelope.dart';
 
 class ConsultationService extends GetxService {
   static ConsultationService get to => Get.find();
-  final _dio = AppDioClient.instance;
+  /// The one client. Constructing a bare `Dio()` here would skip the
+  /// bearer header, the 401 teardown and the logger — see
+  /// `.agents/RULES.md` §3.
+  DioClient get _dio => Get.find<DioClient>();
 
   /// Fetch all consultations with filters
   Future<Response> getConsultations({
@@ -30,7 +34,7 @@ class ConsultationService extends GetxService {
       query['doctorId'] = doctorId;
     }
     return _dio.get(
-      Endpoints.consultations,
+      Endpoints.consultations.list,
       queryParameters: query,
     );
   }
@@ -39,13 +43,13 @@ class ConsultationService extends GetxService {
   Future<Map<String, int>> getStatistics() async {
     try {
       final res = await getConsultations(page: 1, limit: 100);
-      final list = res.data?['data']?['data'] as List? ?? [];
-      int total = list.length;
+      final list = envelopeRows(res.data);
+      final int total = list.length;
       int outpatient = 0;
       int emergency = 0;
       int followup = 0;
 
-      for (var item in list) {
+      for (final item in list) {
         final type = (item['visitType'] as String? ?? '').toLowerCase();
         if (type == 'outpatient') {
           outpatient++;
@@ -80,7 +84,7 @@ class ConsultationService extends GetxService {
   /// Fetch OPD Waiting Queue
   Future<Response> getWaitingQueue() {
     return _dio.get(
-      Endpoints.queue,
+      Endpoints.queue.list,
       queryParameters: {
         'serviceArea': 'opd',
         'status': 'in_service',
@@ -99,14 +103,14 @@ class ConsultationService extends GetxService {
 
   /// Delete a consultation
   Future<Response> deleteConsultation(String id) {
-    return _dio.delete(Endpoints.consultationById(id));
+    return _dio.delete(Endpoints.consultations.byId(id));
   }
 
   /// Mark consultation complete / create one
   Future<Response> completeConsultation(String id, Map<String, dynamic> data) {
     // API complete consultation simulation or PATCH
     return _dio.patch(
-      Endpoints.consultationById(id),
+      Endpoints.consultations.byId(id),
       data: data,
     );
   }

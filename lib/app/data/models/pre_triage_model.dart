@@ -38,11 +38,10 @@ class PreTriageModel {
   });
 
   factory PreTriageModel.fromJson(Map<String, dynamic> json) {
-    // Determine MRN
-    String? parsedMrn;
-    if (json['patient'] != null && json['patient'] is Map) {
-      parsedMrn = json['patient']['mrn'] as String?;
-    }
+    // The MRN, when the route populated the patient rather than sending an id.
+    final patient = json['patient'];
+    final parsedMrn =
+        patient is Map ? patient['mrn'] as String? : null;
 
     return PreTriageModel(
       id: json['id'] as String? ?? '',

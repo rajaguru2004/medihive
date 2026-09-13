@@ -30,8 +30,8 @@ class WardModel {
   });
 
   factory WardModel.fromJson(Map<String, dynamic> json) {
-    var bedsList = json['beds'] as List? ?? [];
-    List<BedModel> parsedBeds = [];
+    final bedsList = json['beds'] as List? ?? [];
+    final List<BedModel> parsedBeds = [];
     for (var bedJson in bedsList) {
       if (bedJson is Map<String, dynamic>) {
         parsedBeds.add(BedModel.fromJson(bedJson));

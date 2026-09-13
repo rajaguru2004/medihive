@@ -1,357 +1,195 @@
 import 'package:flutter/material.dart';
-
-import 'package:dio/dio.dart';
 import 'package:get/get.dart' hide Response;
 
 import '../../../data/models/appointment_model.dart';
 import '../../../data/models/bed_model.dart';
 import '../../../data/models/patient_lookup.dart';
 import '../../../data/models/ward_model.dart';
+import '../../../data/services/data_bus.dart';
 import '../../../data/services/inpatient_service.dart';
-import '../../inpatient/controllers/inpatient_controller.dart';
-import '../../inpatient_admissions/controllers/inpatient_admissions_controller.dart';
-import '../../inpatient_beds_grid/controllers/inpatient_beds_grid_controller.dart';
-import '../../inpatient_overview/controllers/inpatient_overview_controller.dart';
-import '../../inpatient_wards/controllers/inpatient_wards_controller.dart';
+import '../../../data/utils/error_handler.dart';
+import '../../../data/utils/legacy_envelope.dart';
+import '../../../data/utils/load_state.dart';
+import '../../../theme/theme.dart';
 
-class AdmitPatientController extends GetxController {
+/// Admit a patient into a bed.
+///
+/// Six choices, in the order somebody standing at a desk makes them: who,
+/// where, why, and who is responsible. The form does not let a step be skipped
+/// because each one narrows the next — a bed cannot be chosen before a ward,
+/// and choosing one first is how a patient lands in the wrong bay.
+class AdmitPatientController extends GetxController with LoadStateMixin {
+  static AdmitPatientController get to => Get.find<AdmitPatientController>();
+
   final _service = Get.find<InpatientService>();
 
-  // Loading flags
-  bool isLoadingPatients = false;
-  bool isLoadingWards = false;
-  bool isLoadingDoctors = false;
-  bool isLoadingBeds = false;
-  bool isSubmitting = false;
-
-  String? errorMessage;
-
-  // Data lists
-  List<PatientLookup> patients = [];
-  List<WardModel> wards = [];
-  List<BedModel> beds = [];
-  List<AppointmentDoctor> doctors = [];
-
-  // Dropdown options for admission type
-  final List<String> admissionTypes = [
-    'Routine Admission',
-    'Emergency',
-    'Ward Transfer',
-  ];
-
-  // Mapping from display string to API value
-  final Map<String, String> admissionTypeValues = {
-    'Routine Admission': 'routine',
-    'Emergency': 'emergency',
-    'Ward Transfer': 'transfer',
-  };
-
-  // Form selections
-  PatientLookup? selectedPatient;
-  WardModel? selectedWard;
-  BedModel? selectedBed;
-  String? selectedAdmissionType;
-  AppointmentDoctor? selectedAdmittingDoctor;
-  AppointmentDoctor? selectedAttendingDoctor;
-
-  // Admission Reason controller
+  final formKey = GlobalKey<FormState>();
   final reasonController = TextEditingController();
 
+  final patients = <PatientLookup>[].obs;
+  final wards = <WardModel>[].obs;
+  final beds = <BedModel>[].obs;
+  final doctors = <AppointmentDoctor>[].obs;
+
+  final patient = Rxn<PatientLookup>();
+  final ward = Rxn<WardModel>();
+  final bed = Rxn<BedModel>();
+  final admittingDoctor = Rxn<AppointmentDoctor>();
+  final attendingDoctor = Rxn<AppointmentDoctor>();
+  final admissionType = 'Routine admission'.obs;
+
+  final isLoadingBeds = false.obs;
+  final isSubmitting = false.obs;
+  final errorMessage = RxnString();
+
+  static const admissionTypeValues = <String, String>{
+    'Routine admission': 'routine',
+    'Emergency': 'emergency',
+    'Ward transfer': 'transfer',
+  };
+
+  static List<String> get admissionTypes => admissionTypeValues.keys.toList();
+
+  List<WardModel> get activeWards => wards.where((w) => w.isActive).toList();
+
+  /// Only beds somebody can actually be put in.
+  ///
+  /// A picker that offers an occupied bed is a picker whose selection the
+  /// server rejects, after the clinician has filled in everything else.
+  List<BedModel> get vacantBeds => beds
+      .where((b) => BedState.resolve(b.status) == BedState.vacant)
+      .toList();
+
+  bool get canSubmit =>
+      patient.value != null &&
+      bed.value != null &&
+      reasonController.text.trim().isNotEmpty;
+
   @override
-  void onInit() {
-    super.onInit();
-    loadInitialData();
+  void onReady() {
+    super.onReady();
+    load();
+  }
+
+  Future<void> load() => runGuarded(
+        () async {
+          final results = await Future.wait([
+            _service.fetchPatients(query: '', limit: 100),
+            _service.fetchWards(),
+            _service.fetchDoctors(),
+          ]);
+
+          patients.assignAll(
+            envelopeRows(results[0].data).map(PatientLookup.fromJson).toList(),
+          );
+          wards.assignAll(
+            envelopeRows(results[1].data).map(WardModel.fromJson).toList(),
+          );
+          doctors.assignAll(
+            envelopeRows(results[2].data)
+                .map(AppointmentDoctor.fromJson)
+                .toList(),
+          );
+
+          // A bed map can send somebody straight here with the bed already
+          // chosen. Resolve it through its ward so the ward field is filled in
+          // too, rather than showing a bed with no ward above it.
+          final argument = Get.arguments;
+          final incomingWard = argument is Map ? argument['wardId'] : null;
+          if (incomingWard is String && incomingWard.isNotEmpty) {
+            ward.value = wards.firstWhereOrNull((w) => w.id == incomingWard);
+            await loadBeds();
+            final incomingBed = argument is Map ? argument['bedId'] : null;
+            if (incomingBed is String) {
+              bed.value = beds.firstWhereOrNull((b) => b.id == incomingBed);
+            }
+          }
+        },
+        fallback: "Couldn't load what this form needs.",
+      );
+
+  Future<void> selectWard(WardModel? next) async {
+    ward.value = next;
+    // The old bed belonged to the old ward. Keeping it is how an admission
+    // ends up pointing at a bed in a ward nobody selected.
+    bed.value = null;
+    await loadBeds();
+  }
+
+  Future<void> loadBeds() async {
+    final wardId = ward.value?.id;
+    if (wardId == null) {
+      beds.clear();
+      return;
+    }
+    isLoadingBeds.value = true;
+    try {
+      final response = await _service.fetchBeds(wardId: wardId);
+      beds.assignAll(
+        envelopeRows(response.data).map(BedModel.fromJson).toList(),
+      );
+    } catch (e) {
+      errorMessage.value = parseErrorMessage(e, "Couldn't load that ward's beds.");
+    } finally {
+      isLoadingBeds.value = false;
+    }
+  }
+
+  String? validateReason(String? value) =>
+      (value ?? '').trim().isEmpty ? 'Why is this patient being admitted?' : null;
+
+  Future<void> submit() async {
+    if (isSubmitting.value) return;
+    if (!(formKey.currentState?.validate() ?? false)) return;
+
+    if (patient.value == null) {
+      errorMessage.value = 'Choose the patient being admitted.';
+      return;
+    }
+    if (bed.value == null) {
+      errorMessage.value = 'Choose a ward and a bed.';
+      return;
+    }
+
+    FocusManager.instance.primaryFocus?.unfocus();
+    isSubmitting.value = true;
+    errorMessage.value = null;
+
+    final name = patient.value!.fullName;
+
+    try {
+      final response = await _service.admitPatient(
+        patientId: patient.value!.id,
+        bedId: bed.value!.id,
+        admissionType: admissionTypeValues[admissionType.value] ?? 'routine',
+        admissionReason: reasonController.text.trim(),
+        // The API requires both. Where only one clinician has been named they
+        // are both — which is the truth on a routine admission anyway.
+        admittingDoctorId:
+            admittingDoctor.value?.id ?? attendingDoctor.value?.id ?? '',
+        attendingDoctorId:
+            attendingDoctor.value?.id ?? admittingDoctor.value?.id ?? '',
+      );
+
+      if (!envelopeOk(response.data, statusCode: response.statusCode)) {
+        errorMessage.value =
+            envelopeMessage(response.data) ?? "Couldn't admit $name.";
+        return;
+      }
+
+      if (Get.isRegistered<DataBus>()) DataBus.to.changedBed();
+      Get.back<void>();
+      showBentoToast('$name admitted to bed ${bed.value!.bedNumber}.');
+    } catch (e) {
+      errorMessage.value = parseErrorMessage(e, "Couldn't admit $name.");
+    } finally {
+      isSubmitting.value = false;
+    }
   }
 
   @override
   void onClose() {
     reasonController.dispose();
     super.onClose();
-  }
-
-  // Load patients, wards, and doctors
-  Future<void> loadInitialData() async {
-    errorMessage = null;
-    update();
-
-    await Future.wait([_loadPatients(), _loadWards(), _loadDoctors()]);
-
-    update();
-  }
-
-  Future<void> _loadPatients() async {
-    isLoadingPatients = true;
-    update();
-
-    try {
-      final res = await _service.fetchPatients(query: '', limit: 100);
-      if (res.data != null && res.data['success'] == true) {
-        final List<dynamic> rawList = res.data['data']['data'] ?? [];
-        patients = rawList
-            .map((e) => PatientLookup.fromJson(e as Map<String, dynamic>))
-            .toList();
-      }
-    } catch (e) {
-      debugPrint('[AdmitPatientController] Error loading patients: $e');
-    } finally {
-      isLoadingPatients = false;
-      update();
-    }
-  }
-
-  Future<void> _loadWards() async {
-    isLoadingWards = true;
-    update();
-
-    try {
-      // Use existing controllers if already loaded to ensure consistency
-      if (Get.isRegistered<InpatientWardsController>()) {
-        final wardsCtrl = Get.find<InpatientWardsController>();
-        if (wardsCtrl.wards.isNotEmpty) {
-          wards = wardsCtrl.activeWards;
-          isLoadingWards = false;
-          return;
-        }
-      }
-      if (Get.isRegistered<InpatientController>()) {
-        final inpatientCtrl = Get.find<InpatientController>();
-        if (inpatientCtrl.wards.isNotEmpty) {
-          wards = inpatientCtrl.activeWards;
-          isLoadingWards = false;
-          return;
-        }
-      }
-
-      final res = await _service.fetchWards();
-      if (res.data != null && res.data['success'] == true) {
-        final List<dynamic> rawWards = res.data['data'] ?? [];
-        final List<WardModel> parsedWards = [];
-        for (final item in rawWards) {
-          if (item is Map<String, dynamic>) {
-            final w = WardModel.fromJson(item);
-            if (w.isActive) {
-              parsedWards.add(w);
-            }
-          }
-        }
-        wards = parsedWards;
-      }
-    } catch (e) {
-      debugPrint('[AdmitPatientController] Error loading wards: $e');
-    } finally {
-      isLoadingWards = false;
-      update();
-    }
-  }
-
-  Future<void> _loadDoctors() async {
-    isLoadingDoctors = true;
-    update();
-
-    try {
-      final res = await _service.fetchDoctors();
-      if (res.data != null && res.data['success'] == true) {
-        final List<dynamic> rawList = res.data['data'] ?? [];
-        doctors = rawList
-            .map((e) => AppointmentDoctor.fromJson(e as Map<String, dynamic>))
-            .toList();
-      }
-    } catch (e) {
-      debugPrint('[AdmitPatientController] Error loading doctors: $e');
-    } finally {
-      isLoadingDoctors = false;
-      update();
-    }
-  }
-
-  // Handle Ward selection
-  void selectWard(WardModel? ward) {
-    if (selectedWard?.id == ward?.id) return;
-
-    selectedWard = ward;
-    selectedBed = null; // Clear previously selected bed
-    beds = []; // Reset beds list
-
-    if (ward != null) {
-      _loadBedsForWard(ward.id);
-    } else {
-      update();
-    }
-  }
-
-  Future<void> _loadBedsForWard(String wardId) async {
-    isLoadingBeds = true;
-    update();
-
-    try {
-      final res = await _service.fetchBeds(wardId: wardId, status: 'available');
-      if (res.data != null && res.data['success'] == true) {
-        final List<dynamic> rawBeds = res.data['data'] ?? [];
-        final List<BedModel> parsedBeds = [];
-        for (final item in rawBeds) {
-          if (item is Map<String, dynamic>) {
-            final bed = BedModel.fromJson(item);
-            if (bed.status.toLowerCase() == 'available') {
-              parsedBeds.add(bed);
-            }
-          }
-        }
-        beds = parsedBeds;
-      }
-    } catch (e) {
-      debugPrint('[AdmitPatientController] Error loading beds: $e');
-    } finally {
-      isLoadingBeds = false;
-      update();
-    }
-  }
-
-  // Select patient, bed, doctor, type
-  void selectPatient(PatientLookup? patient) {
-    selectedPatient = patient;
-    update();
-  }
-
-  void selectBed(BedModel? bed) {
-    selectedBed = bed;
-    update();
-  }
-
-  void selectAdmissionType(String? type) {
-    selectedAdmissionType = type;
-    update();
-  }
-
-  void selectAdmittingDoctor(AppointmentDoctor? doc) {
-    selectedAdmittingDoctor = doc;
-    update();
-  }
-
-  void selectAttendingDoctor(AppointmentDoctor? doc) {
-    selectedAttendingDoctor = doc;
-    update();
-  }
-
-  // Admission Submit Logic
-  Future<void> submitAdmission() async {
-    if (isSubmitting) return;
-
-    // Validate fields manually for custom snackbars as requested
-    if (selectedPatient == null) {
-      _showValidationError('Please select a patient');
-      return;
-    }
-    if (selectedWard == null) {
-      _showValidationError('Please select a ward');
-      return;
-    }
-    if (selectedBed == null) {
-      _showValidationError('Please select an available bed');
-      return;
-    }
-    if (selectedAdmissionType == null) {
-      _showValidationError('Please select an admission type');
-      return;
-    }
-    if (selectedAdmittingDoctor == null) {
-      _showValidationError('Please select an admitting doctor');
-      return;
-    }
-    if (selectedAttendingDoctor == null) {
-      _showValidationError('Please select an attending doctor');
-      return;
-    }
-    final reason = reasonController.text.trim();
-    if (reason.isEmpty) {
-      _showValidationError('Please enter the admission reason');
-      return;
-    }
-
-    isSubmitting = true;
-    errorMessage = null;
-    update();
-
-    try {
-      final apiType = admissionTypeValues[selectedAdmissionType] ?? 'routine';
-      final res = await _service.admitPatient(
-        patientId: selectedPatient!.id,
-        bedId: selectedBed!.id,
-        admissionType: apiType,
-        admissionReason: reason,
-        admittingDoctorId: selectedAdmittingDoctor!.id,
-        attendingDoctorId: selectedAttendingDoctor!.id,
-      );
-
-      if (res.data != null && res.data['success'] == true) {
-        // Navigate back to Inpatient View first
-        Get.back();
-
-        Get.snackbar(
-          'Success',
-          res.data['message'] ?? 'Patient admitted successfully.',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: const Color(0xFF30D158).withValues(alpha: 0.9),
-          colorText: Colors.white,
-        );
-
-        // Refresh inpatient data
-        if (Get.isRegistered<InpatientController>()) {
-          Get.find<InpatientController>().refreshAllData();
-        }
-        if (Get.isRegistered<InpatientWardsController>()) {
-          Get.find<InpatientWardsController>().refreshAllData();
-        }
-        if (Get.isRegistered<InpatientOverviewController>()) {
-          Get.find<InpatientOverviewController>().refreshData();
-        }
-        if (Get.isRegistered<InpatientAdmissionsController>()) {
-          Get.find<InpatientAdmissionsController>().refreshAllData();
-        }
-        if (Get.isRegistered<InpatientBedsGridController>()) {
-          Get.find<InpatientBedsGridController>().refreshAllData();
-        }
-      } else {
-        final msg = res.data != null ? res.data['message'] as String? : null;
-        Get.snackbar(
-          'Error',
-          msg ?? 'Failed to admit patient.',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: const Color(0xFFFF453A).withValues(alpha: 0.9),
-          colorText: Colors.white,
-        );
-      }
-    } on DioException catch (e) {
-      final msg = e.response?.data?['message'] ??
-          e.message ??
-          'Network error. Please try again.';
-      Get.snackbar(
-        'Error',
-        msg,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: const Color(0xFFFF453A).withValues(alpha: 0.9),
-        colorText: Colors.white,
-      );
-    } catch (e) {
-      Get.snackbar(
-        'Error',
-        'An error occurred. Please try again.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: const Color(0xFFFF453A).withValues(alpha: 0.9),
-        colorText: Colors.white,
-      );
-    } finally {
-      isSubmitting = false;
-      update();
-    }
-  }
-
-  void _showValidationError(String message) {
-    Get.snackbar(
-      'Validation Error',
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: const Color(0xFFFF9F0A).withValues(alpha: 0.9),
-      colorText: Colors.white,
-    );
   }
 }

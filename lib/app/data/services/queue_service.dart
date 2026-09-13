@@ -1,16 +1,19 @@
 import 'package:dio/dio.dart';
 import 'package:get/get.dart' hide Response;
 
-import '../network/app_dio_client.dart';
+import '../network/dio_client.dart';
 import '../network/endpoints.dart';
 
 class QueueService extends GetxService {
-  final _dio = AppDioClient.instance;
+  /// The one client. Constructing a bare `Dio()` here would skip the
+  /// bearer header, the 401 teardown and the logger — see
+  /// `.agents/RULES.md` §3.
+  DioClient get _dio => Get.find<DioClient>();
 
   /// Fetches patients for dropdown lookup with optional search query
   Future<Response> fetchPatients({required String query, int limit = 50}) {
     return _dio.get(
-      Endpoints.patients,
+      Endpoints.patients.list,
       queryParameters: {
         'search': query,
         'limit': limit,
@@ -27,7 +30,7 @@ class QueueService extends GetxService {
     String? assignedRoom,
   }) {
     return _dio.post(
-      Endpoints.queue,
+      Endpoints.queue.list,
       data: {
         'patientId': patientId,
         'serviceArea': serviceArea,
@@ -42,7 +45,7 @@ class QueueService extends GetxService {
   Future<Response> fetchQueueItems(
       {required String statuses, int limit = 100}) {
     return _dio.get(
-      Endpoints.queue,
+      Endpoints.queue.list,
       queryParameters: {
         'status': statuses,
         'limit': limit,
@@ -53,7 +56,7 @@ class QueueService extends GetxService {
   /// Updates queue status (e.g. called, cancelled, completed)
   Future<Response> updateQueueStatus(String id, String status) {
     return _dio.patch(
-      Endpoints.queueById(id),
+      Endpoints.queue.byId(id),
       data: {
         'status': status,
       },
@@ -63,7 +66,7 @@ class QueueService extends GetxService {
   /// Removes an item completely from the queue (DELETE)
   Future<Response> deleteQueueItem(String id) {
     return _dio.delete(
-      Endpoints.queueById(id),
+      Endpoints.queue.byId(id),
     );
   }
 }

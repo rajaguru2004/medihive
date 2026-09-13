@@ -1,229 +1,134 @@
 import 'package:flutter/material.dart';
-
-import 'package:dio/dio.dart';
 import 'package:get/get.dart' hide Response;
 
 import '../../../data/models/ward_model.dart';
+import '../../../data/services/data_bus.dart';
 import '../../../data/services/inpatient_service.dart';
-import '../../inpatient/controllers/inpatient_controller.dart';
-import '../../inpatient_beds_grid/controllers/inpatient_beds_grid_controller.dart';
-import '../../inpatient_wards/controllers/inpatient_wards_controller.dart';
+import '../../../data/utils/error_handler.dart';
+import '../../../data/utils/legacy_envelope.dart';
+import '../../../data/utils/load_state.dart';
+import '../../../theme/theme.dart';
 
-class InpatientAddBedController extends GetxController {
+/// Add a bed to a ward.
+class InpatientAddBedController extends GetxController with LoadStateMixin {
+  static InpatientAddBedController get to =>
+      Get.find<InpatientAddBedController>();
+
   final _service = Get.find<InpatientService>();
 
-  // Form Field Controllers
+  final formKey = GlobalKey<FormState>();
   final bedNumberController = TextEditingController();
 
-  // Selections
-  String? selectedWardId;
-  String? selectedType;
+  final wards = <WardModel>[].obs;
+  final wardId = RxnString();
+  final type = 'Standard'.obs;
+  final isSubmitting = false.obs;
+  final errorMessage = RxnString();
 
-  // Option Lists
-  List<WardModel> activeWards = [];
-  final List<String> typeOptions = [
-    'Standard',
-    'ICU Spec',
-    'Electric Adjustable',
-    'Pediatric Crib',
-  ];
-
-  // Mapping from UI Display type to API value
-  final Map<String, String> typeApiValues = {
+  /// Bed types, and what the API calls each one.
+  ///
+  /// The map is the whole reason this is not a plain list: the UI says
+  /// "ICU spec" and the API stores `icu`, and a screen that sends its own
+  /// label creates a bed nothing can filter on.
+  static const typeApiValues = <String, String>{
     'Standard': 'standard',
-    'ICU Spec': 'icu',
-    'Electric Adjustable': 'electric',
-    'Pediatric Crib': 'pediatric',
+    'ICU spec': 'icu',
+    'Electric adjustable': 'electric',
+    'Pediatric crib': 'crib',
   };
 
-  // State Variables
-  bool isInitialized = false;
-  bool isLoadingWards = false;
-  bool isSubmitting = false;
+  static List<String> get types => typeApiValues.keys.toList();
+
+  List<WardModel> get activeWards => wards.where((w) => w.isActive).toList();
+
+  WardModel? get ward =>
+      wards.firstWhereOrNull((w) => w.id == wardId.value);
 
   @override
-  void onInit() {
-    super.onInit();
-    initialize();
+  void onReady() {
+    super.onReady();
+
+    final argument = Get.arguments;
+    final incoming = argument is Map ? argument['wardId'] : null;
+    if (incoming is String && incoming.isNotEmpty) wardId.value = incoming;
+
+    loadWards();
+  }
+
+  Future<void> loadWards() => runGuarded(
+        () async {
+          final response = await _service.fetchWards();
+          wards.assignAll(
+            envelopeRows(response.data).map(WardModel.fromJson).toList(),
+          );
+          // Only default when the caller did not name a ward, and only when
+          // there is exactly one — picking one of nine for somebody is how a
+          // bed lands in the wrong ward.
+          if (wardId.value == null && activeWards.length == 1) {
+            wardId.value = activeWards.first.id;
+          }
+        },
+        fallback: "Couldn't load the wards.",
+      );
+
+  String? validateBedNumber(String? value) {
+    final text = (value ?? '').trim();
+    if (text.isEmpty) return 'Give the bed a number';
+
+    // Caught here rather than by the server, because the server's duplicate
+    // error names a constraint and this names the bed.
+    final taken = ward?.beds.any(
+          (b) => b.bedNumber.trim().toLowerCase() == text.toLowerCase(),
+        ) ??
+        false;
+    if (taken) return 'That bed number is already used in this ward';
+    return null;
+  }
+
+  Future<void> save() async {
+    if (isSubmitting.value) return;
+    if (!(formKey.currentState?.validate() ?? false)) return;
+
+    if (wardId.value == null) {
+      errorMessage.value = 'Choose which ward this bed is in.';
+      return;
+    }
+
+    FocusManager.instance.primaryFocus?.unfocus();
+    isSubmitting.value = true;
+    errorMessage.value = null;
+
+    final number = bedNumberController.text.trim();
+
+    try {
+      final response = await _service.createBed(
+        wardId: wardId.value!,
+        bedNumber: number,
+        type: typeApiValues[type.value] ?? 'standard',
+        // A new bed is free. Creating it occupied would claim a patient is in
+        // a bed that was invented ten seconds ago.
+        status: 'available',
+      );
+
+      if (!envelopeOk(response.data, statusCode: response.statusCode)) {
+        errorMessage.value =
+            envelopeMessage(response.data) ?? "Couldn't add the bed.";
+        return;
+      }
+
+      if (Get.isRegistered<DataBus>()) DataBus.to.changedBed();
+      Get.back<void>();
+      showBentoToast('Bed $number added to ${ward?.name ?? 'the ward'}.');
+    } catch (e) {
+      errorMessage.value = parseErrorMessage(e, "Couldn't add the bed.");
+    } finally {
+      isSubmitting.value = false;
+    }
   }
 
   @override
   void onClose() {
     bedNumberController.dispose();
     super.onClose();
-  }
-
-  Future<void> initialize() async {
-    if (isInitialized) return;
-
-    // Get ward ID from arguments if passed
-    final args = Get.arguments;
-    if (args is Map && args.containsKey('wardId')) {
-      selectedWardId = args['wardId'] as String?;
-    }
-
-    selectedType = 'Standard';
-
-    await _loadWards();
-
-    // If no ward ID was passed, pre-select the first active ward
-    if (selectedWardId == null && activeWards.isNotEmpty) {
-      selectedWardId = activeWards.first.id;
-    }
-
-    isInitialized = true;
-    update();
-  }
-
-  Future<void> _loadWards() async {
-    isLoadingWards = true;
-    update();
-
-    try {
-      // 1. Try to read from existing controllers to save network call
-      if (Get.isRegistered<InpatientBedsGridController>()) {
-        final gridCtrl = Get.find<InpatientBedsGridController>();
-        final wardsList = gridCtrl.activeWards;
-        if (wardsList.isNotEmpty) {
-          activeWards = wardsList;
-          isLoadingWards = false;
-          update();
-          return;
-        }
-      }
-
-      if (Get.isRegistered<InpatientWardsController>()) {
-        final wardsCtrl = Get.find<InpatientWardsController>();
-        final wardsList = wardsCtrl.activeWards;
-        if (wardsList.isNotEmpty) {
-          activeWards = wardsList;
-          isLoadingWards = false;
-          update();
-          return;
-        }
-      }
-
-      // 2. Fetch from service if not cached
-      final res = await _service.fetchWards();
-      if (res.data != null && res.data['success'] == true) {
-        final List<dynamic> rawWards = res.data['data'] ?? [];
-        final List<WardModel> parsedWards = [];
-        for (final item in rawWards) {
-          if (item is Map<String, dynamic>) {
-            final w = WardModel.fromJson(item);
-            if (w.isActive) {
-              parsedWards.add(w);
-            }
-          }
-        }
-        activeWards = parsedWards;
-      }
-    } catch (e) {
-      debugPrint('[InpatientAddBedController] Error loading wards: $e');
-    } finally {
-      isLoadingWards = false;
-      update();
-    }
-  }
-
-  void setWardId(String? val) {
-    selectedWardId = val;
-    update();
-  }
-
-  void setSelectedType(String? val) {
-    selectedType = val;
-    update();
-  }
-
-  Future<void> saveBed() async {
-    if (isSubmitting) return;
-
-    final bedNumber = bedNumberController.text.trim();
-    final wardId = selectedWardId;
-    final displayType = selectedType;
-
-    if (bedNumber.isEmpty || wardId == null || displayType == null) {
-      Get.snackbar(
-        'Validation Error',
-        'All fields are mandatory',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: const Color(0xFFFF9F0A).withValues(alpha: 0.9),
-        colorText: Colors.white,
-      );
-      return;
-    }
-
-    final apiType = typeApiValues[displayType] ?? 'standard';
-
-    isSubmitting = true;
-    update();
-
-    try {
-      final response = await _service.createBed(
-        wardId: wardId,
-        bedNumber: bedNumber,
-        type: apiType,
-        status: 'available',
-      );
-
-      if (response.data != null && response.data['success'] == true) {
-        Get.back();
-        Get.snackbar(
-          'Success',
-          'Bed created successfully',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: const Color(0xFF30D158).withValues(alpha: 0.9),
-          colorText: Colors.white,
-        );
-
-        // Refresh inpatient tabs to keep everything in sync
-        if (Get.isRegistered<InpatientBedsGridController>()) {
-          final gridCtrl = Get.find<InpatientBedsGridController>();
-          // If the added bed is for the currently selected ward in grid, reload
-          if (gridCtrl.selectedWardId == wardId) {
-            gridCtrl.refreshAllData();
-          } else {
-            // Otherwise, we can change the selection to this ward and load
-            gridCtrl.changeSelectedWard(wardId);
-          }
-        }
-
-        if (Get.isRegistered<InpatientController>()) {
-          Get.find<InpatientController>().refreshAllData();
-        }
-      } else {
-        final msg = response.data != null ? response.data['message'] as String? : null;
-        Get.snackbar(
-          'Error',
-          msg ?? 'Failed to save bed details.',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: const Color(0xFFFF453A).withValues(alpha: 0.9),
-          colorText: Colors.white,
-        );
-      }
-    } on DioException catch (e) {
-      final msg = e.response?.data?['message'] ??
-          e.message ??
-          'Network error. Please try again.';
-      Get.snackbar(
-        'Error',
-        msg,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: const Color(0xFFFF453A).withValues(alpha: 0.9),
-        colorText: Colors.white,
-      );
-    } catch (e) {
-      Get.snackbar(
-        'Error',
-        'An error occurred. Please try again.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: const Color(0xFFFF453A).withValues(alpha: 0.9),
-        colorText: Colors.white,
-      );
-    } finally {
-      isSubmitting = false;
-      update();
-    }
   }
 }
