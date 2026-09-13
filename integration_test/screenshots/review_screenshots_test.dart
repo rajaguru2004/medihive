@@ -259,14 +259,21 @@ void main() {
       HomeController.to.selectRoute(Routes.QUEUE);
       await tester.pumpUntilRouteSettled();
 
-      await tester.tapKey(QueueKeys.advance('q-1'));
-      await tester.pumpUntilFound(find.byType(SheetShell));
-      await shootBoth(tester, harness, '21-sheet');
-
-      // Closed explicitly: a sheet owns tickers that `flutter_test` checks for
-      // at the end of the test *body*, earlier than `addTearDown`.
-      Get.back<void>();
-      await tester.pumpUntilRouteSettled();
+      // Opened fresh in each mode rather than toggled with the sheet up.
+      // `Get.bottomSheet` snapshots the theme at push time, so toggling behind
+      // an open sheet captures a state no user can reach — and it is not what
+      // this shot is for. Closed explicitly between the two: a sheet owns
+      // tickers that `flutter_test` checks for at the end of the test *body*,
+      // earlier than `addTearDown`.
+      for (final mode in ['light', 'dark']) {
+        if (mode == 'dark') await harness.useDarkTheme();
+        await tester.tapKey(QueueKeys.advance('q-1'));
+        await tester.pumpUntilFound(find.byType(SheetShell));
+        await shoot(tester, '21-sheet-$mode');
+        Get.back<void>();
+        await tester.pumpUntilRouteSettled();
+      }
+      await harness.useLightTheme();
     });
   });
 }
