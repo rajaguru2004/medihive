@@ -1,28 +1,53 @@
-# This file configures the analyzer, which statically analyzes Dart code to
-# check for errors, warnings, and lints.
-#
-# The issues identified by the analyzer are surfaced in the UI of Dart-enabled
-# IDEs (https://dart.dev/tools#ides-and-editors). The analyzer can also be
-# invoked from the command line by running `flutter analyze`.
-
-# The following line activates a set of recommended lints for Flutter apps,
-# packages, and plugins designed to encourage good coding practices.
+# Static analysis for MediHive. `flutter analyze` must be clean before any
+# change lands — the CI gate and the agent rules in `.agents/RULES.md` both
+# assume a zero-issue baseline, and a baseline with three known warnings in it
+# is a baseline nobody reads.
 include: package:flutter_lints/flutter.yaml
 
-linter:
-  # The lint rules applied to this project can be customized in the
-  # section below to disable rules from the `package:flutter_lints/flutter.yaml`
-  # included above or to enable additional rules. A list of all available lints
-  # and their documentation is published at https://dart.dev/lints.
-  #
-  # Instead of disabling a lint rule for the entire project in the
-  # section below, it can also be suppressed for a single line of code
-  # or a specific dart file by using the `// ignore: name_of_lint` and
-  # `// ignore_for_file: name_of_lint` syntax on the line or in the file
-  # producing the lint.
-  rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+analyzer:
+  errors:
+    # The design system is the contract. A screen that reaches past it is a
+    # defect, and a defect the analyzer can see should stop the build rather
+    # than wait for review.
+    deprecated_member_use_from_same_package: error
+    unused_import: error
+    unused_local_variable: error
 
-# Additional information about this file can be found at
-# https://dart.dev/guides/language/analysis-options
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - "build/**"
+
+linter:
+  rules:
+    # ── Correctness ───────────────────────────────────────────────────────
+    always_use_package_imports: false
+    avoid_dynamic_calls: true
+    avoid_empty_else: true
+    avoid_slow_async_io: true
+    cancel_subscriptions: true
+    close_sinks: true
+    # A `print` in a release build is an unredacted log line on a device that
+    # holds patient data. Everything goes through `AppLog`, which is
+    # debug-only and redacts.
+    avoid_print: true
+    unawaited_futures: true
+
+    # ── Style, so diffs read as changes and not as reformatting ───────────
+    prefer_single_quotes: true
+    prefer_const_constructors: true
+    prefer_const_constructors_in_immutables: true
+    prefer_const_declarations: true
+    prefer_const_literals_to_create_immutables: true
+    prefer_final_locals: true
+    prefer_relative_imports: true
+    directives_ordering: true
+    sort_child_properties_last: true
+    require_trailing_commas: true
+
+    # ── Flutter ───────────────────────────────────────────────────────────
+    use_key_in_widget_constructors: true
+    use_colored_box: true
+    use_decorated_box: true
+    sized_box_for_whitespace: true
+    avoid_unnecessary_containers: true

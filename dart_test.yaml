@@ -1,0 +1,16 @@
+# Declares the tags used in this repo, so `flutter test` does not warn about
+# them.
+#
+# `live` marks the only tests that touch a real server
+# (test/contract/live_smoke_test.dart). They skip themselves unless credentials
+# are supplied via --dart-define, so a normal run never reaches the network.
+# Exclude them explicitly with: flutter test --exclude-tags live
+tags:
+  live:
+    skip: false
+
+  # Marks the visual-regression tier (test/golden/). Rendering is font- and
+  # engine-sensitive, so these are regenerated deliberately with
+  # `flutter test test/golden --update-goldens`, never as a side effect.
+  golden:
+    skip: false
