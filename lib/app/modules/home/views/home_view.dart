@@ -146,16 +146,17 @@ Future<void> _openAccountSheet(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (user != null) ...[
-            PatientIdentityBand(
-              name: user.name.isEmpty ? user.email : user.name,
-              extra: [
-                if (user.role.isNotEmpty) user.role,
-                if (user.department.isNotEmpty) user.department,
-              ].join(' · '),
+          if (user != null)
+            SheetSection(
+              bottom: BentoSpace.section,
+              child: PatientIdentityBand(
+                name: user.name.isEmpty ? user.email : user.name,
+                extra: [
+                  if (user.role.isNotEmpty) user.role,
+                  if (user.department.isNotEmpty) user.department,
+                ].join(' · '),
+              ),
             ),
-            const SizedBox(height: BentoSpace.section),
-          ],
           SheetRow(
             icon: Icons.brightness_6_outlined,
             label: 'Appearance',

@@ -139,13 +139,22 @@ Future<void> _openWardSheet(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          FactRow(label: 'Code', value: ward.code),
-          FactRow(label: 'Type', value: ward.type),
-          FactRow(
-            label: 'Beds',
-            value: '${ward.occupiedBeds} occupied of ${ward.capacity}',
+          SheetSection(
+            bottom: BentoSpace.section,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                FactRow(label: 'Code', value: ward.code, inset: false),
+                FactRow(label: 'Type', value: ward.type, inset: false),
+                FactRow(
+                  label: 'Beds',
+                  value: '${ward.occupiedBeds} occupied of ${ward.capacity}',
+                  inset: false,
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: BentoSpace.section),
           SheetRow(
             icon: Icons.grid_view_rounded,
             label: 'Bed map',

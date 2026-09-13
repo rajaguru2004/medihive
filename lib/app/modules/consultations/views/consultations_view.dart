@@ -341,49 +341,52 @@ Future<void> _openConsultationSheet(
     SheetShell(
       title: 'Consultation',
       scrollable: true,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          PatientIdentityBand(
-            name: consultation.patient.fullName,
-            mrn: consultation.patient.mrn,
-            age: Formatters.age(consultation.patient.dateOfBirth),
-            sex: consultation.patient.gender,
-            extra: '${Formatters.dateMedium(consultation.visitDate)} · '
-                '${consultation.doctor.fullName}',
-          ),
-          if (vitals.isNotEmpty) ...[
-            const SizedBox(height: BentoSpace.section),
-            InsetSurface(
-              padding: const EdgeInsets.all(16),
-              child: VitalsGrid(tiles: vitals, columns: 3),
+      child: SheetSection(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            PatientIdentityBand(
+              name: consultation.patient.fullName,
+              mrn: consultation.patient.mrn,
+              age: Formatters.age(consultation.patient.dateOfBirth),
+              sex: consultation.patient.gender,
+              extra: '${Formatters.dateMedium(consultation.visitDate)} · '
+                  '${consultation.doctor.fullName}',
             ),
+            if (vitals.isNotEmpty) ...[
+              const SizedBox(height: BentoSpace.section),
+              InsetSurface(
+                padding: const EdgeInsets.all(16),
+                child: VitalsGrid(tiles: vitals, columns: 3),
+              ),
+            ],
+            const SizedBox(height: BentoSpace.section),
+            _Note(label: 'Complaint', value: consultation.chiefComplaint),
+            _Note(
+              label: 'History',
+              value: consultation.historyOfPresentIllness,
+            ),
+            _Note(
+              label: 'Examination',
+              value: consultation.physicalExamination,
+            ),
+            _Note(label: 'Diagnosis', value: consultation.diagnosis),
+            _Note(label: 'Plan', value: consultation.treatmentPlan),
+            _Note(
+              label: 'Follow-up',
+              value: [
+                if (consultation.followUpDate != null)
+                  Formatters.dateMedium(consultation.followUpDate),
+                if (consultation.followUpInstructions?.trim().isNotEmpty ??
+                    false)
+                  consultation.followUpInstructions!,
+              ].join(' · '),
+            ),
+            _Note(label: 'Referred to', value: consultation.referredTo),
+            _Note(label: 'Notes', value: consultation.notes),
           ],
-          const SizedBox(height: BentoSpace.section),
-          _Note(label: 'Complaint', value: consultation.chiefComplaint),
-          _Note(
-            label: 'History',
-            value: consultation.historyOfPresentIllness,
-          ),
-          _Note(
-            label: 'Examination',
-            value: consultation.physicalExamination,
-          ),
-          _Note(label: 'Diagnosis', value: consultation.diagnosis),
-          _Note(label: 'Plan', value: consultation.treatmentPlan),
-          _Note(
-            label: 'Follow-up',
-            value: [
-              if (consultation.followUpDate != null)
-                Formatters.dateMedium(consultation.followUpDate),
-              if (consultation.followUpInstructions?.trim().isNotEmpty ?? false)
-                consultation.followUpInstructions!,
-            ].join(' · '),
-          ),
-          _Note(label: 'Referred to', value: consultation.referredTo),
-          _Note(label: 'Notes', value: consultation.notes),
-        ],
+        ),
       ),
     ),
     isScrollControlled: true,

@@ -334,20 +334,34 @@ Future<void> _openBedSheet(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (occupant != null) ...[
-            PatientIdentityBand(
-              name: controller.showNames
-                  ? occupant.patient.fullName
-                  : 'Occupied',
-              mrn: controller.showNames ? occupant.patient.mrn : null,
-              sex: controller.showNames ? occupant.patient.gender : null,
-              extra: 'Day ${Formatters.lengthOfStayDays(occupant.admissionDate) + 1}'
-                  ' · admitted ${Formatters.dateMedium(occupant.admissionDate)}',
+            SheetSection(
+              bottom: BentoSpace.section,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  PatientIdentityBand(
+                    name: controller.showNames
+                        ? occupant.patient.fullName
+                        : 'Occupied',
+                    mrn: controller.showNames ? occupant.patient.mrn : null,
+                    sex: controller.showNames ? occupant.patient.gender : null,
+                    extra: 'Day '
+                        '${Formatters.lengthOfStayDays(occupant.admissionDate) + 1}'
+                        ' · admitted '
+                        '${Formatters.dateMedium(occupant.admissionDate)}',
+                  ),
+                  if (occupant.admissionReason.trim().isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    FactRow(
+                      label: 'Reason',
+                      value: occupant.admissionReason,
+                      inset: false,
+                    ),
+                  ],
+                ],
+              ),
             ),
-            if (occupant.admissionReason.trim().isNotEmpty) ...[
-              const SizedBox(height: 12),
-              FactRow(label: 'Reason', value: occupant.admissionReason),
-            ],
-            const SizedBox(height: BentoSpace.section),
             SheetRow(
               icon: Icons.logout_rounded,
               label: 'Discharge',
@@ -361,10 +375,18 @@ Future<void> _openBedSheet(
               },
             ),
           ] else ...[
-            FactRow(label: 'State', value: state.label),
-            if (bed.type.trim().isNotEmpty)
-              FactRow(label: 'Type', value: bed.type),
-            const SizedBox(height: BentoSpace.section),
+            SheetSection(
+              bottom: BentoSpace.section,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FactRow(label: 'State', value: state.label, inset: false),
+                  if (bed.type.trim().isNotEmpty)
+                    FactRow(label: 'Type', value: bed.type, inset: false),
+                ],
+              ),
+            ),
             if (state == BedState.vacant)
               SheetRow(
                 icon: Icons.local_hotel_outlined,

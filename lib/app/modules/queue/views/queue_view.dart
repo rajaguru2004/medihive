@@ -306,19 +306,20 @@ Future<void> _openActions(
 
   return Get.bottomSheet<void>(
     SheetShell(
-      title: name,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          PatientIdentityBand(
-            name: name,
-            mrn: item.patient.mrn,
-            sex: item.patient.gender,
-            acuityCode: item.priority,
-            extra: 'Waiting ${Formatters.elapsed(item.joinedQueueAt)}',
+          SheetSection(
+            bottom: BentoSpace.section,
+            child: PatientIdentityBand(
+              name: name,
+              mrn: item.patient.mrn,
+              sex: item.patient.gender,
+              acuityCode: item.priority,
+              extra: 'Waiting ${Formatters.elapsed(item.joinedQueueAt)}',
+            ),
           ),
-          const SizedBox(height: BentoSpace.section),
           if (status == 'waiting')
             SheetRow(
               icon: Icons.campaign_outlined,

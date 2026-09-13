@@ -548,31 +548,41 @@ Future<void> _openActions(
 
   return Get.bottomSheet<void>(
     SheetShell(
-      title: name,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          PatientIdentityBand(
-            name: name,
-            mrn: patient.mrn,
-            sex: patient.gender,
-            extra: '${appointment.appointmentTime} · '
-                '${appointment.doctor.fullName}',
-          ),
-          if (appointment.chiefComplaint.trim().isNotEmpty) ...[
-            const SizedBox(height: 14),
-            FactRow(
-              label: 'Complaint',
-              value: appointment.chiefComplaint,
+          SheetSection(
+            bottom: BentoSpace.section,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                PatientIdentityBand(
+                  name: name,
+                  mrn: patient.mrn,
+                  sex: patient.gender,
+                  extra: '${appointment.appointmentTime} · '
+                      '${appointment.doctor.fullName}',
+                ),
+                if (appointment.chiefComplaint.trim().isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  FactRow(
+                    label: 'Complaint',
+                    value: appointment.chiefComplaint,
+                    inset: false,
+                  ),
+                ],
+              ],
             ),
-          ],
-          const SizedBox(height: BentoSpace.section),
+          ),
           if (closed)
-            const NoticeBanner(
-              message: 'This appointment is closed. Reopening it is done in '
-                  'the admin console.',
-              icon: Icons.lock_outline_rounded,
+            const SheetSection(
+              child: NoticeBanner(
+                message: 'This appointment is closed. Reopening it is done in '
+                    'the admin console.',
+                icon: Icons.lock_outline_rounded,
+              ),
             )
           else ...[
             if (status == 'scheduled' || status == 'confirmed')

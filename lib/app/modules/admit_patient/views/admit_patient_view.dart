@@ -242,11 +242,13 @@ Future<void> _openPatientPicker(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SearchField(
-            hint: 'Name or MRN',
-            onChanged: (value) => query.value = value,
+          SheetSection(
+            bottom: 12,
+            child: SearchField(
+              hint: 'Name or MRN',
+              onChanged: (value) => query.value = value,
+            ),
           ),
-          const SizedBox(height: 12),
           // Bounded, so a site with four thousand patients does not build four
           // thousand rows into a sheet.
           Flexible(
@@ -261,12 +263,14 @@ Future<void> _openPatientPicker(
                   .toList();
 
               if (rows.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: EmptyState(
-                    compact: true,
-                    icon: Icons.person_search_outlined,
-                    title: 'No patient matches that',
+                return const SheetSection(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: EmptyState(
+                      compact: true,
+                      icon: Icons.person_search_outlined,
+                      title: 'No patient matches that',
+                    ),
                   ),
                 );
               }
@@ -339,14 +343,16 @@ Future<void> _openBedPicker(AdmitPatientController controller) {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (controller.vacantBeds.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: EmptyState(
-                  compact: true,
-                  icon: Icons.bed_outlined,
-                  title: 'No free beds in this ward',
-                  message: 'Try another ward, or free a bed by discharging '
-                      'or transferring.',
+              const SheetSection(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: EmptyState(
+                    compact: true,
+                    icon: Icons.bed_outlined,
+                    title: 'No free beds in this ward',
+                    message: 'Try another ward, or free a bed by discharging '
+                        'or transferring.',
+                  ),
                 ),
               )
             else

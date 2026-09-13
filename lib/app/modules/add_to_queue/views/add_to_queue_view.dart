@@ -268,11 +268,13 @@ Future<void> _openPatientPicker(AddToQueueController controller) {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SearchField(
-            hint: 'Name or MRN',
-            onChanged: controller.onSearchChanged,
+          SheetSection(
+            bottom: 12,
+            child: SearchField(
+              hint: 'Name or MRN',
+              onChanged: controller.onSearchChanged,
+            ),
           ),
-          const SizedBox(height: 12),
           Flexible(
             child: Obx(() {
               final error = controller.errorMessage.value;
@@ -290,25 +292,31 @@ Future<void> _openPatientPicker(AddToQueueController controller) {
                   // it sends somebody off to register a patient who is already
                   // on file, and the queue then holds two of them.
                   if (error != null)
-                    ErrorRetryBanner(
-                      message: error,
-                      onRetry: () => controller.searchPatients(''),
+                    SheetSection(
+                      child: ErrorRetryBanner(
+                        message: error,
+                        onRetry: () => controller.searchPatients(''),
+                      ),
                     ),
                   if (searching && rows.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: BentoSkeleton(rows: 3),
+                    const SheetSection(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: BentoSkeleton(rows: 3),
+                      ),
                     )
                   // Only once the search has actually come back. Under a
                   // failure banner this is a second answer contradicting the
                   // first.
                   else if (rows.isEmpty && error == null)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: EmptyState(
-                        compact: true,
-                        icon: Icons.person_search_outlined,
-                        title: 'No patient matches that',
+                    const SheetSection(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: EmptyState(
+                          compact: true,
+                          icon: Icons.person_search_outlined,
+                          title: 'No patient matches that',
+                        ),
                       ),
                     )
                   else if (rows.isNotEmpty)
