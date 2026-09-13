@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:integration_test/integration_test.dart';
@@ -49,6 +51,19 @@ void main() {
     await binding.takeScreenshot(name);
   }
 
+  /// Pushes a route without waiting for it to be popped.
+  ///
+  /// `Get.toNamed` returns a future that completes when the route comes *off*
+  /// the stack. Awaiting it in a test that only wants to photograph the screen
+  /// blocks forever — the screen is never popped until the next line runs, and
+  /// the next line is what is being awaited. The same trap is commented in
+  /// `SessionManager.endSession`.
+  void open(String route, {Object? arguments}) {
+    unawaited(
+      Get.toNamed<void>(route, arguments: arguments) ?? Future<void>.value(),
+    );
+  }
+
   /// Captures one screen in both themes, then restores light.
   ///
   /// Both, always: the palette derives its inks per mode, and a world that is
@@ -94,25 +109,25 @@ void main() {
     testWidgets('bed map, wards, admissions and ward round', (tester) async {
       final harness = await AppHarness.bootSignedIn(tester, fonts: true);
 
-      await Get.toNamed<void>(Routes.INPATIENT_BEDS_GRID);
+      open(Routes.INPATIENT_BEDS_GRID);
       await tester.pumpUntilFound(find.byKey(InpatientKeys.beds));
       await shootBoth(tester, harness, '06-bed-map');
       Get.back<void>();
       await tester.pumpUntilRouteSettled();
 
-      await Get.toNamed<void>(Routes.INPATIENT_WARDS);
+      open(Routes.INPATIENT_WARDS);
       await tester.pumpUntilFound(find.byKey(InpatientKeys.wards));
       await shootBoth(tester, harness, '07-wards');
       Get.back<void>();
       await tester.pumpUntilRouteSettled();
 
-      await Get.toNamed<void>(Routes.INPATIENT_ADMISSIONS);
+      open(Routes.INPATIENT_ADMISSIONS);
       await tester.pumpUntilFound(find.byKey(InpatientKeys.admissions));
       await shootBoth(tester, harness, '08-admissions');
       Get.back<void>();
       await tester.pumpUntilRouteSettled();
 
-      await Get.toNamed<void>(Routes.INPATIENT_OVERVIEW);
+      open(Routes.INPATIENT_OVERVIEW);
       await tester.pumpUntilRouteSettled();
       await shootBoth(tester, harness, '09-ward-round');
       Get.back<void>();
@@ -122,13 +137,13 @@ void main() {
     testWidgets('admit and discharge forms', (tester) async {
       final harness = await AppHarness.bootSignedIn(tester, fonts: true);
 
-      await Get.toNamed<void>(Routes.INPATIENT_ADMIT);
+      open(Routes.INPATIENT_ADMIT);
       await tester.pumpUntilFound(find.byKey(AdmitPatientKeys.screen));
       await shootBoth(tester, harness, '10-admit');
       Get.back<void>();
       await tester.pumpUntilRouteSettled();
 
-      await Get.toNamed<void>(
+      open(
         Routes.DISCHARGE_PATIENT,
         arguments: {'admissionId': 'adm-1'},
       );
@@ -141,13 +156,13 @@ void main() {
     testWidgets('ward and bed forms', (tester) async {
       final harness = await AppHarness.bootSignedIn(tester, fonts: true);
 
-      await Get.toNamed<void>(Routes.INPATIENT_ADD_WARD);
+      open(Routes.INPATIENT_ADD_WARD);
       await tester.pumpUntilFound(find.byKey(InpatientKeys.wardForm));
       await shootBoth(tester, harness, '12-add-ward');
       Get.back<void>();
       await tester.pumpUntilRouteSettled();
 
-      await Get.toNamed<void>(Routes.INPATIENT_ADD_BED);
+      open(Routes.INPATIENT_ADD_BED);
       await tester.pumpUntilFound(find.byKey(InpatientKeys.bedForm));
       await shootBoth(tester, harness, '13-add-bed');
       Get.back<void>();
@@ -159,7 +174,7 @@ void main() {
     testWidgets('board, detail and the two-step form', (tester) async {
       final harness = await AppHarness.bootSignedIn(tester, fonts: true);
 
-      await Get.toNamed<void>(Routes.PRE_TRIAGE);
+      open(Routes.PRE_TRIAGE);
       await tester.pumpUntilFound(find.byKey(PreTriageKeys.screen));
       await shootBoth(tester, harness, '14-pre-triage');
       Get.back<void>();
@@ -167,7 +182,7 @@ void main() {
 
       // The screening with the alarming observations, so the out-of-range
       // treatment is in the contact sheet.
-      await Get.toNamed<void>(
+      open(
         Routes.PRE_TRIAGE_DETAILS,
         arguments: {'id': 's-1'},
       );
@@ -176,13 +191,13 @@ void main() {
       Get.back<void>();
       await tester.pumpUntilRouteSettled();
 
-      await Get.toNamed<void>(Routes.NEW_SCREENING_STEP1);
+      open(Routes.NEW_SCREENING_STEP1);
       await tester.pumpUntilFound(find.byKey(ScreeningKeys.step1));
       await shootBoth(tester, harness, '16-screening-step1');
       Get.back<void>();
       await tester.pumpUntilRouteSettled();
 
-      await Get.toNamed<void>(
+      open(
         Routes.NEW_SCREENING_STEP2,
         arguments: {
           'firstName': 'Tom',
@@ -204,19 +219,19 @@ void main() {
         (tester) async {
       final harness = await AppHarness.bootSignedIn(tester, fonts: true);
 
-      await Get.toNamed<void>(Routes.ADD_TO_QUEUE);
+      open(Routes.ADD_TO_QUEUE);
       await tester.pumpUntilFound(find.byKey(AddToQueueKeys.screen));
       await shootBoth(tester, harness, '18-add-to-queue');
       Get.back<void>();
       await tester.pumpUntilRouteSettled();
 
-      await Get.toNamed<void>(Routes.CONSULTATIONS);
+      open(Routes.CONSULTATIONS);
       await tester.pumpUntilFound(find.byKey(ConsultationsKeys.screen));
       await shootBoth(tester, harness, '19-consultations');
       Get.back<void>();
       await tester.pumpUntilRouteSettled();
 
-      await Get.toNamed<void>(Routes.PHARMACY);
+      open(Routes.PHARMACY);
       await tester.pumpUntilFound(
         find.byKey(PlaceholderKeys.screen('pharmacy')),
       );
