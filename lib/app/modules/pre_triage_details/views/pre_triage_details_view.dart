@@ -1,421 +1,304 @@
 import 'package:flutter/material.dart';
-
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
 
+import '../../../core/keys/app_keys.dart';
+import '../../../data/models/pre_triage_model.dart';
+import '../../../data/utils/formatters.dart';
+import '../../../routes/app_pages.dart';
 import '../../../theme/theme.dart';
 import '../controllers/pre_triage_details_controller.dart';
 
+/// One screening.
+///
+/// Identity, then observations, then the complaint, then what happens next.
+/// The observations come second rather than last because they are the reason
+/// somebody opened this record — a clinician checking a walk-in is checking
+/// the numbers.
 class PreTriageDetailsView extends GetView<PreTriageDetailsController> {
   const PreTriageDetailsView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? AppColors.darkBackground : AppColors.lightBackground;
-    final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
-
-    final screening = controller.screening;
-
     return Scaffold(
-      backgroundColor: bg,
-      appBar: AppBar(
-        backgroundColor: surface,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: textPrimary),
-          onPressed: () => Get.back(),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Screening Details',
-              style: AppTextStyles.titleMedium(textPrimary),
-            ),
-            Text(
-              'Read-only view of screening ${screening.screeningId}',
-              style: AppTextStyles.bodySmall(textSecondary),
-            ),
-          ],
-        ),
-      ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          children: [
-            // Section 1: Patient Identity Card
-            _buildIdentityCard(context, isDark),
-            const SizedBox(height: AppSpacing.md),
+      appBar: const DetailHeader(title: 'Screening'),
+      body: Obx(() {
+        final screening = controller.screening.value;
 
-            // Section 2: Clinical Assessment Card
-            _buildClinicalCard(context, isDark),
-            const SizedBox(height: AppSpacing.md),
-
-            // Section 3: Vitals Metrics Card
-            _buildVitalsCard(context, isDark),
-            const SizedBox(height: AppSpacing.md),
-
-            // Section 4: Routing & Status Card
-            _buildStatusCard(context, isDark),
-            const SizedBox(height: AppSpacing.xl),
-
-            // Close Button
-            SizedBox(
-              height: AppSpacing.buttonHeightMD,
-              child: OutlinedButton(
-                onPressed: () => Get.back(),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(
-                    color: AppColors.primary.withValues(alpha: 0.4),
+        if (screening == null) {
+          return Padding(
+            padding: const EdgeInsets.all(BentoSpace.page),
+            child: controller.isLoading
+                ? const BentoSkeleton(rows: 4)
+                : EmptyState(
+                    key: PreTriageKeys.detailError,
+                    icon: Icons.search_off_rounded,
+                    title: 'Screening not found',
+                    message: controller.rxLoadError.value,
+                    actionLabel: 'Go back',
+                    onAction: Get.back,
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: AppDecorations.borderMD,
-                  ),
-                ),
-                child: Text(
-                  'Close Details',
-                  style: AppTextStyles.labelLarge(AppColors.primary),
+          );
+        }
+
+        return BentoScreen(
+          key: PreTriageKeys.detail,
+          onRefresh: controller.load,
+          slivers: [
+            if (controller.hasLoadError)
+              BentoSection(
+                top: BentoSpace.page,
+                child: ErrorRetryBanner(
+                  message: controller.rxLoadError.value!,
+                  onRetry: controller.load,
                 ),
               ),
+
+            // ── Who ─────────────────────────────────────────────────────
+            BentoSection(
+              top: controller.hasLoadError ? 0 : BentoSpace.page,
+              bottom: BentoSpace.header,
+              child: BentoCard(
+                hero: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    PatientIdentityBand(
+                      name: screening.fullName.isEmpty
+                          ? 'Unnamed'
+                          : screening.fullName,
+                      mrn: screening.mrn,
+                      age: screening.age == null ? null : '${screening.age}y',
+                      sex: screening.gender,
+                      acuityCode: screening.status,
+                    ),
+                    const SizedBox(height: 14),
+                    const Hairline(),
+                    const SizedBox(height: 6),
+                    FactRow(
+                      label: 'Screening ID',
+                      value: screening.screeningId,
+                    ),
+                    FactRow(
+                      label: 'Screened',
+                      value: '${Formatters.dateMedium(screening.createdAt)} · '
+                          '${Formatters.time(screening.createdAt)}',
+                    ),
+                    if (screening.phone?.trim().isNotEmpty ?? false)
+                      FactRow(label: 'Phone', value: screening.phone!),
+                    if (screening.route?.trim().isNotEmpty ?? false)
+                      FactRow(label: 'Routed to', value: screening.route!),
+                  ],
+                ),
+              ),
+            ),
+
+            // ── Observations ────────────────────────────────────────────
+            BentoSection(
+              bottom: BentoSpace.header,
+              child: _Vitals(screening: screening),
+            ),
+
+            // ── What they came in with ──────────────────────────────────
+            if (screening.chiefComplaint.trim().isNotEmpty ||
+                (screening.briefHistory?.trim().isNotEmpty ?? false))
+              BentoSection(
+                bottom: BentoSpace.header,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SectionHeader(title: 'Presentation'),
+                    BentoCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (screening.chiefComplaint.trim().isNotEmpty) ...[
+                            Text(
+                              'COMPLAINT',
+                              style: AppTextStyles.overline(
+                                Theme.of(context).brightness,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              screening.chiefComplaint,
+                              style: Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? AppTextStyles.darkBody()
+                                  : AppTextStyles.lightBody(),
+                            ),
+                          ],
+                          if (screening.briefHistory?.trim().isNotEmpty ??
+                              false) ...[
+                            if (screening.chiefComplaint.trim().isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              const Hairline(),
+                              const SizedBox(height: 16),
+                            ],
+                            Text(
+                              'HISTORY',
+                              style: AppTextStyles.overline(
+                                Theme.of(context).brightness,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              screening.briefHistory!,
+                              style: Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? AppTextStyles.darkCallout()
+                                  : AppTextStyles.lightCallout(),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // ── What happens next ───────────────────────────────────────
+            BentoSection(
+              child: _Actions(screening: screening, controller: controller),
             ),
           ],
-        ),
-      ),
+        );
+      }),
     );
   }
+}
 
-  Widget _buildIdentityCard(BuildContext context, bool isDark) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
-    final screening = controller.screening;
+// ── Observations ────────────────────────────────────────────────────────────
 
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        borderRadius: AppDecorations.borderLG,
-        boxShadow: AppDecorations.elevation1(isDark),
-        border: Border.all(
-          color: isDark
-              ? AppColors.darkGlassBorder
-              : AppColors.lightGlassBorder,
-          width: 0.5,
+class _Vitals extends StatelessWidget {
+  const _Vitals({required this.screening});
+
+  final PreTriageModel screening;
+
+  @override
+  Widget build(BuildContext context) {
+    final tiles = <VitalTile>[
+      if (screening.temperature != null)
+        VitalTile(
+          label: 'Temp',
+          value: screening.temperature!.toStringAsFixed(1),
+          unit: '°C',
+          tone: VitalRange.temperature(screening.temperature),
+          caption: VitalRange.captions['temperature'],
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.person_rounded, color: AppColors.primary),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                'Patient Identity',
-                style: AppTextStyles.titleMedium(
-                  textPrimary,
-                ).copyWith(fontWeight: FontWeight.bold),
-              ),
-            ],
+      if (screening.pulse != null)
+        VitalTile(
+          label: 'Pulse',
+          value: '${screening.pulse}',
+          unit: 'bpm',
+          tone: VitalRange.pulse(screening.pulse),
+          caption: VitalRange.captions['pulse'],
+        ),
+      if (screening.bpSystolic != null)
+        VitalTile(
+          label: 'BP',
+          value: screening.bpDiastolic == null
+              ? '${screening.bpSystolic}'
+              : '${screening.bpSystolic}/${screening.bpDiastolic}',
+          unit: 'mmHg',
+          tone: VitalRange.bloodPressure(
+            screening.bpSystolic,
+            screening.bpDiastolic,
           ),
-          const Divider(height: AppSpacing.lg),
-          _buildDetailRow(
-            'First Name',
-            screening.firstName,
-            textPrimary,
-            textSecondary,
-          ),
-          _buildDetailRow(
-            'Last Name',
-            screening.lastName ?? 'N/A',
-            textPrimary,
-            textSecondary,
-          ),
-          _buildDetailRow(
-            'Age',
-            screening.age != null ? '${screening.age} years' : 'N/A',
-            textPrimary,
-            textSecondary,
-          ),
-          _buildDetailRow(
-            'Gender',
-            screening.gender != null ? screening.gender!.toUpperCase() : 'N/A',
-            textPrimary,
-            textSecondary,
-          ),
-          _buildDetailRow(
-            'Phone Number',
-            screening.phone ?? 'N/A',
-            textPrimary,
-            textSecondary,
-          ),
-          if (screening.mrn != null)
-            _buildDetailRow(
-              'Assigned MRN',
-              screening.mrn!,
-              AppColors.primary,
-              textSecondary,
-              isBold: true,
-            ),
-        ],
-      ),
+          caption: VitalRange.captions['bloodPressure'],
+        ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(title: 'Observations'),
+        BentoCard(
+          key: PreTriageKeys.detailVitals,
+          child: tiles.isEmpty
+              ? const EmptyState(
+                  compact: true,
+                  icon: Icons.monitor_heart_outlined,
+                  title: 'No observations recorded',
+                  message: 'Add them by editing this screening.',
+                )
+              : VitalsGrid(tiles: tiles, columns: 3),
+        ),
+      ],
     );
   }
+}
 
-  Widget _buildClinicalCard(BuildContext context, bool isDark) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
-    final screening = controller.screening;
+// ── Actions ─────────────────────────────────────────────────────────────────
 
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        borderRadius: AppDecorations.borderLG,
-        boxShadow: AppDecorations.elevation1(isDark),
-        border: Border.all(
-          color: isDark
-              ? AppColors.darkGlassBorder
-              : AppColors.lightGlassBorder,
-          width: 0.5,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.healing_rounded, color: AppColors.warning),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                'Clinical Assessment',
-                style: AppTextStyles.titleMedium(
-                  textPrimary,
-                ).copyWith(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const Divider(height: AppSpacing.lg),
-          _buildDetailRow(
-            'Chief Complaint',
-            screening.chiefComplaint,
-            textPrimary,
-            textSecondary,
-            isMultiline: true,
-          ),
-          _buildDetailRow(
-            'Brief History',
-            screening.briefHistory ?? 'None recorded',
-            textPrimary,
-            textSecondary,
-            isMultiline: true,
-          ),
-        ],
-      ),
-    );
-  }
+class _Actions extends StatelessWidget {
+  const _Actions({required this.screening, required this.controller});
 
-  Widget _buildVitalsCard(BuildContext context, bool isDark) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
-    final screening = controller.screening;
+  final PreTriageModel screening;
+  final PreTriageDetailsController controller;
 
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        borderRadius: AppDecorations.borderLG,
-        boxShadow: AppDecorations.elevation1(isDark),
-        border: Border.all(
-          color: isDark
-              ? AppColors.darkGlassBorder
-              : AppColors.lightGlassBorder,
-          width: 0.5,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.favorite_rounded, color: AppColors.error),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                'Vitals Metrics',
-                style: AppTextStyles.titleMedium(
-                  textPrimary,
-                ).copyWith(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const Divider(height: AppSpacing.lg),
-          _buildDetailRow(
-            'Temperature',
-            screening.temperature != null
-                ? '${screening.temperature} °C'
-                : 'Not recorded',
-            textPrimary,
-            textSecondary,
-          ),
-          _buildDetailRow(
-            'Pulse Rate',
-            screening.pulse != null ? '${screening.pulse} bpm' : 'Not recorded',
-            textPrimary,
-            textSecondary,
-          ),
-          _buildDetailRow(
-            'Blood Pressure',
-            screening.bpSystolic != null || screening.bpDiastolic != null
-                ? '${screening.bpSystolic ?? "?"}/${screening.bpDiastolic ?? "?"} mmHg'
-                : 'Not recorded',
-            textPrimary,
-            textSecondary,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusCard(BuildContext context, bool isDark) {
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSecondary = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
-    final screening = controller.screening;
-
-    String statusLabel = 'Screening';
-    Color statusColor = AppColors.primary;
-
-    switch (screening.status) {
-      case 'screening':
-        statusLabel = 'Screening';
-        statusColor = AppColors.primary;
-        break;
-      case 'routed':
-        statusLabel = 'Routed';
-        statusColor = AppColors.warning;
-        break;
-      case 'registered_as_patient':
-        statusLabel = 'Registered';
-        statusColor = AppColors.secondary;
-        break;
+  @override
+  Widget build(BuildContext context) {
+    if (!controller.isOpen) {
+      return NoticeBanner(
+        message: screening.status == 'registered_as_patient'
+            ? 'This screening has been registered as a patient record. '
+                'Further changes are made on the patient.'
+            : 'This screening has been routed and can no longer be changed '
+                'here.',
+        icon: Icons.lock_outline_rounded,
+      );
     }
 
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        borderRadius: AppDecorations.borderLG,
-        boxShadow: AppDecorations.elevation1(isDark),
-        border: Border.all(
-          color: isDark
-              ? AppColors.darkGlassBorder
-              : AppColors.lightGlassBorder,
-          width: 0.5,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Obx(
+          () => PrimaryBar(
+            key: PreTriageKeys.detailConvert,
+            label: 'Register as patient',
+            icon: Icons.how_to_reg_outlined,
+            busy: controller.isActing.value,
+            onPressed: () async {
+              final confirmed = await ConfirmDialog.show(
+                context,
+                title: 'Register ${screening.fullName}?',
+                message: 'A patient record is created from this screening and '
+                    'an MRN is issued. The screening itself stops being '
+                    'editable.',
+                confirmLabel: 'Register',
+              );
+              if (confirmed) await controller.convertToPatient();
+            },
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.info_outline_rounded, color: AppColors.info),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                'Status & Routing',
-                style: AppTextStyles.titleMedium(
-                  textPrimary,
-                ).copyWith(fontWeight: FontWeight.bold),
-              ),
-            ],
+        const SizedBox(height: BentoSpace.action),
+        SecondaryBar(
+          key: PreTriageKeys.detailEdit,
+          label: 'Edit screening',
+          icon: Icons.edit_outlined,
+          onPressed: () => Get.toNamed<void>(
+            Routes.EDIT_SCREENING,
+            arguments: screening,
           ),
-          const Divider(height: AppSpacing.lg),
-          _buildDetailRow(
-            'Screening ID',
-            screening.screeningId,
-            textPrimary,
-            textSecondary,
-          ),
-          _buildDetailRow(
-            'Status',
-            statusLabel.toUpperCase(),
-            statusColor,
-            textSecondary,
-            isBold: true,
-          ),
-          _buildDetailRow(
-            'Route Destination',
-            screening.route != null && screening.route!.isNotEmpty
-                ? screening.route!.toUpperCase()
-                : 'NONE',
-            AppColors.primary,
-            textSecondary,
-            isBold: true,
-          ),
-          _buildDetailRow(
-            'Screened At',
-            DateFormat('dd/MM/yyyy HH:mm:ss').format(screening.createdAt),
-            textPrimary,
-            textSecondary,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(
-    String label,
-    String value,
-    Color valColor,
-    Color labelColor, {
-    bool isBold = false,
-    bool isMultiline = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: isMultiline
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: AppTextStyles.labelSmall(labelColor)),
-                const SizedBox(height: 2),
-                Text(value, style: AppTextStyles.bodyMedium(valColor)),
-              ],
-            )
-          : Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(label, style: AppTextStyles.labelSmall(labelColor)),
-                Text(
-                  value,
-                  style: isBold
-                      ? AppTextStyles.labelMedium(
-                          valColor,
-                        ).copyWith(fontWeight: FontWeight.bold)
-                      : AppTextStyles.bodyMedium(valColor),
-                ),
-              ],
-            ),
+        ),
+        const SizedBox(height: BentoSpace.action),
+        SecondaryBar(
+          label: 'Delete screening',
+          icon: Icons.delete_outline_rounded,
+          destructive: true,
+          onPressed: () async {
+            final confirmed = await ConfirmDialog.show(
+              context,
+              title: 'Delete this screening?',
+              message: 'The observations and the complaint are lost. If the '
+                  'patient is still here they will need screening again.',
+              confirmLabel: 'Delete',
+              destructive: true,
+            );
+            if (confirmed) await controller.deleteScreening();
+          },
+        ),
+      ],
     );
   }
 }

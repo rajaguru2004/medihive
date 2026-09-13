@@ -46,10 +46,10 @@ Legend: ✅ done · 🔄 in progress · ⬜ not started · ⛔ blocked / decline
 | 2.1 | Core helpers ported | ✅ | `app_log`, `window_class`, `app_clock`, `live_obx`, `paged_list_controller`, `nav_icons`, `unsaved_changes` |
 | 2.2 | Data utils ported | ✅ | `api_envelope`, `error_handler`, `load_state`, `formatters` |
 | 2.3 | `DioClient` + interceptors | ✅ | Envelope reads `data` (with `result` fallback); auth + logging interceptors wired |
-| 2.4 | Move `network/`→`data/network`, `services/`→`data/services`, `models/`→`data/models` | ⬜ | Matches reference layout |
+| 2.4 | Move `network/`→`data/network`, `services/`→`data/services`, `models/`→`data/models` | ✅ | Matches reference layout; imports rewritten at correct depth |
 | 2.5 | Repositories layer | ✅ | `CrudRepository<T>` over `DioClient`; writes announce on `DataBus` |
 | 2.6 | `SessionManager` teardown contract | ✅ | Idempotent `endSession()`, scoped controller registry |
-| 2.7 | `main.dart` rewrite | ⬜ | Restore theme + brand before `runApp`; no `Obx` around `GetMaterialApp` |
+| 2.7 | `main.dart` rewrite | ✅ | Theme + brand restored before `runApp`; no `Obx` around `GetMaterialApp`; text scale clamped 0.85–1.3 |
 | 2.8 | Widget-key registry | ✅ | 14 module files under `core/keys/`, exported from `app_keys.dart` |
 | 2.9 | `tool/check_keys.dart` ratchet | ⬜ | Unkeyed count may only go down |
 
@@ -60,28 +60,28 @@ kit. 22 screens.
 
 | # | Screen | Status | Notes |
 |---|---|---|---|
-| 3.1 | Splash | ⬜ | |
-| 3.2 | Login | ⬜ | |
-| 3.3 | Home shell | ⬜ | Split from 1,981-line god-view; `IndexedStack` + table-driven destinations |
-| 3.4 | Dashboard | ⬜ | Census, occupancy, queue load |
-| 3.5 | Queue | ⬜ | Acuity-sorted, wait-breach flag |
-| 3.6 | Add to queue | ⬜ | |
-| 3.7 | Appointments | ⬜ | |
-| 3.8 | Consultations | ⬜ | |
-| 3.9 | Pre-triage | ⬜ | |
-| 3.10 | Pre-triage details | ⬜ | |
-| 3.11 | New screening step 1 | ⬜ | |
-| 3.12 | New screening step 2 | ⬜ | |
-| 3.13 | Edit screening | ⬜ | |
-| 3.14 | Inpatient overview | ⬜ | |
-| 3.15 | Inpatient wards | ⬜ | |
-| 3.16 | Inpatient beds grid | ⬜ | Bed-state map, not a list |
-| 3.17 | Inpatient admissions | ⬜ | |
-| 3.18 | Admit patient | ⬜ | |
-| 3.19 | Discharge patient | ⬜ | |
-| 3.20 | Add ward | ⬜ | |
-| 3.21 | Add bed | ⬜ | |
-| 3.22 | Placeholders (pharmacy, lab, radiology, billing, staff, integrations) | ⬜ | Real empty states, not "coming soon" |
+| 3.1 | Splash | ✅ | |
+| 3.2 | Login | ✅ | |
+| 3.3 | Home shell | ✅ | Split from 1,981-line god-view; `IndexedStack` + table-driven destinations |
+| 3.4 | Dashboard | ✅ | Census, occupancy, queue load |
+| 3.5 | Queue | ✅ | Acuity-sorted, wait-breach flag |
+| 3.6 | Add to queue | ✅ | |
+| 3.7 | Appointments | ✅ | |
+| 3.8 | Consultations | ✅ | |
+| 3.9 | Pre-triage | ✅ | |
+| 3.10 | Pre-triage details | ✅ | |
+| 3.11 | New screening step 1 | ✅ | |
+| 3.12 | New screening step 2 | ✅ | |
+| 3.13 | Edit screening | ✅ | |
+| 3.14 | Inpatient overview | ✅ | |
+| 3.15 | Inpatient wards | ✅ | |
+| 3.16 | Inpatient beds grid | ✅ | Bed-state map, not a list |
+| 3.17 | Inpatient admissions | ✅ | |
+| 3.18 | Admit patient | ✅ | |
+| 3.19 | Discharge patient | ✅ | |
+| 3.20 | Add ward | ✅ | |
+| 3.21 | Add bed | ✅ | |
+| 3.22 | Placeholders (pharmacy, lab, radiology, billing, staff, integrations) | ✅ | Each names the module and says where the work happens today |
 
 ## Phase 4 — Test contract
 

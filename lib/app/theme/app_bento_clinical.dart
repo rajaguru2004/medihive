@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/window_class.dart';
 import 'app_bento.dart';
@@ -970,6 +971,170 @@ class PatientIdentityBand extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+// ── Reference ranges ────────────────────────────────────────────────────────
+
+/// Whether an observation is inside its normal adult range.
+///
+/// This is the one piece of clinical judgement in the design system, and it
+/// exists here rather than on each screen for a single reason: a temperature
+/// of 38.9 must be the same colour on the screening form, on the screening
+/// detail and on the ward board. Three screens each deciding for themselves is
+/// three screens that eventually disagree, and a clinician who has learned to
+/// trust the colour is a clinician the third screen misleads.
+///
+/// **These are adult ranges and a triage aid, not a diagnosis.** They are
+/// deliberately wide: the job is to catch a figure worth a second look, not to
+/// flag every patient who is slightly off. Paediatric ranges differ by age and
+/// are not modelled — a site running a paediatric department should read
+/// [VitalRange.paediatricWarning] before relying on the colours.
+abstract final class VitalRange {
+  /// Shown beside vitals on a paediatric record.
+  static const paediatricWarning =
+      'Ranges shown are adult. Check against the paediatric chart for age.';
+
+  /// Body temperature, °C.
+  ///
+  /// Below 36 is hypothermia; 38 and above is a fever. 39.5 and above earns
+  /// red rather than amber.
+  static Color? temperature(double? celsius) {
+    if (celsius == null) return null;
+    if (celsius >= 39.5 || celsius < 35.0) return AppColors.acuityCritical;
+    if (celsius >= 38.0 || celsius < 36.0) return AppColors.acuityUrgent;
+    return null;
+  }
+
+  /// Heart rate, beats per minute.
+  static Color? pulse(int? bpm) {
+    if (bpm == null || bpm <= 0) return null;
+    if (bpm >= 130 || bpm < 40) return AppColors.acuityCritical;
+    if (bpm > 100 || bpm < 50) return AppColors.acuityUrgent;
+    return null;
+  }
+
+  /// Blood pressure, from both figures.
+  ///
+  /// Takes the pair because they are read as a pair: 90/60 is one reading, and
+  /// judging the systolic alone calls a healthy young adult hypotensive.
+  static Color? bloodPressure(int? systolic, int? diastolic) {
+    if (systolic == null || systolic <= 0) return null;
+    if (systolic >= 180 || systolic < 90) return AppColors.acuityCritical;
+    if (diastolic != null && diastolic > 0) {
+      if (diastolic >= 120 || diastolic < 50) return AppColors.acuityCritical;
+      if (diastolic >= 90) return AppColors.acuityUrgent;
+    }
+    if (systolic >= 140 || systolic < 100) return AppColors.acuityUrgent;
+    return null;
+  }
+
+  /// Oxygen saturation, percent.
+  ///
+  /// The one vital where a small number is the emergency and there is no upper
+  /// bound to worry about.
+  static Color? oxygenSaturation(int? percent) {
+    if (percent == null || percent <= 0) return null;
+    if (percent < 92) return AppColors.acuityCritical;
+    if (percent < 95) return AppColors.acuityUrgent;
+    return null;
+  }
+
+  /// Respiratory rate, breaths per minute.
+  static Color? respiratoryRate(int? perMinute) {
+    if (perMinute == null || perMinute <= 0) return null;
+    if (perMinute >= 25 || perMinute < 9) return AppColors.acuityCritical;
+    if (perMinute > 20 || perMinute < 12) return AppColors.acuityUrgent;
+    return null;
+  }
+
+  /// The normal range as words, for the caption under a reading.
+  static const captions = <String, String>{
+    'temperature': '36.0–38.0 °C',
+    'pulse': '50–100 bpm',
+    'bloodPressure': '100–140 systolic',
+    'oxygenSaturation': '95% and above',
+    'respiratoryRate': '12–20 /min',
+  };
+}
+
+// ── Observation entry ───────────────────────────────────────────────────────
+
+/// A numeric observation field that colours its own unit when out of range.
+///
+/// The colour lands on the **unit**, not the border. A red border in a form
+/// already means "this field is invalid", and 39.8 °C is a perfectly valid
+/// entry that happens to describe a patient with a fever — so a form that uses
+/// the same signal for both teaches its users to ignore one of them.
+///
+/// [tone] is passed in rather than computed here, so the caller decides which
+/// range applies (a blood pressure needs both figures) and the field stays a
+/// plain widget. Wrap it in an `Obx` to recolour as the reading is typed.
+class VitalInput extends StatelessWidget {
+  const VitalInput({
+    super.key,
+    required this.label,
+    required this.unit,
+    required this.controller,
+    this.fieldKey,
+    this.tone,
+    this.error,
+    this.hint,
+    this.onChanged,
+    this.decimal = false,
+    this.textInputAction = TextInputAction.next,
+  });
+
+  final String label;
+  final String unit;
+  final TextEditingController controller;
+  final Key? fieldKey;
+
+  /// An acuity colour when the reading is outside its range.
+  final Color? tone;
+
+  /// A validation message. Distinct from [tone]: this means the entry is not a
+  /// number the field can accept, not that the patient is unwell.
+  final String? error;
+
+  /// The normal range, as a hint under the field.
+  final String? hint;
+
+  final ValueChanged<String>? onChanged;
+
+  /// Allows a decimal point. Temperature only, in practice.
+  final bool decimal;
+
+  final TextInputAction textInputAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return BentoInput(
+      fieldKey: fieldKey,
+      label: label,
+      controller: controller,
+      keyboardType: TextInputType.numberWithOptions(decimal: decimal),
+      textInputAction: textInputAction,
+      inputFormatters: [
+        FilteringTextInputFormatter.allow(
+          decimal ? RegExp(r'[\d.]') : RegExp(r'\d'),
+        ),
+        LengthLimitingTextInputFormatter(decimal ? 5 : 3),
+      ],
+      onChanged: onChanged,
+      error: error,
+      hint: hint,
+      suffix: Padding(
+        padding: const EdgeInsets.only(right: 12),
+        child: Text(
+          unit,
+          style: AppTextStyles.unit(
+            Theme.of(context).brightness,
+            color: tone == null ? null : semanticInk(context, tone!),
+          ),
+        ),
+      ),
     );
   }
 }

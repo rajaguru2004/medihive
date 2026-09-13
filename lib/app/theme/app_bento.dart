@@ -2084,6 +2084,7 @@ class BentoInput extends StatelessWidget {
     this.enabled = true,
     this.keyboardType,
     this.textInputAction,
+    this.textCapitalization = TextCapitalization.none,
     this.inputFormatters,
     this.maxLines = 1,
     this.maxLength,
@@ -2107,6 +2108,14 @@ class BentoInput extends StatelessWidget {
   final bool enabled;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
+
+  /// Sentence case for prose, word case for names.
+  ///
+  /// Worth setting rather than leaving to the keyboard: a phone's own
+  /// auto-capitalisation is off inside a field whose type is not text, so a
+  /// name typed into a field that also takes a phone number arrives lowercase.
+  final TextCapitalization textCapitalization;
+
   final List<TextInputFormatter>? inputFormatters;
   final int maxLines;
   final int? maxLength;
@@ -2139,6 +2148,7 @@ class BentoInput extends StatelessWidget {
         enabled: enabled,
         keyboardType: keyboardType,
         textInputAction: textInputAction,
+        textCapitalization: textCapitalization,
         inputFormatters: inputFormatters,
         maxLines: obscure ? 1 : maxLines,
         maxLength: maxLength,

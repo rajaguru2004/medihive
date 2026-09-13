@@ -1,38 +1,40 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
+import 'package:get/get.dart' hide Response;
 
-import 'package:get/get.dart';
-
-import '../../../routes/app_pages.dart';
+import '../../../data/services/data_bus.dart';
 import '../../../data/services/pre_triage_service.dart';
+import '../../../data/utils/error_handler.dart';
+import '../../../data/utils/legacy_envelope.dart';
 import '../../../theme/theme.dart';
-import '../../pre_triage/controllers/pre_triage_controller.dart';
 
+/// Screening, step two: what is wrong, and the observations.
 class NewScreeningStep2Controller extends GetxController {
+  static NewScreeningStep2Controller get to =>
+      Get.find<NewScreeningStep2Controller>();
+
   final _service = PreTriageService.to;
 
   final formKey = GlobalKey<FormState>();
 
-  // Patient Identity details from Step 1
-  late final String firstName;
-  late final String? lastName;
-  late final int? age;
-  late final String? gender;
-  late final String? phone;
+  final complaintController = TextEditingController();
+  final historyController = TextEditingController();
+  final temperatureController = TextEditingController();
+  final pulseController = TextEditingController();
+  final systolicController = TextEditingController();
+  final diastolicController = TextEditingController();
 
-  // Clinical inputs
-  final chiefComplaintCtrl = TextEditingController();
-  final briefHistoryCtrl = TextEditingController();
-  final temperatureCtrl = TextEditingController();
-  final pulseCtrl = TextEditingController();
-  final bpSystolicCtrl = TextEditingController();
-  final bpDiastolicCtrl = TextEditingController();
+  final route = RxnString();
+  final isSubmitting = false.obs;
+  final errorMessage = RxnString();
 
-  final RxnString selectedRoute = RxnString();
-  final List<String> routesList = [
+  /// Set as the observations are typed, so the form can flag a reading the
+  /// moment it is entered rather than after it is saved.
+  final vitalsRevision = 0.obs;
+
+  static const routes = [
     'OPD',
-    'Radiology',
     'Emergency',
+    'Radiology',
     'Laboratory',
     'Pharmacy',
     'General Medicine',
@@ -40,116 +42,155 @@ class NewScreeningStep2Controller extends GetxController {
     'Pediatrics',
   ];
 
-  final RxBool isSaving = false.obs;
+  // Carried from step one.
+  String firstName = '';
+  String lastName = '';
+  int? age;
+  String? sex;
+  String phone = '';
+
+  String get fullName => '$firstName $lastName'.trim();
+
+  double? get temperature =>
+      double.tryParse(temperatureController.text.trim());
+  int? get pulse => int.tryParse(pulseController.text.trim());
+  int? get systolic => int.tryParse(systolicController.text.trim());
+  int? get diastolic => int.tryParse(diastolicController.text.trim());
+
+  /// The worst flag across the observations entered so far.
+  ///
+  /// Drives the banner at the top of the form: a nurse who has just typed a
+  /// temperature of 39.8 should be told before they tap save, not after.
+  Color? get worstFlag {
+    final flags = [
+      VitalRange.temperature(temperature),
+      VitalRange.pulse(pulse),
+      VitalRange.bloodPressure(systolic, diastolic),
+    ].whereType<Color>();
+    if (flags.isEmpty) return null;
+    return flags.contains(AppColors.acuityCritical)
+        ? AppColors.acuityCritical
+        : AppColors.acuityUrgent;
+  }
 
   @override
   void onInit() {
     super.onInit();
-    final args = Get.arguments as Map<String, dynamic>? ?? {};
-    firstName = args['firstName'] ?? '';
-    lastName = args['lastName'];
-    age = args['age'];
-    gender = args['gender'];
-    phone = args['phone'];
+    final arguments = Get.arguments;
+    if (arguments is Map) {
+      firstName = (arguments['firstName'] ?? '').toString();
+      lastName = (arguments['lastName'] ?? '').toString();
+      age = arguments['age'] is int ? arguments['age'] as int : null;
+      sex = arguments['gender'] as String?;
+      phone = (arguments['phone'] ?? '').toString();
+    }
+  }
+
+  void onVitalChanged(String _) => vitalsRevision.value++;
+
+  String? validateComplaint(String? value) => (value ?? '').trim().isEmpty
+      ? 'What has brought them in?'
+      : null;
+
+  String? validateTemperature(String? value) {
+    final text = (value ?? '').trim();
+    if (text.isEmpty) return null;
+    final celsius = double.tryParse(text);
+    if (celsius == null) return 'Enter a number';
+    // A plausibility guard, not a clinical one: 25–45 covers every survivable
+    // reading, and catches a decimal point typed in the wrong place.
+    if (celsius < 25 || celsius > 45) return 'Between 25 and 45 °C';
+    return null;
+  }
+
+  String? validatePulse(String? value) {
+    final text = (value ?? '').trim();
+    if (text.isEmpty) return null;
+    final bpm = int.tryParse(text);
+    if (bpm == null) return 'Enter a number';
+    if (bpm < 20 || bpm > 250) return 'Between 20 and 250 bpm';
+    return null;
+  }
+
+  String? validateSystolic(String? value) {
+    final text = (value ?? '').trim();
+    if (text.isEmpty) return null;
+    final mmHg = int.tryParse(text);
+    if (mmHg == null) return 'Enter a number';
+    if (mmHg < 40 || mmHg > 300) return 'Between 40 and 300';
+    return null;
+  }
+
+  String? validateDiastolic(String? value) {
+    final text = (value ?? '').trim();
+    if (text.isEmpty) return null;
+    final mmHg = int.tryParse(text);
+    if (mmHg == null) return 'Enter a number';
+    if (mmHg < 20 || mmHg > 200) return 'Between 20 and 200';
+    // Caught here because the pair is meaningless the wrong way round, and a
+    // server that stores it produces a chart nobody can read.
+    final top = systolic;
+    if (top != null && mmHg >= top) {
+      return 'Diastolic must be below systolic';
+    }
+    return null;
+  }
+
+  Future<void> save() async {
+    if (isSubmitting.value) return;
+    if (!(formKey.currentState?.validate() ?? false)) return;
+
+    FocusManager.instance.primaryFocus?.unfocus();
+    isSubmitting.value = true;
+    errorMessage.value = null;
+
+    try {
+      final response = await _service.createScreening(
+        firstName: firstName,
+        lastName: lastName.isEmpty ? null : lastName,
+        age: age,
+        gender: sex,
+        phone: phone.isEmpty ? null : phone,
+        chiefComplaint: complaintController.text.trim(),
+        briefHistory: historyController.text.trim().isEmpty
+            ? null
+            : historyController.text.trim(),
+        temperature: temperature,
+        pulse: pulse,
+        bpSystolic: systolic,
+        bpDiastolic: diastolic,
+        routedTo: route.value,
+      );
+
+      if (!envelopeOk(response.data, statusCode: response.statusCode)) {
+        errorMessage.value =
+            envelopeMessage(response.data) ?? "Couldn't save the screening.";
+        return;
+      }
+
+      if (Get.isRegistered<DataBus>()) {
+        DataBus.to.changedRecord('pre-triage');
+      }
+      // Back past step one as well: the two screens are one task, and leaving
+      // step one on the stack means Back from the board reopens a half-filled
+      // form for a patient already screened.
+      Get.close(2);
+      showBentoToast('Screening saved for $fullName.');
+    } catch (e) {
+      errorMessage.value = parseErrorMessage(e, "Couldn't save the screening.");
+    } finally {
+      isSubmitting.value = false;
+    }
   }
 
   @override
   void onClose() {
-    chiefComplaintCtrl.dispose();
-    briefHistoryCtrl.dispose();
-    temperatureCtrl.dispose();
-    pulseCtrl.dispose();
-    bpSystolicCtrl.dispose();
-    bpDiastolicCtrl.dispose();
+    complaintController.dispose();
+    historyController.dispose();
+    temperatureController.dispose();
+    pulseController.dispose();
+    systolicController.dispose();
+    diastolicController.dispose();
     super.onClose();
-  }
-
-  void selectRoute(String route) {
-    selectedRoute.value = route;
-  }
-
-  Future<void> saveScreening() async {
-    if (formKey.currentState?.validate() ?? false) {
-      isSaving.value = true;
-      try {
-        final double? temp = temperatureCtrl.text.trim().isNotEmpty
-            ? double.tryParse(temperatureCtrl.text.trim())
-            : null;
-        final int? pulse = pulseCtrl.text.trim().isNotEmpty
-            ? int.tryParse(pulseCtrl.text.trim())
-            : null;
-        final int? bpSys = bpSystolicCtrl.text.trim().isNotEmpty
-            ? int.tryParse(bpSystolicCtrl.text.trim())
-            : null;
-        final int? bpDia = bpDiastolicCtrl.text.trim().isNotEmpty
-            ? int.tryParse(bpDiastolicCtrl.text.trim())
-            : null;
-
-        final response = await _service.createScreening(
-          firstName: firstName,
-          lastName: lastName,
-          age: age,
-          gender: gender,
-          phone: phone,
-          chiefComplaint: chiefComplaintCtrl.text.trim(),
-          briefHistory: briefHistoryCtrl.text.trim().isNotEmpty
-              ? briefHistoryCtrl.text.trim()
-              : null,
-          temperature: temp,
-          pulse: pulse,
-          bpSystolic: bpSys,
-          bpDiastolic: bpDia,
-          routedTo: selectedRoute.value?.toLowerCase(),
-        );
-
-        if (response.data != null && response.data['success'] == true) {
-          // Trigger reload in PreTriageController if active
-          if (Get.isRegistered<PreTriageController>()) {
-            Get.find<PreTriageController>().fetchScreenings();
-          }
-
-          // Return to Pre-Triage main screen
-          Get.until((route) => route.settings.name == Routes.PRE_TRIAGE);
-
-          Get.snackbar(
-            'Success',
-            'Screening created successfully',
-            backgroundColor: AppColors.secondary.withValues(alpha: 0.9),
-            colorText: AppColors.lightSurface,
-            margin: const EdgeInsets.all(AppSpacing.md),
-            borderRadius: AppDecorations.radiusMD,
-          );
-        } else {
-          Get.snackbar(
-            'Error',
-            response.data['message'] ?? 'Failed to save screening',
-            backgroundColor: AppColors.error.withValues(alpha: 0.9),
-            colorText: AppColors.lightSurface,
-            margin: const EdgeInsets.all(AppSpacing.md),
-            borderRadius: AppDecorations.radiusMD,
-          );
-        }
-      } catch (e) {
-        String errorMsg = 'An error occurred while saving the screening';
-        if (e is DioException) {
-          final resData = e.response?.data;
-          if (resData is Map && resData['message'] != null) {
-            errorMsg = resData['message'].toString();
-          } else if (e.message != null) {
-            errorMsg = e.message!;
-          }
-        }
-        Get.snackbar(
-          'Error',
-          errorMsg,
-          backgroundColor: AppColors.error.withValues(alpha: 0.9),
-          colorText: AppColors.lightSurface,
-          margin: const EdgeInsets.all(AppSpacing.md),
-          borderRadius: AppDecorations.radiusMD,
-        );
-      } finally {
-        isSaving.value = false;
-      }
-    }
   }
 }
