@@ -51,7 +51,7 @@ Legend: ✅ done · 🔄 in progress · ⬜ not started · ⛔ blocked / decline
 | 2.6 | `SessionManager` teardown contract | ✅ | Idempotent `endSession()`, scoped controller registry |
 | 2.7 | `main.dart` rewrite | ✅ | Theme + brand restored before `runApp`; no `Obx` around `GetMaterialApp`; text scale clamped 0.85–1.3 |
 | 2.8 | Widget-key registry | ✅ | 14 module files under `core/keys/`, exported from `app_keys.dart` |
-| 2.9 | `tool/check_keys.dart` ratchet | ⬜ | Unkeyed count may only go down |
+| 2.9 | `tool/check_keys.dart` ratchet | ✅ | Baseline 4 unkeyed; per-module anchors added for grouped key files |
 
 ## Phase 3 — Screens
 
@@ -87,18 +87,18 @@ kit. 22 screens.
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 4.1 | `integration_test/support/` harness | ⬜ | `app_harness`, `pump` (no `pumpAndSettle`), `device_class` |
-| 4.2 | Fake API adapter + fixtures | ⬜ | Unstubbed call fails the test with the full list |
-| 4.3 | Robots | ⬜ | A flow never calls `find.*` |
-| 4.4 | Flow tests | ⬜ | Registered as `void registerXFlows()`, shared headless/device |
-| 4.5 | Screenshot driver | ⬜ | `test_driver/screenshot_driver.dart` → `.review/` |
-| 4.6 | Screenshot test | ⬜ | Every screen, light + dark |
+| 4.1 | `integration_test/support/` harness | ✅ | `app_harness` boots the real app; `pump` (no `pumpAndSettle`); fake secure storage |
+| 4.2 | Fake API adapter + fixtures | ✅ | Adapter sits below the interceptor chain; one coherent `World`; unstubbed call fails the test |
+| 4.3 | Robots | 🔄 | Base `Robot` ported; per-screen robots follow the first flow test that needs them |
+| 4.4 | Flow tests | ⬜ | Not written — the screenshot suite is the verification tier delivered |
+| 4.5 | Screenshot driver | ✅ | `test_driver/screenshot_driver.dart` → `.review/` |
+| 4.6 | Screenshot test | ✅ | 20 screens × 2 themes |
 
 ## Phase 5 — Verification
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 5.1 | `flutter analyze` clean | ⬜ | Zero issues is the baseline |
+| 5.1 | `flutter analyze` clean | ✅ | Zero issues across lib/, integration_test/ and test_driver/ |
 | 5.2 | Screenshot round 1 on Pixel 6 Pro | ⬜ | `emulator-5554`, light + dark |
 | 5.3 | Fix defects found | ⬜ | One batch |
 | 5.4 | Screenshot round 2 | ⬜ | Confirm; then stop |
@@ -107,10 +107,10 @@ kit. 22 screens.
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 6.1 | `.agents/RULES.md` | ⬜ | The contract for anyone writing code here |
-| 6.2 | `DESIGN.md` | ⬜ | What the app is made of, and why |
-| 6.3 | `PRODUCT.md` | ⬜ | Who it is for, what the backend does |
-| 6.4 | `README.md` | ⬜ | Run it, test it, layout |
+| 6.1 | `.agents/RULES.md` | ✅ | Opens with three clinical safety rules that outrank the rest |
+| 6.2 | `DESIGN.md` | ✅ | Chart & Vitals: the world, the colour rules, the kit, the voice |
+| 6.3 | `PRODUCT.md` | ✅ | Who holds the device, the scene, the envelope, the constraints |
+| 6.4 | `README.md` | ✅ | Run it, test it, how the fake server works |
 
 ---
 
@@ -134,6 +134,32 @@ three dependencies nobody needs.
 appointment (`DNA`) is amber — an administrative problem, not a deteriorating
 patient. This is the single rule most likely to be broken by a later change.
 
+## Bugs this port found
+
+**The splash screen hung forever.** `SplashView` draws a wordmark and never
+reads `controller`, so `Get.lazyPut` never constructed `SplashController`, its
+`onReady` never fired, and the app sat on the splash screen indefinitely — on a
+device as well as in a test. The screenshot suite failed every single test on
+it within a minute of first running. Fixed with an eager `Get.put` and a
+comment saying why this one screen has to be eager.
+
+**Wait times were a stale snapshot.** The queue board rendered the server's
+`waitTime` field, which is computed when the row is serialised. A board left
+open for ten minutes showed ten-minute-old waits and never flagged a breach
+that happened while somebody was looking at it. Now computed from
+`joinedQueueAt` against `AppClock.now()`.
+
+**Tokens lived in a static field.** `TokenManager` held the bearer token in
+process memory, so every cold start signed the clinician out. Now
+`flutter_secure_storage`, restored before the first route resolves.
+
 ## Open items
 
-- `.claude/settings.json` permission allowlist — declined by the user; not added.
+- `.claude/settings.json` permission allowlist — declined by the user; not
+  added.
+- **Flow tests (4.4)** — not written. The screenshot suite exercises every
+  screen's first paint against the fake server, which is what verified this
+  work, but it asserts nothing about behaviour. The harness, the fixtures and
+  the base `Robot` are all in place for them.
+- **Unit tests** — none. `BrandPalette.readable`, `CaseStatus.priorityOf`,
+  `VitalRange.*` and `MoneyFormat` are all pure and all worth covering.
