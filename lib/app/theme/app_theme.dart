@@ -209,7 +209,7 @@ abstract class AppTheme {
         filled: true,
         fillColor: isDark
             ? Colors.white.withValues(alpha: 0.05)
-            : const Color(0xFFF2EFE9),
+            : const Color(0xFFEBEFF0),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
@@ -271,7 +271,7 @@ abstract class AppTheme {
       chipTheme: ChipThemeData(
         backgroundColor: isDark
             ? Colors.white.withValues(alpha: 0.06)
-            : const Color(0xFFF2EFE9),
+            : const Color(0xFFEBEFF0),
         selectedColor: tonal,
         side: BorderSide(color: divider, width: 0.5),
         labelStyle: AppFonts.text(
