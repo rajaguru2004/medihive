@@ -280,7 +280,7 @@ class AppPages {
         title: 'Pharmacy',
         icon: Icons.medication_outlined,
         message: 'Dispensing is not switched on for this site yet. Pending '
-            'prescription counts still appear on today\'s board.',
+            'prescription counts still appear on today’s board.',
       ),
       middlewares: _auth,
       transition: _push,
@@ -292,7 +292,7 @@ class AppPages {
         title: 'Laboratory',
         icon: Icons.science_outlined,
         message: 'Lab ordering and results are not switched on for this site '
-            "yet. Pending order counts still appear on today's board.",
+            'yet. Pending order counts still appear on today’s board.',
       ),
       middlewares: _auth,
       transition: _push,
