@@ -19,16 +19,16 @@ class QueueView extends GetView<QueueController> {
 
   /// False when pushed as its own route rather than shown inside the shell.
   ///
-  /// The difference is the header and the bottom clearance, nothing else — a
-  /// screen that renders differently depending on where it is mounted is two
-  /// screens pretending to be one.
+  /// The difference is the header, nothing else — a screen that renders
+  /// differently depending on where it is mounted is two screens pretending to
+  /// be one.
   final bool embedded;
 
   @override
   Widget build(BuildContext context) {
     final body = Obx(() {
       if (controller.isLoading && controller.rxFirstLoad.value) {
-        return _QueueSkeleton(embedded: embedded);
+        return const _QueueSkeleton();
       }
 
       final rows = controller.displayed;
@@ -36,7 +36,7 @@ class QueueView extends GetView<QueueController> {
       return BentoScreen(
         key: QueueKeys.screen,
         onRefresh: controller.reload,
-        bottomClearance: !embedded,
+        bottomClearance: false,
         slivers: [
           if (controller.hasLoadError)
             BentoSection(
@@ -388,15 +388,13 @@ Future<void> _openActions(
 // ── Loading ─────────────────────────────────────────────────────────────────
 
 class _QueueSkeleton extends StatelessWidget {
-  const _QueueSkeleton({required this.embedded});
-
-  final bool embedded;
+  const _QueueSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    return BentoScreen(
-      bottomClearance: !embedded,
-      slivers: const [
+    return const BentoScreen(
+      bottomClearance: false,
+      slivers: [
         BentoSection(top: BentoSpace.page, child: BentoSkeleton(rows: 2)),
         BentoSection(child: BentoSkeleton(rows: 5)),
       ],

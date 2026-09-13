@@ -23,7 +23,7 @@ class InpatientView extends GetView<InpatientController> {
   Widget build(BuildContext context) {
     final body = Obx(() {
       if (controller.isLoading && controller.rxFirstLoad.value) {
-        return _InpatientSkeleton(embedded: embedded);
+        return const _InpatientSkeleton();
       }
 
       final stats = controller.stats.value;
@@ -32,7 +32,7 @@ class InpatientView extends GetView<InpatientController> {
       return BentoScreen(
         key: InpatientKeys.overview,
         onRefresh: controller.reload,
-        bottomClearance: !embedded,
+        bottomClearance: false,
         slivers: [
           if (controller.hasLoadError)
             BentoSection(
@@ -248,15 +248,13 @@ class WardRow extends StatelessWidget {
 }
 
 class _InpatientSkeleton extends StatelessWidget {
-  const _InpatientSkeleton({required this.embedded});
-
-  final bool embedded;
+  const _InpatientSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    return BentoScreen(
-      bottomClearance: !embedded,
-      slivers: const [
+    return const BentoScreen(
+      bottomClearance: false,
+      slivers: [
         BentoSection(top: BentoSpace.page, child: BentoSkeleton(rows: 3)),
         BentoSection(child: BentoSkeleton(rows: 4)),
       ],

@@ -1000,8 +1000,14 @@ abstract final class VitalRange {
   ///
   /// Below 36 is hypothermia; 38 and above is a fever. 39.5 and above earns
   /// red rather than amber.
+  ///
+  /// Zero is "not recorded", exactly as it is for the four ranges below: the
+  /// backend stores an unobserved numeric vital as zero, and a blank field on a
+  /// half-typed triage form parses the same way. Judging it as a reading paints
+  /// an empty row red — a red that is not a deteriorating patient, which is the
+  /// one thing red is not allowed to be.
   static Color? temperature(double? celsius) {
-    if (celsius == null) return null;
+    if (celsius == null || celsius <= 0) return null;
     if (celsius >= 39.5 || celsius < 35.0) return AppColors.acuityCritical;
     if (celsius >= 38.0 || celsius < 36.0) return AppColors.acuityUrgent;
     return null;

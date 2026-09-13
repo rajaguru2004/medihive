@@ -134,6 +134,15 @@ three dependencies nobody needs.
 appointment (`DNA`) is amber — an administrative problem, not a deteriorating
 patient. This is the single rule most likely to be broken by a later change.
 
+## Phase 7 — Review and hardening
+
+| # | Task | Status | Notes |
+|---|---|---|---|
+| 7.1 | Unit tests for pure logic | ✅ | 116 tests across 7 files: BrandPalette, CaseStatus, VitalRange, BedState, MoneyFormat, Formatters, ApiEnvelope |
+| 7.2 | Craft review of all 45 module files | ✅ | Zero contract violations; 10 craft defects found |
+| 7.3 | Make form validation work | 🔄 | `BentoInput`/`BentoPicker` are not `FormField`s, so every `validate()` returns true |
+| 7.4 | Layout and contrast fixes | 🔄 | Inverted `bottomClearance`, `Opacity` over live text, sub-48 tap targets, missing retries |
+
 ## Bugs this port found
 
 **The splash screen hung forever.** `SplashView` draws a wordmark and never
@@ -152,6 +161,38 @@ that happened while somebody was looking at it. Now computed from
 **Tokens lived in a static field.** `TokenManager` held the bearer token in
 process memory, so every cold start signed the clinician out. Now
 `flutter_secure_storage`, restored before the first route resolves.
+
+**The triage sort tied P2 and P3.** `CaseStatus.priorityOf` derived its rank
+from the *colour*, and P2 and P3 are deliberately the same amber — so they
+returned the same integer and the queue silently fell through to arrival
+order. A 10-minute-target P2 could be seated behind a 60-minute-target P3
+purely on who walked in first, which is exactly the failure the method exists
+to prevent. Found by a unit test; bands are now spaced off the colour ladder
+with a within-band offset, and the colour vocabulary is unchanged.
+
+**An unrecorded temperature painted red.** Four of the five `VitalRange`
+checks guard `<= 0`, because this backend stores an unobserved numeric vital
+as zero. `temperature` guarded only null, so `0.0` fell into the hypothermia
+branch and returned `acuityCritical` — a red that is not a deteriorating
+patient, which breaks the first clinical rule. Reachable from a half-typed
+triage form.
+
+**Form validation never ran.** `BentoInput` is a `TextField`, not a
+`TextFormField`, and nothing in `lib/` was a `FormField`. So every
+`formKey.currentState?.validate()` in the app returned true unconditionally
+and fourteen written validators were dead code: sign-in fired with empty
+fields, a discharge saved with no reason, and the ward form reached
+`int.parse('')`.
+
+**Every pushed screen reserved height for a tab bar it does not have.**
+`BentoScreen.bottomClearance` defaults to the reference app's *floating* tab
+bar. This shell uses a real `bottomNavigationBar`, so the Scaffold already
+reserves the height — every pushed screen carried ~96 dp of dead space, and
+the three tab views had the flag inverted on top of that.
+
+**`Opacity` over live text is a contrast bug.** Two screens muted a whole row
+with `Opacity`, which composites the text colour toward the ground: a
+6.5:1 subtitle became 2.8:1. Muting is a token change, not an alpha change.
 
 ## Open items
 

@@ -24,13 +24,13 @@ class AppointmentsView extends GetView<AppointmentsController> {
   Widget build(BuildContext context) {
     final body = Obx(() {
       if (controller.isLoading && controller.rxFirstLoad.value) {
-        return _ClinicSkeleton(embedded: embedded);
+        return const _ClinicSkeleton();
       }
 
       return BentoScreen(
         key: AppointmentsKeys.screen,
         onRefresh: controller.reload,
-        bottomClearance: !embedded,
+        bottomClearance: false,
         slivers: [
           if (controller.hasLoadError)
             BentoSection(
@@ -648,15 +648,13 @@ Future<void> _openActions(
 // ── Loading ─────────────────────────────────────────────────────────────────
 
 class _ClinicSkeleton extends StatelessWidget {
-  const _ClinicSkeleton({required this.embedded});
-
-  final bool embedded;
+  const _ClinicSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    return BentoScreen(
-      bottomClearance: !embedded,
-      slivers: const [
+    return const BentoScreen(
+      bottomClearance: false,
+      slivers: [
         BentoSection(top: BentoSpace.page, child: BentoSkeleton(rows: 2)),
         BentoSection(child: BentoSkeleton(rows: 5)),
       ],

@@ -24,6 +24,7 @@ class ConsultationsView extends GetView<ConsultationsController> {
       body: Obx(() {
         if (controller.isLoading && controller.rxFirstLoad.value) {
           return const BentoScreen(
+            bottomClearance: false,
             slivers: [
               BentoSection(top: BentoSpace.page, child: BentoSkeleton(rows: 2)),
               BentoSection(child: BentoSkeleton(rows: 5)),
@@ -37,6 +38,7 @@ class ConsultationsView extends GetView<ConsultationsController> {
           key: ConsultationsKeys.screen,
           controller: controller.scrollController,
           onRefresh: controller.reload,
+          bottomClearance: false,
           slivers: [
             if (controller.hasLoadError)
               BentoSection(

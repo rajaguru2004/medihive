@@ -916,11 +916,8 @@ abstract final class CaseStatus {
     return _codeLabels[code] ?? labelOf(status);
   }
 
-  /// How urgent a code is, lowest number first. A queue sorted by arrival time
-  /// alone will seat a sprained ankle ahead of a chest pain that walked in two
-  /// minutes later, so every list that shows mixed acuity sorts on this first.
-  static int priorityOf(String? status) {
-    final c = colorOfCode(status);
+  /// The colour ladder, most urgent first. Both vocabularies land on it.
+  static int _band(Color c) {
     if (c == AppColors.acuityCritical) return 0;
     if (c == AppColors.acuityUrgent) return 1;
     if (c == AppColors.acuityReview) return 2;
@@ -929,6 +926,26 @@ abstract final class CaseStatus {
     if (c == AppColors.acuityStable) return 5;
     return 6;
   }
+
+  /// Where a code sits *within* its colour band.
+  ///
+  /// P2 and P3 are both amber, and deliberately so — a reader should not have
+  /// to tell two ambers apart across a corridor. But they are a ten-minute
+  /// target and a sixty-minute one, and a rank that ties them hands the choice
+  /// between them straight back to arrival order, which is the sort this
+  /// exists to replace. The colour stays coarse; the rank does not.
+  static const Map<String, int> _withinBand = {'P3': 1};
+
+  /// How urgent a code is, lowest number first. A queue sorted by arrival time
+  /// alone will seat a sprained ankle ahead of a chest pain that walked in two
+  /// minutes later, so every list that shows mixed acuity sorts on this first.
+  ///
+  /// Bands are spaced by ten so [_withinBand] can separate two codes inside one
+  /// band without disturbing the order of the bands. Only the ordering is
+  /// meaningful — no caller reads the number itself.
+  static int priorityOf(String? status) =>
+      _band(colorOfCode(status)) * 10 +
+      (_withinBand[(status ?? '').trim().toUpperCase()] ?? 0);
 
   /// States a record can no longer be edited in.
   ///

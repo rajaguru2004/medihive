@@ -32,6 +32,7 @@ class PreTriageView extends GetView<PreTriageController> {
       body: Obx(() {
         if (controller.isLoading && controller.rxFirstLoad.value) {
           return const BentoScreen(
+            bottomClearance: false,
             slivers: [
               BentoSection(top: BentoSpace.page, child: BentoSkeleton(rows: 2)),
               BentoSection(child: BentoSkeleton(rows: 4)),
@@ -44,6 +45,7 @@ class PreTriageView extends GetView<PreTriageController> {
         return BentoScreen(
           key: PreTriageKeys.screen,
           onRefresh: controller.reload,
+          bottomClearance: false,
           slivers: [
             if (controller.hasLoadError)
               BentoSection(

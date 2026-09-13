@@ -43,6 +43,7 @@ class PreTriageDetailsView extends GetView<PreTriageDetailsController> {
         return BentoScreen(
           key: PreTriageKeys.detail,
           onRefresh: controller.load,
+          bottomClearance: false,
           slivers: [
             if (controller.hasLoadError)
               BentoSection(

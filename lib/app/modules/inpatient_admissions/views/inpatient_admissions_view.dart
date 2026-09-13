@@ -26,6 +26,7 @@ class InpatientAdmissionsView extends GetView<InpatientAdmissionsController> {
       body: Obx(() {
         if (controller.isLoading && controller.rxFirstLoad.value) {
           return const BentoScreen(
+            bottomClearance: false,
             slivers: [
               BentoSection(top: BentoSpace.page, child: BentoSkeleton(rows: 5)),
             ],
@@ -37,6 +38,7 @@ class InpatientAdmissionsView extends GetView<InpatientAdmissionsController> {
         return BentoScreen(
           key: InpatientKeys.admissions,
           onRefresh: controller.reload,
+          bottomClearance: false,
           slivers: [
             if (controller.hasLoadError)
               BentoSection(

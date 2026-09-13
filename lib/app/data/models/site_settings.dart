@@ -211,13 +211,19 @@ class MoneyFormat {
   /// Returns null for anything that is not a number, so a caller can tell an
   /// empty field from a zero.
   double? parse(String? raw) {
-    final text = (raw ?? '').trim();
+    var text = (raw ?? '').trim();
     if (text.isEmpty) return null;
+
+    // The symbol comes off first, and as a whole string. Plenty of sites write
+    // theirs with more than one character — `kr`, `Rs`, `RM`, `CHF` — and a
+    // loop comparing one rune at a time never matches any of them, so the
+    // figure this class had just formatted came back out as null.
+    if (symbol.isNotEmpty) text = text.replaceAll(symbol, '');
 
     final buffer = StringBuffer();
     for (final rune in text.runes) {
       final char = String.fromCharCode(rune);
-      if (char == thousandSeparator || char == symbol || char == ' ') continue;
+      if (char == thousandSeparator || char == ' ') continue;
       if (char == decimalSeparator) {
         buffer.write('.');
         continue;
