@@ -847,9 +847,13 @@ abstract final class CaseStatus {
     return AppColors.acuityRoutine;
   }
 
-  /// The status as a reader should see it: `in progress` → `In progress`.
+  /// The status as a reader should see it: `checked_in` → `Checked in`.
+  ///
+  /// The underscore matters. This backend stores `checked_in`, `in_service`
+  /// and `no_show`, and a pill that prints the stored value has leaked a
+  /// database convention onto a ward board.
   static String labelOf(String? status) {
-    final s = normalise(status);
+    final s = normalise(status).replaceAll('_', ' ');
     if (s.isEmpty) return '—';
     return s[0].toUpperCase() + s.substring(1);
   }

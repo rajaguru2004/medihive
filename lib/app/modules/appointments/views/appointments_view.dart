@@ -215,7 +215,7 @@ class _TodaySummary extends StatelessWidget {
         columns: 3,
         tiles: [
           VitalTile(
-            label: 'Booked today',
+            label: 'Booked',
             value: '${controller.countToday(null)}',
           ),
           VitalTile(
