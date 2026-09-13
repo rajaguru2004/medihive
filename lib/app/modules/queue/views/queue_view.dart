@@ -279,8 +279,6 @@ class _QueueRow extends StatelessWidget {
               key: QueueKeys.advance(item.id),
               icon: Icons.more_horiz_rounded,
               tooltip: 'Actions',
-              size: 40,
-              iconSize: 18,
               onTap: () => _openActions(context, item, controller),
             )
           : StatusPill(status: item.status, compact: true),
@@ -292,9 +290,9 @@ class _QueueRow extends StatelessWidget {
 /// What can be done to one person in the queue.
 ///
 /// A sheet rather than a row of icon buttons: there are five actions, one is
-/// destructive, and five 40 dp targets on a phone row leaves nothing for the
-/// name. The sheet also gets to say the patient's name at the top, which is
-/// the check somebody makes before calling the wrong person.
+/// destructive, and five targets at the 48 dp minimum leave nothing of a phone
+/// row for the name. The sheet also gets to say the patient's name at the top,
+/// which is the check somebody makes before calling the wrong person.
 Future<void> _openActions(
   BuildContext context,
   QueueItem item,

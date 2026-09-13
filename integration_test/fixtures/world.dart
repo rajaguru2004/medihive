@@ -1,3 +1,5 @@
+import 'package:medihive/app/core/app_clock.dart';
+
 import '../fakes/fake_api.dart';
 
 /// A coherent department, in fixtures.
@@ -86,12 +88,15 @@ abstract final class World {
         'scheduled': 4,
         'cancelled': 2,
       },
-      'queueByService': [
-        {'name': 'Emergency', 'count': 4},
-        {'name': 'OPD', 'count': 6},
-        {'name': 'Radiology', 'count': 2},
-        {'name': 'Laboratory', 'count': 3},
-      ],
+      // A map of name → count, which is what `DashboardData.fromJson` reads.
+      // A list of {name, count} objects is the obvious shape and the wrong
+      // one: the cast throws and the whole board renders as an error.
+      'queueByService': {
+        'Emergency': 4,
+        'OPD': 6,
+        'Radiology': 2,
+        'Laboratory': 3,
+      },
       'recentPatients': [
         _patientRow('p-1', 'MRN-10421', 'Ifeoma', 'Balogun', 'Female', '1991-04-12'),
         _patientRow('p-2', 'MRN-10422', 'Tom', 'Whitfield', 'Male', '1958-11-02'),
@@ -449,12 +454,19 @@ abstract final class World {
 
   static String get _today => _dayOffset(0);
 
+  // Every timestamp is derived from `AppClock`, which the harness freezes.
+  //
+  // Wall-clock time here would be silently wrong in both directions: a wait of
+  // "42 minutes ago" computed at `DateTime.now()` is in the *future* relative
+  // to a frozen clock, so every wait chip renders 0m and the breach flag never
+  // fires — the board looks calm in a screenshot whose whole point is that it
+  // is not.
   static String _dayOffset(int days) {
-    final now = DateTime.now().toUtc().add(Duration(days: days));
+    final now = AppClock.now().toUtc().add(Duration(days: days));
     return DateTime.utc(now.year, now.month, now.day).toIso8601String();
   }
 
-  static String _minutesAgo(int minutes) => DateTime.now()
+  static String _minutesAgo(int minutes) => AppClock.now()
       .toUtc()
       .subtract(Duration(minutes: minutes))
       .toIso8601String();

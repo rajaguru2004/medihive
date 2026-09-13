@@ -31,6 +31,7 @@ class InpatientOverviewView extends GetView<InpatientOverviewController> {
         }
 
         final rows = controller.displayed;
+        final filtered = controller.query.value.trim().isNotEmpty;
 
         return BentoScreen(
           key: InpatientKeys.overview,
@@ -93,17 +94,19 @@ class InpatientOverviewView extends GetView<InpatientOverviewController> {
                 top: BentoSpace.header,
                 child: EmptyState(
                   icon: Icons.local_hotel_outlined,
-                  title: controller.query.value.trim().isNotEmpty
+                  title: filtered
                       ? 'Nobody matches that'
                       : 'No patients in beds',
-                  message: controller.query.value.trim().isNotEmpty
+                  message: filtered
                       ? null
                       : 'Admitted patients appear here, longest stay first.',
-                  actionLabel: controller.query.value.trim().isNotEmpty
-                      ? null
-                      : 'Admit patient',
-                  onAction: controller.query.value.trim().isNotEmpty
-                      ? null
+                  // A search matching nothing is not an empty ward, so it does
+                  // not offer an admission — it offers the query back. An
+                  // empty state with no action at all is a dead end reached by
+                  // typing, which is the easiest dead end in the app to reach.
+                  actionLabel: filtered ? 'Clear search' : 'Admit patient',
+                  onAction: filtered
+                      ? controller.clearSearch
                       : () => Get.toNamed<void>(Routes.INPATIENT_ADMIT),
                 ),
               )

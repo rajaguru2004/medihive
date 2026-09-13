@@ -820,16 +820,22 @@ class WardCapacityBar extends StatelessWidget {
           borderRadius: BorderRadius.circular(BentoRadius.band),
           child: SizedBox(
             height: height,
-            child: Row(
-              children: [
-                for (final (count, color, _) in segments)
-                  if (count > 0)
-                    Expanded(
-                      flex: count,
-                      child: ColoredBox(color: color),
-                    ),
-              ],
-            ),
+            // An empty track when there is nothing to divide up. Without it a
+            // ward with no beds — or a board whose fetch failed — renders the
+            // bar as a gap, which reads as a rendering fault rather than as
+            // "no beds".
+            child: total <= 0
+                ? ColoredBox(color: wellColor(context))
+                : Row(
+                    children: [
+                      for (final (count, color, _) in segments)
+                        if (count > 0)
+                          Expanded(
+                            flex: count,
+                            child: ColoredBox(color: color),
+                          ),
+                    ],
+                  ),
           ),
         ),
         if (showLegend) ...[

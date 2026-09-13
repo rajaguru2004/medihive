@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/keys/app_keys.dart';
+import '../../../data/models/ward_model.dart';
 import '../../../routes/app_pages.dart';
 import '../../../theme/theme.dart';
 import '../../inpatient/views/inpatient_view.dart' show WardRow;
@@ -75,15 +76,22 @@ class InpatientWardsView extends GetView<InpatientWardsController> {
                     children: [
                       for (var i = 0; i < rows.length; i++) ...[
                         if (i > 0) const Hairline(indent: BentoSpace.listPad),
-                        Opacity(
-                          // Out-of-service wards stay legible but read as
-                          // secondary — they are context, not capacity.
-                          opacity: rows[i].isActive ? 1 : 0.55,
-                          child: WardRow(
-                            key: InpatientKeys.ward(rows[i].id),
-                            ward: rows[i],
-                            onTap: () => _openWardSheet(context, i, controller),
-                          ),
+                        WardRow(
+                          key: InpatientKeys.ward(rows[i].id),
+                          ward: rows[i],
+                          onTap: () =>
+                              _openWardSheet(context, rows[i], controller),
+                          // Out of service is a word, not a fade. Dimming the
+                          // row put its title at 4.14:1 and its subtitle at
+                          // 2.41:1 — the wards that need the closest read were
+                          // the ones hardest to read.
+                          trailing: rows[i].isActive
+                              ? null
+                              : const StatusPill(
+                                  status: 'inactive',
+                                  label: 'Out of service',
+                                  compact: true,
+                                ),
                         ),
                       ],
                     ],
@@ -113,13 +121,17 @@ class InpatientWardsView extends GetView<InpatientWardsController> {
   }
 }
 
+/// The sheet takes the ward itself, never its position in the list.
+///
+/// `displayed` is derived from an observable, so a `DataBus` tick between the
+/// row being built and the row being tapped can reorder or shorten it. An
+/// index read back at tap time is then either somebody else's ward or a
+/// `RangeError`, and the first of those is the dangerous one — it is silent.
 Future<void> _openWardSheet(
   BuildContext context,
-  int index,
+  WardModel ward,
   InpatientWardsController controller,
 ) {
-  final ward = controller.displayed[index];
-
   return Get.bottomSheet<void>(
     SheetShell(
       title: ward.name,

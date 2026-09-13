@@ -101,6 +101,9 @@ class InpatientAddWardController extends GetxController {
     errorMessage.value = null;
 
     final name = nameController.text.trim();
+    // Guarded past validateCapacity, because a parse that can throw inside a
+    // submit handler is waiting for the caller who forgets the validator.
+    final capacity = int.tryParse(capacityController.text.trim()) ?? 0;
 
     try {
       final response = isEdit
@@ -109,13 +112,13 @@ class InpatientAddWardController extends GetxController {
               name: name,
               code: codeController.text.trim(),
               type: type.value!.toLowerCase(),
-              capacity: int.parse(capacityController.text.trim()),
+              capacity: capacity,
             )
           : await _service.createWard(
               name: name,
               code: codeController.text.trim(),
               type: type.value!.toLowerCase(),
-              capacity: int.parse(capacityController.text.trim()),
+              capacity: capacity,
             );
 
       if (!envelopeOk(response.data, statusCode: response.statusCode)) {

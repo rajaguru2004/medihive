@@ -204,8 +204,6 @@ class _Filters extends StatelessWidget {
             CircleIconButton(
               icon: Icons.filter_alt_off_outlined,
               tooltip: 'Clear filters',
-              size: 40,
-              iconSize: 18,
               onTap: controller.clearFilters,
             ),
           ],

@@ -79,6 +79,7 @@ class NewScreeningStep2View extends GetView<NewScreeningStep2Controller> {
                                 fieldKey: ScreeningKeys.complaintField,
                                 label: 'Chief complaint',
                                 controller: controller.complaintController,
+                                validator: controller.validateComplaint,
                                 required: true,
                                 maxLines: 2,
                                 autofocus: true,

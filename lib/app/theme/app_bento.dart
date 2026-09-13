@@ -287,8 +287,13 @@ class BentoScreen extends StatelessWidget {
   /// Wires pull-to-refresh. Omit for a screen with nothing to refetch.
   final Future<void> Function()? onRefresh;
 
-  /// Leaves room under the last row for the floating tab bar. False on a
-  /// pushed sub-screen, which has no bar.
+  /// Leaves room under the last row for a floating tab bar.
+  ///
+  /// **False on every screen in this app.** There is no floating bar here: the
+  /// shell hangs its tabs off a real `bottomNavigationBar`, so the `Scaffold`
+  /// has already reserved that height, and a pushed screen has no bar at all.
+  /// Either way this reserves a second bar's worth of space that nothing ever
+  /// occupies, which reads as a list that has stopped short of the fold.
   final bool bottomClearance;
 
   /// Paints the ground behind this screen.
@@ -2096,6 +2101,7 @@ class BentoInput extends StatelessWidget {
     this.hint,
     this.placeholder,
     this.error,
+    this.validator,
     this.required = false,
     this.obscure = false,
     this.enabled = true,
@@ -2120,6 +2126,18 @@ class BentoInput extends StatelessWidget {
   final String? hint;
   final String? placeholder;
   final String? error;
+
+  /// Joins the field to the enclosing `Form`, so `validate()` reaches it.
+  ///
+  /// It is handed [controller]'s text rather than the copy the `FormField`
+  /// keeps, because the caller owns the controller and writes to it whenever
+  /// it likes — a record loading into an edit form fills text the field never
+  /// saw typed, and a cached value would validate yesterday's entry.
+  ///
+  /// [error] still wins where both are set: a caller that works out its own
+  /// message has already decided what this field says.
+  final String? Function(String?)? validator;
+
   final bool required;
   final bool obscure;
   final bool enabled;
@@ -2151,10 +2169,29 @@ class BentoInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // No validator, no FormField. A field with nothing to say to `validate()`
+    // is one more piece of state a `Form.reset()` could pull out of step with
+    // the controller, bought for nothing.
+    if (validator == null) return _control(context, error);
+
+    return FormField<String>(
+      initialValue: controller?.text,
+      // The cached value is the fallback, not the source: it is only current
+      // when the caller left the controller to us.
+      validator: (cached) => validator!(controller?.text ?? cached),
+      builder: (field) => _control(context, error ?? field.errorText, field),
+    );
+  }
+
+  Widget _control(
+    BuildContext context,
+    String? shownError, [
+    FormFieldState<String>? field,
+  ]) {
     return BentoField(
       label: label,
       hint: hint,
-      error: error,
+      error: shownError,
       required: required,
       child: TextField(
         key: fieldKey,
@@ -2170,7 +2207,8 @@ class BentoInput extends StatelessWidget {
         maxLines: obscure ? 1 : maxLines,
         maxLength: maxLength,
         autofillHints: autofillHints,
-        onChanged: onChanged,
+        onChanged:
+            field == null ? onChanged : (value) => _onEdited(field, value),
         onSubmitted: onSubmitted,
         style: AppFonts.text(fontSize: 16, color: labelColor(context)),
         decoration: InputDecoration(
@@ -2190,7 +2228,7 @@ class BentoInput extends StatelessWidget {
           // it a second time — but it still needs to know, to paint the red
           // border.
           errorText: null,
-          enabledBorder: error == null
+          enabledBorder: shownError == null
               ? null
               : OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -2200,6 +2238,18 @@ class BentoInput extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  void _onEdited(FormFieldState<String> field, String value) {
+    // Only worth storing when there is no controller to read back from; with
+    // one, this would be a second copy of the same text kept in step for the
+    // sake of it.
+    if (controller == null) field.didChange(value);
+    // Re-checked only while a message is up. A red line that outlives the fix
+    // teaches a reader that the red means nothing; checking from the first
+    // keystroke tells somebody their half-typed address is not an email.
+    if (field.hasError) field.validate();
+    onChanged?.call(value);
   }
 }
 
@@ -2214,6 +2264,7 @@ class BentoPicker extends StatelessWidget {
     this.placeholder = 'Select',
     this.hint,
     this.error,
+    this.validator,
     this.required = false,
     this.enabled = true,
     this.icon = Icons.expand_more_rounded,
@@ -2230,6 +2281,17 @@ class BentoPicker extends StatelessWidget {
   final String placeholder;
   final String? hint;
   final String? error;
+
+  /// Joins the picker to the enclosing `Form`, so a required choice nobody
+  /// made fails `validate()` rather than reaching the server as a null.
+  ///
+  /// It is handed [value], not the copy the `FormField` keeps: the selection
+  /// lives in the caller's state and arrives here as a rebuilt prop, so the
+  /// widget's own is the only one that can be current.
+  ///
+  /// [error] still wins where both are set.
+  final String? Function(String?)? validator;
+
   final bool required;
   final bool enabled;
   final IconData icon;
@@ -2238,13 +2300,30 @@ class BentoPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (validator == null) return _control(context, error);
+
+    return FormField<String>(
+      initialValue: value,
+      validator: (_) => validator!(value),
+      // `validate()` latches the failure; the message itself is worked out
+      // again from the current selection on every build, so choosing something
+      // clears the red there and then. Unlike an input, a picker has no
+      // keystroke to hang a re-check on.
+      builder: (field) => _control(
+        context,
+        error ?? (field.hasError ? validator!(value) : null),
+      ),
+    );
+  }
+
+  Widget _control(BuildContext context, String? shownError) {
     final hasValue = (value ?? '').trim().isNotEmpty;
     final theme = Theme.of(context);
 
     return BentoField(
       label: label,
       hint: hint,
-      error: error,
+      error: shownError,
       required: required,
       child: Material(
         key: fieldKey,
@@ -2259,10 +2338,10 @@ class BentoPicker extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: error == null
+                color: shownError == null
                     ? hairlineColor(context)
                     : AppColors.error,
-                width: error == null ? 0.5 : 1.5,
+                width: shownError == null ? 0.5 : 1.5,
               ),
             ),
             child: Row(

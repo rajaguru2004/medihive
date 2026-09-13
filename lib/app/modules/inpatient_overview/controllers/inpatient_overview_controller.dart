@@ -85,4 +85,11 @@ class InpatientOverviewController extends GetxController with LoadStateMixin {
   Future<void> reload() => load(silent: true);
 
   void search(String text) => query.value = text;
+
+  /// Empties the search, so the no-matches state has a way out of itself.
+  ///
+  /// A ward round filtered down to nothing is the one empty state here where
+  /// "Admit patient" is the wrong offer: the patients are in their beds, the
+  /// query is what is wrong.
+  void clearSearch() => query.value = '';
 }

@@ -73,6 +73,7 @@ class EditScreeningView extends GetView<EditScreeningController> {
                               BentoInput(
                                 label: 'First name',
                                 controller: controller.firstNameController,
+                                validator: controller.validateFirstName,
                                 required: true,
                                 textInputAction: TextInputAction.next,
                                 textCapitalization: TextCapitalization.words,
@@ -132,6 +133,7 @@ class EditScreeningView extends GetView<EditScreeningController> {
                               BentoInput(
                                 label: 'Chief complaint',
                                 controller: controller.complaintController,
+                                validator: controller.validateComplaint,
                                 required: true,
                                 maxLines: 2,
                                 textCapitalization:

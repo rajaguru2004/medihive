@@ -135,6 +135,7 @@ class DischargePatientView extends GetView<DischargePatientController> {
                                 BentoInput(
                                   label: 'Reason',
                                   controller: controller.reasonController,
+                                  validator: controller.validateReason,
                                   required: true,
                                   maxLines: 2,
                                   hint: 'In a line, for the record',

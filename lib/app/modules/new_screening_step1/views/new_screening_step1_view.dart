@@ -39,6 +39,7 @@ class NewScreeningStep1View extends GetView<NewScreeningStep1Controller> {
                                 fieldKey: ScreeningKeys.nameField,
                                 label: 'First name',
                                 controller: controller.firstNameController,
+                                validator: controller.validateFirstName,
                                 required: true,
                                 autofocus: true,
                                 textInputAction: TextInputAction.next,
@@ -69,6 +70,7 @@ class NewScreeningStep1View extends GetView<NewScreeningStep1Controller> {
                                 fieldKey: ScreeningKeys.ageField,
                                 label: 'Age',
                                 controller: controller.ageController,
+                                validator: controller.validateAge,
                                 keyboardType: TextInputType.number,
                                 textInputAction: TextInputAction.next,
                                 inputFormatters: [
@@ -90,6 +92,7 @@ class NewScreeningStep1View extends GetView<NewScreeningStep1Controller> {
                                 fieldKey: ScreeningKeys.phoneField,
                                 label: 'Phone',
                                 controller: controller.phoneController,
+                                validator: controller.validatePhone,
                                 keyboardType: TextInputType.phone,
                                 textInputAction: TextInputAction.done,
                                 hint: 'For follow-up, if they have one',

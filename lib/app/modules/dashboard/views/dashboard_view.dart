@@ -57,10 +57,14 @@ class DashboardView extends GetView<DashboardController> {
             ),
 
           // ── Census ──────────────────────────────────────────────────────
-          BentoSection(
-            top: controller.stats.criticalAlerts > 0 ? 0 : BentoSpace.page,
-            child: _CensusCard(controller: controller),
-          ),
+          // Suppressed when the fetch failed and there is nothing behind it: a
+          // wall of zeros under an error banner reads as a department with no
+          // patients rather than as a board that did not load.
+          if (!(controller.hasLoadError && controller.dashboard == null))
+            BentoSection(
+              top: controller.stats.criticalAlerts > 0 ? 0 : BentoSpace.page,
+              child: _CensusCard(controller: controller),
+            ),
 
           // ── Quick actions ───────────────────────────────────────────────
           BentoSection(child: _QuickActions(controller: controller)),
@@ -171,7 +175,7 @@ class _CensusCard extends StatelessWidget {
               ),
               VitalTile(
                 key: HomeKeys.figure('appointments'),
-                label: 'Booked today',
+                label: 'Booked',
                 value: '${stats.todayAppointments}',
                 onTap: () => Get.toNamed<void>(Routes.APPOINTMENTS),
               ),
@@ -182,13 +186,13 @@ class _CensusCard extends StatelessWidget {
               ),
               VitalTile(
                 key: HomeKeys.figure('labs'),
-                label: 'Labs pending',
+                label: 'Labs',
                 value: '${stats.pendingLabOrders}',
                 onTap: () => Get.toNamed<void>(Routes.LABORATORY),
               ),
               VitalTile(
                 key: HomeKeys.figure('prescriptions'),
-                label: 'Scripts pending',
+                label: 'Scripts',
                 value: '${stats.pendingPrescriptions}',
                 onTap: () => Get.toNamed<void>(Routes.PHARMACY),
               ),
@@ -196,7 +200,9 @@ class _CensusCard extends StatelessWidget {
                 key: HomeKeys.figure('free-beds'),
                 label: 'Beds free',
                 value: '${stats.availableBeds}',
-                tone: stats.availableBeds == 0 ? AppColors.acuityCritical : null,
+                tone: stats.availableBeds == 0 && controller.totalBeds > 0
+                    ? AppColors.acuityCritical
+                    : null,
                 onTap: () => Get.toNamed<void>(Routes.INPATIENT_BEDS_GRID),
               ),
             ],
@@ -237,12 +243,6 @@ class _QuickActions extends StatelessWidget {
         icon: Icons.local_hotel_outlined,
         label: 'Admit patient',
         route: Routes.INPATIENT_ADMIT,
-      ),
-      (
-        id: 'appointment',
-        icon: Icons.event_available_outlined,
-        label: 'Book appointment',
-        route: Routes.APPOINTMENT_CREATE,
       ),
     ];
 

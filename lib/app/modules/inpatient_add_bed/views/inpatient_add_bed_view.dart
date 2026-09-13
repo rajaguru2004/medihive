@@ -27,14 +27,30 @@ class InpatientAddBedView extends GetView<InpatientAddBedController> {
                         key: InpatientKeys.bedForm,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          // Two failures that want different answers. Wards
+                          // that never arrived leave the picker with nothing
+                          // in it, so that one carries the retry; a save that
+                          // bounced only needs saying, because the thing to
+                          // try again is the button already on the screen.
                           Obx(() {
-                            final error = controller.errorMessage.value ??
-                                controller.rxLoadError.value;
-                            if (error == null) return const SizedBox.shrink();
+                            final loadError = controller.rxLoadError.value;
+                            if (loadError == null) {
+                              return const SizedBox.shrink();
+                            }
+                            return ErrorRetryBanner(
+                              message: loadError,
+                              onRetry: controller.loadWards,
+                            );
+                          }),
+                          Obx(() {
+                            final submitError = controller.errorMessage.value;
+                            if (submitError == null) {
+                              return const SizedBox.shrink();
+                            }
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 14),
                               child: NoticeBanner(
-                                message: error,
+                                message: submitError,
                                 icon: Icons.error_outline_rounded,
                                 tint: AppColors.error,
                               ),
@@ -64,6 +80,7 @@ class InpatientAddBedView extends GetView<InpatientAddBedController> {
                                 fieldKey: InpatientKeys.bedNumberField,
                                 label: 'Bed number',
                                 controller: controller.bedNumberController,
+                                validator: controller.validateBedNumber,
                                 required: true,
                                 textInputAction: TextInputAction.done,
                                 hint: 'As it is labelled on the bay',

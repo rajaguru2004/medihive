@@ -109,6 +109,9 @@ class SimpleCrudScaffold extends StatelessWidget {
       body: MaxWidthBody(
         child: BentoScreen(
           onRefresh: onRefresh,
+          // Pushed, under a DetailHeader, with no tab bar anywhere beneath it
+          // — the same as every other screen in this app.
+          bottomClearance: false,
           slivers: [
             if (onSearch != null || onFilter != null || onSort != null)
               BentoSection(

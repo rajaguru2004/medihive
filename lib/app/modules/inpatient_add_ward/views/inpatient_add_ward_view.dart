@@ -48,6 +48,7 @@ class InpatientAddWardView extends GetView<InpatientAddWardController> {
                                 fieldKey: InpatientKeys.wardNameField,
                                 label: 'Ward name',
                                 controller: controller.nameController,
+                                validator: controller.validateName,
                                 required: true,
                                 textInputAction: TextInputAction.next,
                                 hint: 'How staff refer to it on the floor',
@@ -55,6 +56,7 @@ class InpatientAddWardView extends GetView<InpatientAddWardController> {
                               BentoInput(
                                 label: 'Short code',
                                 controller: controller.codeController,
+                                validator: controller.validateCode,
                                 required: true,
                                 textInputAction: TextInputAction.next,
                                 hint: 'Appears on bed labels and handovers',
@@ -83,6 +85,7 @@ class InpatientAddWardView extends GetView<InpatientAddWardController> {
                                 fieldKey: InpatientKeys.wardCapacityField,
                                 label: 'Beds',
                                 controller: controller.capacityController,
+                                validator: controller.validateCapacity,
                                 required: true,
                                 keyboardType: TextInputType.number,
                                 textInputAction: TextInputAction.done,

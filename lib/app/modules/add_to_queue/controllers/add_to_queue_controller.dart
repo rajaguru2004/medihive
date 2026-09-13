@@ -70,6 +70,10 @@ class AddToQueueController extends GetxController {
 
   Future<void> searchPatients(String query) async {
     isSearching.value = true;
+    // A new search supersedes whatever the last one said. Without this a
+    // failure outlives its own retry: the results come back and the banner
+    // over them still says the search never reached the server.
+    errorMessage.value = null;
     try {
       final response = await _queueService.fetchPatients(query: query.trim());
       patients.assignAll(

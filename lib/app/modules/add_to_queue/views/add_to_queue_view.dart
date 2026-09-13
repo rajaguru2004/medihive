@@ -275,44 +275,66 @@ Future<void> _openPatientPicker(AddToQueueController controller) {
           const SizedBox(height: 12),
           Flexible(
             child: Obx(() {
-              if (controller.isSearching.value &&
-                  controller.patients.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: BentoSkeleton(rows: 3),
-                );
-              }
-
+              final error = controller.errorMessage.value;
+              final searching = controller.isSearching.value;
               final rows = controller.patients.take(40).toList();
-              if (rows.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: EmptyState(
-                    compact: true,
-                    icon: Icons.person_search_outlined,
-                    title: 'No patient matches that',
-                  ),
-                );
-              }
 
-              return ListView.separated(
-                shrinkWrap: true,
-                itemCount: rows.length,
-                separatorBuilder: (_, _) => const Hairline(),
-                itemBuilder: (context, i) => SheetRow(
-                  icon: Icons.person_outline_rounded,
-                  label: rows[i].fullName,
-                  sublabel: [
-                    if (rows[i].mrn.isNotEmpty) 'MRN ${rows[i].mrn}',
-                    Formatters.age(rows[i].dateOfBirth),
-                    if (rows[i].gender?.isNotEmpty ?? false) rows[i].gender!,
-                  ].where((s) => s != '—').join(' · '),
-                  selected: controller.patient.value?.id == rows[i].id,
-                  onTap: () {
-                    controller.patient.value = rows[i];
-                    Get.back<void>();
-                  },
-                ),
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // The search's own failure, said inside the sheet rather
+                  // than only on the form behind it. A search that never
+                  // reached the server fell through to "No patient matches
+                  // that", which is the one wrong answer this sheet can give:
+                  // it sends somebody off to register a patient who is already
+                  // on file, and the queue then holds two of them.
+                  if (error != null)
+                    ErrorRetryBanner(
+                      message: error,
+                      onRetry: () => controller.searchPatients(''),
+                    ),
+                  if (searching && rows.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: BentoSkeleton(rows: 3),
+                    )
+                  // Only once the search has actually come back. Under a
+                  // failure banner this is a second answer contradicting the
+                  // first.
+                  else if (rows.isEmpty && error == null)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: EmptyState(
+                        compact: true,
+                        icon: Icons.person_search_outlined,
+                        title: 'No patient matches that',
+                      ),
+                    )
+                  else if (rows.isNotEmpty)
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: rows.length,
+                        separatorBuilder: (_, _) => const Hairline(),
+                        itemBuilder: (context, i) => SheetRow(
+                          icon: Icons.person_outline_rounded,
+                          label: rows[i].fullName,
+                          sublabel: [
+                            if (rows[i].mrn.isNotEmpty) 'MRN ${rows[i].mrn}',
+                            Formatters.age(rows[i].dateOfBirth),
+                            if (rows[i].gender?.isNotEmpty ?? false)
+                              rows[i].gender!,
+                          ].where((s) => s != '—').join(' · '),
+                          selected: controller.patient.value?.id == rows[i].id,
+                          onTap: () {
+                            controller.patient.value = rows[i];
+                            Get.back<void>();
+                          },
+                        ),
+                      ),
+                    ),
+                ],
               );
             }),
           ),

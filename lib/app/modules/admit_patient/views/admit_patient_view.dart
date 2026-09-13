@@ -42,17 +42,33 @@ class AdmitPatientView extends GetView<AdmitPatientController> {
                           key: AdmitPatientKeys.screen,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            // A load that failed and a save that bounced are
+                            // not the same news. The first leaves every picker
+                            // on this form empty, so it is the one that needs
+                            // a way back; folded into the same notice it had
+                            // none, and the screen could then neither be
+                            // filled in nor asked for its data again.
                             Obx(() {
-                              final error = controller.errorMessage.value ??
-                                  controller.rxLoadError.value;
-                              if (error == null) {
+                              final loadError = controller.rxLoadError.value;
+                              if (loadError == null) {
+                                return const SizedBox.shrink();
+                              }
+                              return ErrorRetryBanner(
+                                key: AdmitPatientKeys.loadError,
+                                message: loadError,
+                                onRetry: controller.load,
+                              );
+                            }),
+                            Obx(() {
+                              final submitError = controller.errorMessage.value;
+                              if (submitError == null) {
                                 return const SizedBox.shrink();
                               }
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 14),
                                 child: NoticeBanner(
                                   key: AdmitPatientKeys.error,
-                                  message: error,
+                                  message: submitError,
                                   icon: Icons.error_outline_rounded,
                                   tint: AppColors.error,
                                 ),
@@ -160,6 +176,7 @@ class AdmitPatientView extends GetView<AdmitPatientController> {
                                   fieldKey: AdmitPatientKeys.reasonField,
                                   label: 'Reason',
                                   controller: controller.reasonController,
+                                  validator: controller.validateReason,
                                   required: true,
                                   maxLines: 3,
                                   hint: 'The presenting problem, in a line',

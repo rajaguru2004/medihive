@@ -11,4 +11,5 @@ abstract final class AdmitPatientKeys {
   static const acuityPicker = Key('admit_patient_acuity');
   static const submit = Key('admit_patient_submit');
   static const error = Key('admit_patient_error');
+  static const loadError = Key('admit_patient_load_error');
 }

@@ -160,7 +160,6 @@ class AppointmentsView extends GetView<AppointmentsController> {
               title: 'Dealt with',
               rows: closed,
               controller: controller,
-              muted: true,
             ),
           ),
       ];
@@ -275,8 +274,6 @@ class _MonthGrid extends StatelessWidget {
               CircleIconButton(
                 icon: Icons.chevron_left_rounded,
                 tooltip: 'Previous month',
-                size: 36,
-                iconSize: 18,
                 onTap: () => controller.selectDay(
                   DateTime(month.year, month.month - 1, 1),
                 ),
@@ -284,8 +281,6 @@ class _MonthGrid extends StatelessWidget {
               CircleIconButton(
                 icon: Icons.chevron_right_rounded,
                 tooltip: 'Next month',
-                size: 36,
-                iconSize: 18,
                 onTap: () => controller.selectDay(
                   DateTime(month.year, month.month + 1, 1),
                 ),
@@ -318,7 +313,7 @@ class _MonthGrid extends StatelessWidget {
                       builder: (context) {
                         final day = week * 7 + slot - leading + 1;
                         if (day < 1 || day > daysInMonth) {
-                          return const SizedBox(height: 42);
+                          return const SizedBox(height: AppTheme.minTapTarget);
                         }
                         final date = DateTime(month.year, month.month, day);
                         return _DayCell(
@@ -369,7 +364,10 @@ class _DayCell extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(BentoRadius.small),
       child: SizedBox(
-        height: 42,
+        // The disc stays 34 — it is a date, not a button — but the target
+        // under it is the full minimum. A month grid is thirty-odd targets
+        // side by side, which is exactly where a near-miss costs a mis-booking.
+        height: AppTheme.minTapTarget,
         child: Center(
           child: Container(
             width: 34,
@@ -428,7 +426,6 @@ class _AppointmentList extends StatelessWidget {
     this.title,
     required this.rows,
     required this.controller,
-    this.muted = false,
     this.showDate = false,
   });
 
@@ -436,10 +433,6 @@ class _AppointmentList extends StatelessWidget {
   final String? title;
   final List<AppointmentModel> rows;
   final AppointmentsController controller;
-
-  /// Greys the group. For appointments that are already dealt with.
-  final bool muted;
-
   final bool showDate;
 
   @override
@@ -448,26 +441,29 @@ class _AppointmentList extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (title != null) SectionHeader(title: title!),
-        Opacity(
-          opacity: muted ? 0.62 : 1,
-          child: BentoCard(
-            key: listKey,
-            padding: const EdgeInsets.symmetric(
-              vertical: BentoSpace.listCardPad,
-            ),
-            child: Column(
-              children: [
-                for (var i = 0; i < rows.length; i++) ...[
-                  if (i > 0) const Hairline(indent: BentoSpace.listPad),
-                  _AppointmentRow(
-                    key: AppointmentsKeys.row(rows[i].id),
-                    appointment: rows[i],
-                    controller: controller,
-                    showDate: showDate,
-                  ),
-                ],
+        // Nothing dims this group. Opacity over live text is a contrast
+        // defect, not a shade of emphasis: 0.62 took these subtitles to
+        // 2.80:1, under the 4.5:1 floor, and a dealt-with appointment is
+        // still the record somebody opens to check what was done. It is
+        // already said twice without costing a single ratio — by the header
+        // above and by each row's StatusPill.
+        BentoCard(
+          key: listKey,
+          padding: const EdgeInsets.symmetric(
+            vertical: BentoSpace.listCardPad,
+          ),
+          child: Column(
+            children: [
+              for (var i = 0; i < rows.length; i++) ...[
+                if (i > 0) const Hairline(indent: BentoSpace.listPad),
+                _AppointmentRow(
+                  key: AppointmentsKeys.row(rows[i].id),
+                  appointment: rows[i],
+                  controller: controller,
+                  showDate: showDate,
+                ),
               ],
-            ),
+            ],
           ),
         ),
       ],
