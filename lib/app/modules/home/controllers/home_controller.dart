@@ -1,151 +1,86 @@
-import 'package:flutter/foundation.dart';
-
-import 'package:dio/dio.dart';
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
-import 'package:medihive/app/models/dashboard_model.dart';
-import 'package:medihive/app/services/home_service.dart';
+import '../../../data/models/auth_user.dart';
+import '../../../data/services/auth_service.dart';
+import '../../../data/services/session_manager.dart';
+import '../../../data/services/settings_service.dart';
 
-// lib/app/modules/home/controllers/home_controller.dart
+/// One destination in the shell.
+///
+/// Adding a tab is one entry in `HomeBinding.shellDestinations()` plus its
+/// controller registration — not an edit to the tab bar, the `IndexedStack`,
+/// the title logic and the key list, which is how the previous shell grew to
+/// 1,981 lines with four screens inside it.
+class ShellDestination {
+  const ShellDestination({
+    required this.route,
+    required this.label,
+    required this.icon,
+    required this.activeIcon,
+    required this.body,
+    this.title,
+  });
 
-enum LoadState { idle, loading, success, error }
+  /// The route this tab is also reachable at, so a deep link can open it
+  /// directly. Also the tab's key suffix.
+  final String route;
 
+  /// What the tab bar says.
+  final String label;
+
+  final IconData icon;
+  final IconData activeIcon;
+
+  /// The shell's title while this tab is active. Defaults to [label].
+  final String? title;
+
+  /// Built once, lazily, and kept alive by the shell's `IndexedStack`.
+  final Widget Function() body;
+}
+
+/// The shell.
+///
+/// Owns only cross-cutting state: which tab is active, who is signed in, and
+/// the sheets the top bar opens. Every tab's *data* belongs to that tab's own
+/// controller — a shell that fetches on behalf of its children is a shell that
+/// refetches all of them when one of them changes.
 class HomeController extends GetxController {
-  final _homeService = Get.find<HomeService>();
+  static HomeController get to => Get.find<HomeController>();
 
-  // ── Observable State ───────────────────────────────────────────────────────
-  final _loadState = LoadState.idle.obs;
-  final _dashboardData = Rxn<DashboardData>();
-  final _orgData = Rxn<OrganizationData>();
-  final _errorMessage = ''.obs;
-  final _selectedNavIndex = 0.obs;
-  final _showAllPatients = false.obs;
+  HomeController({required this.destinations});
 
-  // ── Getters ────────────────────────────────────────────────────────────────
-  LoadState get loadState => _loadState.value;
-  DashboardData? get dashboardData => _dashboardData.value;
-  OrganizationData? get orgData => _orgData.value;
-  String get errorMessage => _errorMessage.value;
-  int get selectedNavIndex => _selectedNavIndex.value;
-  bool get showAllPatients => _showAllPatients.value;
+  final List<ShellDestination> destinations;
 
-  bool get isLoading => _loadState.value == LoadState.loading;
-  bool get hasError => _loadState.value == LoadState.error;
-  bool get hasData => _loadState.value == LoadState.success;
+  final _activeIndex = 0.obs;
 
-  DashboardStats get stats =>
-      _dashboardData.value?.stats ??
-      const DashboardStats(
-        totalPatients: 0,
-        todayAppointments: 0,
-        pendingLabOrders: 0,
-        pendingPrescriptions: 0,
-        todayRevenue: 0,
-        occupiedBeds: 0,
-        availableBeds: 0,
-        queueWaiting: 0,
-        criticalAlerts: 0,
+  int get activeIndex => _activeIndex.value;
+  ShellDestination get active => destinations[_activeIndex.value];
+
+  /// The shell bar's title: the active tab's. The tab body must not repeat it.
+  String get title => active.title ?? active.label;
+
+  AuthUser? get user => AuthService.to.currentUser;
+  Rxn<AuthUser> get rxUser => AuthService.to.rxUser;
+
+  String get siteName => SettingsService.to.settings.siteName;
+
+  void select(int index) {
+    if (index < 0 || index >= destinations.length) return;
+    _activeIndex.value = index;
+  }
+
+  /// Switches to the tab at [route], if the shell has one. Returns false when
+  /// it does not, so a caller can fall back to pushing the route instead.
+  bool selectRoute(String route) {
+    final index = destinations.indexWhere((d) => d.route == route);
+    if (index < 0) return false;
+    _activeIndex.value = index;
+    return true;
+  }
+
+  Future<void> signOut() => SessionManager.to.endSession(
+        reason: SessionEndReason.userLogout,
+        revokeToken: true,
       );
-
-  List<RecentPatient> get recentPatients {
-    final patients = _dashboardData.value?.recentPatients ?? [];
-    if (_showAllPatients.value) return patients;
-    return patients.take(5).toList();
-  }
-
-  List<UpcomingAppointment> get upcomingAppointments =>
-      _dashboardData.value?.upcomingAppointments ?? [];
-
-  AppointmentStatuses get appointmentStatuses =>
-      _dashboardData.value?.appointmentStatuses ?? const AppointmentStatuses();
-
-  List<QueueService> get queueByService =>
-      _dashboardData.value?.queueByService ?? [];
-
-  String get orgName => _orgData.value?.name ?? 'MediHive';
-  String? get orgLogoUrl => _orgData.value?.logoUrl;
-
-  @override
-  void onInit() {
-    super.onInit();
-    fetchAll();
-  }
-
-  // ── Actions ────────────────────────────────────────────────────────────────
-  Future<void> fetchAll() async {
-    _loadState.value = LoadState.loading;
-    _errorMessage.value = '';
-
-    try {
-      final results = await Future.wait([
-        _homeService.fetchDashboard(),
-        _homeService.fetchOrganization(),
-      ]);
-
-      final dashRes = results[0];
-      final orgRes = results[1];
-
-      if (dashRes.data != null) {
-        _dashboardData.value =
-            DashboardData.fromJson(dashRes.data as Map<String, dynamic>);
-      }
-      if (orgRes.data != null) {
-        _orgData.value =
-            OrganizationData.fromJson(orgRes.data as Map<String, dynamic>);
-      }
-
-      _loadState.value = LoadState.success;
-    } on DioException catch (e) {
-      _loadState.value = LoadState.error;
-      _errorMessage.value = e.message ?? 'Network error. Please try again.';
-      if (kDebugMode) {
-        debugPrint('[HomeController] DioException: ${e.message}');
-      }
-    } catch (e) {
-      _loadState.value = LoadState.error;
-      _errorMessage.value = 'Something went wrong. Please try again.';
-      if (kDebugMode) {
-        debugPrint('[HomeController] Error: $e');
-      }
-    }
-  }
-
-  Future<void> onRefresh() async {
-    await fetchAll();
-  }
-
-  void setNavIndex(int index) => _selectedNavIndex.value = index;
-
-  void toggleShowAllPatients() =>
-      _showAllPatients.value = !_showAllPatients.value;
-
-  void onQuickAction(String action) {
-    // Navigation stubs — connect to routes when modules are ready
-    switch (action) {
-      case 'add_patient':
-        Get.snackbar('Add Patient', 'Coming soon',
-            snackPosition: SnackPosition.BOTTOM);
-        break;
-      case 'book_appointment':
-        Get.snackbar('Book Appointment', 'Coming soon',
-            snackPosition: SnackPosition.BOTTOM);
-        break;
-      case 'admit_patient':
-        Get.snackbar('Admit Patient', 'Coming soon',
-            snackPosition: SnackPosition.BOTTOM);
-        break;
-      case 'create_prescription':
-        Get.snackbar('Create Prescription', 'Coming soon',
-            snackPosition: SnackPosition.BOTTOM);
-        break;
-      case 'lab_orders':
-        Get.snackbar('Lab Orders', 'Coming soon',
-            snackPosition: SnackPosition.BOTTOM);
-        break;
-      case 'billing':
-        Get.snackbar('Billing', 'Coming soon',
-            snackPosition: SnackPosition.BOTTOM);
-        break;
-    }
-  }
 }

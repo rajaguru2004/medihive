@@ -3,10 +3,10 @@ import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:get/get.dart' hide Response;
 
-import '../../../models/admission_model.dart';
-import '../../../models/bed_model.dart';
-import '../../../models/ward_model.dart';
-import '../../../services/inpatient_service.dart';
+import '../../../data/models/admission_model.dart';
+import '../../../data/models/bed_model.dart';
+import '../../../data/models/ward_model.dart';
+import '../../../data/services/inpatient_service.dart';
 
 class InpatientBedsGridController extends GetxController {
   final _service = Get.find<InpatientService>();

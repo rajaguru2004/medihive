@@ -3,8 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 
-import '../../../models/queue_item.dart';
-import '../../../services/queue_service.dart';
+import '../../../data/models/queue_item.dart';
+import '../../../data/services/queue_service.dart';
 
 enum QueueLoadState { idle, loading, success, error }
 

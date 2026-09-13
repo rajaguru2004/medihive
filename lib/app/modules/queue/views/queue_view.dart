@@ -5,7 +5,7 @@ import 'package:get/get.dart';
 import 'package:medihive/app/routes/app_pages.dart';
 import 'package:medihive/app/theme/theme.dart';
 
-import '../../../models/queue_item.dart';
+import '../../../data/models/queue_item.dart';
 import '../controllers/queue_controller.dart';
 
 class QueueView extends GetView<QueueController> {

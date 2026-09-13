@@ -1,68 +1,94 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-
-import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 
-import '../../../network/token_manager.dart';
+import '../../../core/app_log.dart';
+import '../../../data/services/auth_service.dart';
+import '../../../data/services/session_manager.dart';
+import '../../../data/services/settings_service.dart';
+import '../../../data/utils/error_handler.dart';
 import '../../../routes/app_pages.dart';
-import '../../../services/auth_service.dart';
 
 class LoginController extends GetxController {
-  final _authService = Get.find<AuthService>();
-
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final formKey = GlobalKey<FormState>();
 
-  final isLoading = false.obs;
+  final isSubmitting = false.obs;
   final isPasswordHidden = true.obs;
-  final errorMessage = ''.obs;
+  final errorMessage = RxnString();
+
+  /// Why the last session ended, when it ended on its own.
+  ///
+  /// Read from the route arguments `SessionManager` passes. Shown once, above
+  /// the form: a clinician whose token expired mid-round needs to know that is
+  /// what happened, not to wonder whether they mistyped a password they never
+  /// typed.
+  final sessionNotice = RxnString();
+
+  @override
+  void onInit() {
+    super.onInit();
+
+    final reason = (Get.arguments as Map?)?['sessionEndReason'];
+    if (reason is String) {
+      sessionNotice.value = SessionEndReason.values
+          .firstWhereOrNull((r) => r.name == reason)
+          ?.notice;
+    }
+
+    // Re-arm the teardown guard here rather than in a `finally` inside
+    // endSession: clearing it the moment that returns would let a late 401
+    // from a request still in flight trigger a second redirect onto this
+    // screen.
+    SessionManager.to.armForNextSession();
+  }
 
   void togglePassword() => isPasswordHidden.toggle();
 
-  String? validateEmail(String? val) {
-    if (val == null || val.trim().isEmpty) return 'Email required';
-    final ok = RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,}$').hasMatch(val.trim());
-    return ok ? null : 'Enter a valid email';
+  String? validateEmail(String? value) {
+    final text = (value ?? '').trim();
+    if (text.isEmpty) return 'Enter your work email';
+    final ok = RegExp(r'^[\w.+-]+@([\w-]+\.)+[\w-]{2,}$').hasMatch(text);
+    return ok ? null : 'That does not look like an email address';
   }
 
-  String? validatePassword(String? val) {
-    if (val == null || val.isEmpty) return 'Password required';
+  String? validatePassword(String? value) {
+    if ((value ?? '').isEmpty) return 'Enter your password';
     return null;
   }
 
-  Future<void> login() async {
+  Future<void> submit() async {
+    if (isSubmitting.value) return;
     if (!(formKey.currentState?.validate() ?? false)) return;
-    isLoading.value = true;
-    errorMessage.value = '';
+
+    // Dismiss the keyboard before the request: on a phone the error banner
+    // renders above the fold and behind the keyboard otherwise, so a failed
+    // sign-in looks like nothing happened at all.
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    isSubmitting.value = true;
+    errorMessage.value = null;
+    sessionNotice.value = null;
 
     try {
-      final res = await _authService.login(
-        email: emailController.text.trim(),
+      await AuthService.to.signIn(
+        email: emailController.text,
         password: passwordController.text,
       );
 
-      final data = res.data as Map<String, dynamic>;
-      if (data['success'] == true) {
-        final tokenData = data['data'] as Map<String, dynamic>;
-        final accessToken = tokenData['accessToken'] as String;
-        final refreshToken = tokenData['refreshToken'] as String?;
-        TokenManager.setTokens(
-            accessToken: accessToken, refreshToken: refreshToken);
-        if (kDebugMode) debugPrint('Login success — token: $accessToken');
-        Get.offAllNamed(Routes.HOME);
-      } else {
-        errorMessage.value =
-            data['message'] as String? ?? 'Login failed. Try again.';
-      }
-    } on DioException catch (e) {
-      final msg = e.response?.data?['message'] as String?;
-      errorMessage.value = msg ?? 'Network error. Check connection.';
-    } catch (_) {
-      errorMessage.value = 'Unexpected error. Please try again.';
+      // Branding before the shell paints. A site whose brand is not the
+      // default would otherwise show one frame of teal on sign-in.
+      await SettingsService.to.load();
+
+      await Get.offAllNamed<void>(Routes.HOME);
+    } catch (e, stack) {
+      errorMessage.value = parseErrorMessage(
+        e,
+        "That didn't work. Check your email and password, then try again.",
+      );
+      AppLog.error('LoginController', 'sign-in failed', e, stack);
     } finally {
-      isLoading.value = false;
+      isSubmitting.value = false;
     }
   }
 

@@ -4,7 +4,7 @@ import 'package:get/get.dart';
 
 import 'package:medihive/app/theme/theme.dart';
 
-import '../../../models/ward_model.dart';
+import '../../../data/models/ward_model.dart';
 import '../controllers/inpatient_add_ward_controller.dart';
 
 class InpatientAddWardView extends StatelessWidget {

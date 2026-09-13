@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:get/get.dart' hide Response;
 
-import '../../../models/ward_model.dart';
-import '../../../services/inpatient_service.dart';
+import '../../../data/models/ward_model.dart';
+import '../../../data/services/inpatient_service.dart';
 import '../../inpatient/controllers/inpatient_controller.dart';
 import '../../inpatient_beds_grid/controllers/inpatient_beds_grid_controller.dart';
 import '../../inpatient_wards/controllers/inpatient_wards_controller.dart';

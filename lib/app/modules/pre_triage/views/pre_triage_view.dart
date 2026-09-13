@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
-import '../../../models/pre_triage_model.dart';
+import '../../../data/models/pre_triage_model.dart';
 import '../../../routes/app_pages.dart';
 import '../../../theme/theme.dart';
 import '../controllers/pre_triage_controller.dart';

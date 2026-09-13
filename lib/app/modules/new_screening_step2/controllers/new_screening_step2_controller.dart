@@ -4,7 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 
 import '../../../routes/app_pages.dart';
-import '../../../services/pre_triage_service.dart';
+import '../../../data/services/pre_triage_service.dart';
 import '../../../theme/theme.dart';
 import '../../pre_triage/controllers/pre_triage_controller.dart';
 

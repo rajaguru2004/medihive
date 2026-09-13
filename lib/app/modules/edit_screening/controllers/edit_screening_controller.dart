@@ -3,8 +3,8 @@ import 'package:dio/dio.dart';
 
 import 'package:get/get.dart';
 
-import '../../../models/pre_triage_model.dart';
-import '../../../services/pre_triage_service.dart';
+import '../../../data/models/pre_triage_model.dart';
+import '../../../data/services/pre_triage_service.dart';
 import '../../../theme/theme.dart';
 import '../../pre_triage/controllers/pre_triage_controller.dart';
 

@@ -1,6 +1,6 @@
 import 'package:get/get.dart';
 
-import '../../../models/pre_triage_model.dart';
+import '../../../data/models/pre_triage_model.dart';
 
 class PreTriageDetailsController extends GetxController {
   late final PreTriageModel screening;

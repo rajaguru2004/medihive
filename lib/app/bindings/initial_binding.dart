@@ -1,11 +1,11 @@
 import 'package:get/get.dart';
 
-import '../services/appointment_service.dart';
-import '../services/consultation_service.dart';
-import '../services/home_service.dart';
-import '../services/inpatient_service.dart';
-import '../services/pre_triage_service.dart';
-import '../services/queue_service.dart';
+import '../data/services/appointment_service.dart';
+import '../data/services/consultation_service.dart';
+import '../data/services/home_service.dart';
+import '../data/services/inpatient_service.dart';
+import '../data/services/pre_triage_service.dart';
+import '../data/services/queue_service.dart';
 
 class InitialBinding extends Bindings {
   @override

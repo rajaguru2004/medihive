@@ -5,8 +5,8 @@ import 'package:get/get.dart';
 
 import 'package:medihive/app/theme/theme.dart';
 
-import '../../../models/patient_lookup.dart';
-import '../../../services/queue_service.dart';
+import '../../../data/models/patient_lookup.dart';
+import '../../../data/services/queue_service.dart';
 import '../../queue/controllers/queue_controller.dart';
 
 class AddToQueueController extends GetxController {

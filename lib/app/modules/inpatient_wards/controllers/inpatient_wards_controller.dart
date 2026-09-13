@@ -3,8 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:get/get.dart' hide Response;
 
-import '../../../models/ward_model.dart';
-import '../../../services/inpatient_service.dart';
+import '../../../data/models/ward_model.dart';
+import '../../../data/services/inpatient_service.dart';
 import '../../inpatient/controllers/inpatient_controller.dart';
 
 class InpatientWardsController extends GetxController {

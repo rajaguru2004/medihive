@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:dio/dio.dart' as dio;
 
-import '../../../models/consultation_model.dart';
-import '../../../models/doctor_model.dart';
-import '../../../models/queue_item.dart';
-import '../../../services/consultation_service.dart';
+import '../../../data/models/consultation_model.dart';
+import '../../../data/models/doctor_model.dart';
+import '../../../data/models/queue_item.dart';
+import '../../../data/services/consultation_service.dart';
 import '../../../theme/theme.dart';
 
 class ConsultationsController extends GetxController {

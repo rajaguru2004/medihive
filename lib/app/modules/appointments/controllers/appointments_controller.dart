@@ -3,8 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 
-import '../../../models/appointment_model.dart';
-import '../../../services/appointment_service.dart';
+import '../../../data/models/appointment_model.dart';
+import '../../../data/services/appointment_service.dart';
 import '../../../theme/theme.dart';
 
 class AppointmentsController extends GetxController {

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
-import '../../../models/appointment_model.dart';
+import '../../../data/models/appointment_model.dart';
 import '../../../theme/theme.dart';
 import '../controllers/discharge_patient_controller.dart';
 

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../models/consultation_model.dart';
-import '../../../models/doctor_model.dart';
-import '../../../models/queue_item.dart';
+import '../../../data/models/consultation_model.dart';
+import '../../../data/models/doctor_model.dart';
+import '../../../data/models/queue_item.dart';
 import '../../../theme/theme.dart';
 import '../controllers/consultations_controller.dart';
 

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 import 'package:get/get.dart';
 
-import '../../../models/appointment_model.dart';
-import '../../../models/bed_model.dart';
-import '../../../models/patient_lookup.dart';
-import '../../../models/ward_model.dart';
+import '../../../data/models/appointment_model.dart';
+import '../../../data/models/bed_model.dart';
+import '../../../data/models/patient_lookup.dart';
+import '../../../data/models/ward_model.dart';
 import '../../../theme/theme.dart';
 import '../controllers/admit_patient_controller.dart';
 

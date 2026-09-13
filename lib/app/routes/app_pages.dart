@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import 'package:get/get.dart';
 
 import '../modules/add_to_queue/bindings/add_to_queue_binding.dart';
@@ -10,6 +9,8 @@ import '../modules/appointments/bindings/appointments_binding.dart';
 import '../modules/appointments/views/appointments_view.dart';
 import '../modules/consultations/bindings/consultations_binding.dart';
 import '../modules/consultations/views/consultations_view.dart';
+import '../modules/dashboard/bindings/dashboard_binding.dart';
+import '../modules/dashboard/views/dashboard_view.dart';
 import '../modules/discharge_patient/bindings/discharge_patient_binding.dart';
 import '../modules/discharge_patient/views/discharge_patient_view.dart';
 import '../modules/edit_screening/bindings/edit_screening_binding.dart';
@@ -43,186 +44,318 @@ import '../modules/pre_triage_details/bindings/pre_triage_details_binding.dart';
 import '../modules/pre_triage_details/views/pre_triage_details_view.dart';
 import '../modules/queue/bindings/queue_binding.dart';
 import '../modules/queue/views/queue_view.dart';
+import '../modules/splash/bindings/splash_binding.dart';
+import '../modules/splash/views/splash_view.dart';
+import 'middlewares/auth_middleware.dart';
 
 part 'app_routes.dart';
 
+/// The route table.
+///
+/// Every tab in the shell is **also** a standalone page here, so a deep link
+/// or a push from a sub-screen can open it directly. Inside the shell its
+/// controller is already registered `permanent`, so the binding's `lazyPut`
+/// finds the live instance rather than building a second one.
 class AppPages {
   AppPages._();
 
-  static const INITIAL = Routes.LOGIN;
+  /// Where a cold start goes before the session has been checked.
+  // ignore: constant_identifier_names — matches the Routes convention above.
+  static const INITIAL = Routes.SPLASH;
 
-  static final routes = [
+  /// The transition every pushed screen uses.
+  ///
+  /// One transition, named once. A table where a third of the entries specify
+  /// `Transition.cupertino` and the rest inherit whatever the default is that
+  /// year is a table where screens animate differently for no reason anybody
+  /// chose.
+  static const _push = Transition.cupertino;
+
+  static final _auth = [AuthMiddleware()];
+
+  static final routes = <GetPage<dynamic>>[
+    // ── Entry ─────────────────────────────────────────────────────────────
     GetPage(
-      name: _Paths.HOME,
-      page: () => const HomeView(),
-      binding: HomeBinding(),
+      name: _Paths.SPLASH,
+      page: () => const SplashView(),
+      binding: SplashBinding(),
     ),
     GetPage(
       name: _Paths.LOGIN,
       page: () => const LoginView(),
       binding: LoginBinding(),
+      middlewares: [GuestMiddleware()],
+    ),
+
+    // ── Shell ─────────────────────────────────────────────────────────────
+    GetPage(
+      name: _Paths.HOME,
+      page: () => const HomeView(),
+      binding: HomeBinding(),
+      middlewares: _auth,
     ),
     GetPage(
-      name: _Paths.CONSULTATIONS,
-      page: () => const ConsultationsView(),
-      binding: ConsultationsBinding(),
-      transition: Transition.cupertino,
+      name: _Paths.DASHBOARD,
+      page: () => const DashboardView(),
+      binding: DashboardBinding(),
+      middlewares: _auth,
+      transition: _push,
     ),
-    GetPage(
-      name: _Paths.PATIENTS,
-      page: () =>
-          const PlaceholderView(title: 'Patients', icon: Icons.people_rounded),
-      transition: Transition.cupertino,
-    ),
-    GetPage(
-      name: _Paths.PHARMACY,
-      page: () => const PlaceholderView(
-        title: 'Pharmacy',
-        icon: Icons.local_pharmacy_rounded,
-      ),
-      transition: Transition.cupertino,
-    ),
-    GetPage(
-      name: _Paths.LABORATORY,
-      page: () => const PlaceholderView(
-        title: 'Laboratory',
-        icon: Icons.science_rounded,
-      ),
-      transition: Transition.cupertino,
-    ),
-    GetPage(
-      name: _Paths.RADIOLOGY,
-      page: () => const PlaceholderView(
-        title: 'Radiology',
-        icon: Icons.settings_accessibility_rounded,
-      ),
-      transition: Transition.cupertino,
-    ),
-    GetPage(
-      name: _Paths.PRE_TRIAGE,
-      page: () => const PreTriageView(),
-      binding: PreTriageBinding(),
-      transition: Transition.cupertino,
-    ),
-    GetPage(
-      name: _Paths.NEW_SCREENING_STEP1,
-      page: () => const NewScreeningStep1View(),
-      binding: NewScreeningStep1Binding(),
-      transition: Transition.cupertino,
-    ),
-    GetPage(
-      name: _Paths.NEW_SCREENING_STEP2,
-      page: () => const NewScreeningStep2View(),
-      binding: NewScreeningStep2Binding(),
-      transition: Transition.cupertino,
-    ),
-    GetPage(
-      name: _Paths.EDIT_SCREENING,
-      page: () => const EditScreeningView(),
-      binding: EditScreeningBinding(),
-      transition: Transition.cupertino,
-    ),
-    GetPage(
-      name: _Paths.PRE_TRIAGE_DETAILS,
-      page: () => const PreTriageDetailsView(),
-      binding: PreTriageDetailsBinding(),
-      transition: Transition.cupertino,
-    ),
-    GetPage(
-      name: _Paths.BILLING,
-      page: () => const PlaceholderView(
-        title: 'Billing & Revenue',
-        icon: Icons.currency_rupee_rounded,
-      ),
-      transition: Transition.cupertino,
-    ),
-    GetPage(
-      name: _Paths.USERS_STAFF,
-      page: () => const PlaceholderView(
-        title: 'Users & Staff',
-        icon: Icons.badge_rounded,
-      ),
-      transition: Transition.cupertino,
-    ),
-    GetPage(
-      name: _Paths.INTEGRATIONS,
-      page: () => const PlaceholderView(
-        title: 'Integrations',
-        icon: Icons.integration_instructions_rounded,
-      ),
-      transition: Transition.cupertino,
-    ),
+
+    // ── Queue ─────────────────────────────────────────────────────────────
     GetPage(
       name: _Paths.QUEUE,
-      page: () => const QueueView(isEmbedded: false),
+      page: () => const QueueView(),
       binding: QueueBinding(),
-      transition: Transition.cupertino,
+      middlewares: _auth,
+      transition: _push,
     ),
     GetPage(
       name: _Paths.ADD_TO_QUEUE,
       page: () => const AddToQueueView(),
       binding: AddToQueueBinding(),
-      transition: Transition.cupertino,
+      middlewares: _auth,
+      transition: _push,
     ),
+
+    // ── Clinic ────────────────────────────────────────────────────────────
     GetPage(
       name: _Paths.APPOINTMENTS,
-      page: () => const AppointmentsView(isEmbedded: false),
+      page: () => const AppointmentsView(),
       binding: AppointmentsBinding(),
-      transition: Transition.cupertino,
+      middlewares: _auth,
+      transition: _push,
     ),
+    GetPage(
+      name: _Paths.APPOINTMENT_CREATE,
+      page: () => const PlaceholderView(
+        module: 'appointment-create',
+        title: 'Book appointment',
+        icon: Icons.event_available_outlined,
+        message: 'Booking from the app is not switched on for this site yet. '
+            'Appointments booked in the admin console appear on the clinic '
+            'board straight away.',
+      ),
+      middlewares: _auth,
+      transition: _push,
+    ),
+    GetPage(
+      name: _Paths.CONSULTATIONS,
+      page: () => const ConsultationsView(),
+      binding: ConsultationsBinding(),
+      middlewares: _auth,
+      transition: _push,
+    ),
+
+    // ── Pre-triage ────────────────────────────────────────────────────────
+    GetPage(
+      name: _Paths.PRE_TRIAGE,
+      page: () => const PreTriageView(),
+      binding: PreTriageBinding(),
+      middlewares: _auth,
+      transition: _push,
+    ),
+    GetPage(
+      name: _Paths.PRE_TRIAGE_DETAILS,
+      page: () => const PreTriageDetailsView(),
+      binding: PreTriageDetailsBinding(),
+      middlewares: _auth,
+      transition: _push,
+    ),
+    GetPage(
+      name: _Paths.NEW_SCREENING_STEP1,
+      page: () => const NewScreeningStep1View(),
+      binding: NewScreeningStep1Binding(),
+      middlewares: _auth,
+      transition: _push,
+    ),
+    GetPage(
+      name: _Paths.NEW_SCREENING_STEP2,
+      page: () => const NewScreeningStep2View(),
+      binding: NewScreeningStep2Binding(),
+      middlewares: _auth,
+      transition: _push,
+    ),
+    GetPage(
+      name: _Paths.EDIT_SCREENING,
+      page: () => const EditScreeningView(),
+      binding: EditScreeningBinding(),
+      middlewares: _auth,
+      transition: _push,
+    ),
+
+    // ── Inpatient ─────────────────────────────────────────────────────────
     GetPage(
       name: _Paths.INPATIENT,
-      page: () => const InpatientView(isEmbedded: false),
+      page: () => const InpatientView(),
       binding: InpatientBinding(),
-      transition: Transition.cupertino,
-    ),
-    GetPage(
-      name: _Paths.INPATIENT_ADD_BED,
-      page: () => const InpatientAddBedView(),
-      binding: InpatientAddBedBinding(),
-      transition: Transition.cupertino,
-    ),
-    GetPage(
-      name: _Paths.INPATIENT_ADMIT,
-      page: () => const AdmitPatientView(),
-      binding: AdmitPatientBinding(),
-      transition: Transition.cupertino,
-    ),
-    GetPage(
-      name: _Paths.DISCHARGE_PATIENT,
-      page: () => const DischargePatientView(),
-      binding: DischargePatientBinding(),
-      transition: Transition.cupertino,
+      middlewares: _auth,
+      transition: _push,
     ),
     GetPage(
       name: _Paths.INPATIENT_OVERVIEW,
       page: () => const InpatientOverviewView(),
       binding: InpatientOverviewBinding(),
-      transition: Transition.cupertino,
-    ),
-    GetPage(
-      name: _Paths.INPATIENT_BEDS_GRID,
-      page: () => const InpatientBedsGridView(),
-      binding: InpatientBedsGridBinding(),
-      transition: Transition.cupertino,
-    ),
-    GetPage(
-      name: _Paths.INPATIENT_ADD_WARD,
-      page: () => const InpatientAddWardView(),
-      binding: InpatientAddWardBinding(),
-      transition: Transition.cupertino,
-    ),
-    GetPage(
-      name: _Paths.INPATIENT_ADMISSIONS,
-      page: () => const InpatientAdmissionsView(),
-      binding: InpatientAdmissionsBinding(),
-      transition: Transition.cupertino,
+      middlewares: _auth,
+      transition: _push,
     ),
     GetPage(
       name: _Paths.INPATIENT_WARDS,
       page: () => const InpatientWardsView(),
       binding: InpatientWardsBinding(),
-      transition: Transition.cupertino,
+      middlewares: _auth,
+      transition: _push,
+    ),
+    GetPage(
+      name: _Paths.INPATIENT_BEDS_GRID,
+      page: () => const InpatientBedsGridView(),
+      binding: InpatientBedsGridBinding(),
+      middlewares: _auth,
+      transition: _push,
+    ),
+    GetPage(
+      name: _Paths.INPATIENT_ADMISSIONS,
+      page: () => const InpatientAdmissionsView(),
+      binding: InpatientAdmissionsBinding(),
+      middlewares: _auth,
+      transition: _push,
+    ),
+    GetPage(
+      name: _Paths.INPATIENT_ADD_WARD,
+      page: () => const InpatientAddWardView(),
+      binding: InpatientAddWardBinding(),
+      middlewares: _auth,
+      transition: _push,
+    ),
+    GetPage(
+      name: _Paths.INPATIENT_ADD_BED,
+      page: () => const InpatientAddBedView(),
+      binding: InpatientAddBedBinding(),
+      middlewares: _auth,
+      transition: _push,
+    ),
+    GetPage(
+      name: _Paths.INPATIENT_ADMIT,
+      page: () => const AdmitPatientView(),
+      binding: AdmitPatientBinding(),
+      middlewares: _auth,
+      transition: _push,
+    ),
+    GetPage(
+      name: _Paths.DISCHARGE_PATIENT,
+      page: () => const DischargePatientView(),
+      binding: DischargePatientBinding(),
+      middlewares: _auth,
+      transition: _push,
+    ),
+
+    // ── Routed, not yet built ─────────────────────────────────────────────
+    //
+    // Reachable rather than absent: a nav entry or a deep link that lands on
+    // one of these gets a screen that says what the module is for and where
+    // the work happens today. The alternative is an unknown-route page, which
+    // reads as a broken app rather than as an unfinished one.
+    GetPage(
+      name: _Paths.PATIENTS,
+      page: () => const PlaceholderView(
+        module: 'patients',
+        title: 'Patients',
+        icon: Icons.people_outline_rounded,
+        message: 'The patient register is managed in the admin console. '
+            'Patients registered there are searchable from every picker in '
+            'this app.',
+      ),
+      middlewares: _auth,
+      transition: _push,
+    ),
+    GetPage(
+      name: _Paths.PHARMACY,
+      page: () => const PlaceholderView(
+        module: 'pharmacy',
+        title: 'Pharmacy',
+        icon: Icons.medication_outlined,
+        message: 'Dispensing is not switched on for this site yet. Pending '
+            'prescription counts still appear on today\'s board.',
+      ),
+      middlewares: _auth,
+      transition: _push,
+    ),
+    GetPage(
+      name: _Paths.LABORATORY,
+      page: () => const PlaceholderView(
+        module: 'laboratory',
+        title: 'Laboratory',
+        icon: Icons.science_outlined,
+        message: 'Lab ordering and results are not switched on for this site '
+            "yet. Pending order counts still appear on today's board.",
+      ),
+      middlewares: _auth,
+      transition: _push,
+    ),
+    GetPage(
+      name: _Paths.RADIOLOGY,
+      page: () => const PlaceholderView(
+        module: 'radiology',
+        title: 'Radiology',
+        icon: Icons.monitor_heart_outlined,
+        message: 'Imaging requests are not switched on for this site yet.',
+      ),
+      middlewares: _auth,
+      transition: _push,
+    ),
+    GetPage(
+      name: _Paths.BILLING,
+      page: () => const PlaceholderView(
+        module: 'billing',
+        title: 'Billing',
+        icon: Icons.receipt_long_outlined,
+        message: 'Charges and payments are handled in the admin console for '
+            'this site.',
+      ),
+      middlewares: _auth,
+      transition: _push,
+    ),
+    GetPage(
+      name: _Paths.USERS_STAFF,
+      page: () => const PlaceholderView(
+        module: 'staff',
+        title: 'Staff',
+        icon: Icons.badge_outlined,
+        message: 'Staff accounts, roles and permissions are managed in the '
+            'admin console.',
+      ),
+      middlewares: _auth,
+      transition: _push,
+    ),
+    GetPage(
+      name: _Paths.INTEGRATIONS,
+      page: () => const PlaceholderView(
+        module: 'integrations',
+        title: 'Integrations',
+        icon: Icons.hub_outlined,
+        message: 'Device and third-party integrations are configured in the '
+            'admin console.',
+      ),
+      middlewares: _auth,
+      transition: _push,
     ),
   ];
+
+  /// Where an unrecognised route lands.
+  ///
+  /// A deep link from an old build, or a typo in a pushed route name. Saying
+  /// so and offering the way back beats GetX's default, which is a bare red
+  /// "Route not found" on a black ground.
+  static final GetPage<dynamic> unknown = GetPage(
+    name: '/not-found',
+    page: () => PlaceholderView(
+      module: 'not-found',
+      title: 'Screen not found',
+      icon: Icons.help_outline_rounded,
+      message: "This link points at a screen that doesn't exist in this "
+          'version of MediHive.',
+      actionLabel: 'Go to today',
+      onAction: () => Get.offAllNamed<void>(Routes.HOME),
+    ),
+  );
 }

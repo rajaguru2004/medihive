@@ -3,15 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:get/get.dart' hide Response;
 
-import '../../../models/admission_model.dart';
-import '../../../models/appointment_model.dart';
-import '../../../services/inpatient_service.dart';
+import '../../../data/models/admission_model.dart';
+import '../../../data/models/appointment_model.dart';
+import '../../../data/services/inpatient_service.dart';
 import '../../inpatient/controllers/inpatient_controller.dart';
 import '../../inpatient_admissions/controllers/inpatient_admissions_controller.dart';
 import '../../inpatient_beds_grid/controllers/inpatient_beds_grid_controller.dart';
 import '../../inpatient_overview/controllers/inpatient_overview_controller.dart';
 import '../../inpatient_wards/controllers/inpatient_wards_controller.dart';
-import '../models/discharge_patient_model.dart';
+import '../../../data/models/discharge_patient_model.dart';
 
 class DischargePatientController extends GetxController {
   final _service = Get.find<InpatientService>();
