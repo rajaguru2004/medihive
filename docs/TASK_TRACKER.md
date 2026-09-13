@@ -143,6 +143,31 @@ patient. This is the single rule most likely to be broken by a later change.
 | 7.3 | Make form validation work | ✅ | `BentoInput`/`BentoPicker` take a `validator:` and wrap a `FormField`; 14 validators wired |
 | 7.4 | Layout and contrast fixes | ✅ | `bottomClearance`, `Opacity` over text, 4 tap targets, 2 missing retries, 1 stale index |
 
+## What the screenshots caught
+
+Sixteen defects, none of which `flutter analyze` or a unit test can see. Listed
+because the pattern is the point: almost all of them are a **stored value or a
+stored length reaching a screen unchanged**.
+
+| Defect | Class |
+|---|---|
+| `168/96` rendered as `16…` | A vital truncated — the worst failure mode in the kit |
+| `Checked_in`, `Registered_as_patient`, `icu` | Stored values printed raw |
+| `BOOKED TOD…`, `LABS PENDI…`, `ADMITTED TO…` ×5 | Label past the grid's 12-character ceiling |
+| `MRN MRN-10422` | The band's label repeating the value's prefix |
+| `— · Male` | A placeholder dash joined into an identity line |
+| `Acute Medical · be…` | Two facts joined into one half-width row |
+| A red "Open queue" button | Red as an affordance colour |
+| A red "Emergency" visit-type pill | A category routed through the acuity ramp |
+| Every wait chip reading `0m` | Fixtures on wall-clock against a frozen `AppClock` |
+| Zeros under an error banner | No data rendered as a department with no patients |
+| `Beds free 0` in red with no data | A false alarm from an unloaded board |
+| A gap where the capacity bar goes | Zero total rendered as nothing rather than as empty |
+| Four quick actions, one unreadable | Too many tiles for the label lengths at 411dp |
+| Yusuf Adeyemi in two beds at once | Fixture incoherence |
+| A ward round where only some rows tap | An invisible condition on an identical-looking row |
+| The observations step opening under the keyboard | `autofocus` on a form meant to be read first |
+
 ## Bugs this port found
 
 **The splash screen hung forever.** `SplashView` draws a wordmark and never
