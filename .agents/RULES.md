@@ -88,8 +88,9 @@ import 'package:medihive/app/theme/theme.dart';
 - ❌ NEVER use `AppColors.primary` for a status, a chart series, or a chip
   that is not the primary action.
 - ❌ NEVER use the brand as text by reading `colorScheme.primary` — that is
-  the fill. `#0E7C7B` on the paper ground is 4.35:1. Read
-  `brandInkColor(context)`.
+  the fill. `#0E7C7B` passes on paper (4.63:1) and fails on slate (3.79:1) —
+  and which way round a brand fails is not predictable from looking at it.
+  Read `brandInkColor(context)`.
 - ✅ **A ramp or semantic colour used as text goes through
   `semanticInk(context, colour)`.** The ramp is chosen for a light ground;
   `#0070C0` on a dark card is 2.7:1. Fills and legend dots keep the raw

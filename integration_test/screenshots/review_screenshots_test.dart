@@ -28,9 +28,13 @@ void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   // `convertFlutterSurfaceToImage` swaps the Android surface for one that can
-  // be read back, and asserts if it is called twice. Once per process, not
-  // once per capture — the assertion is the whole reason this flag exists.
+  // be read back. It asserts if called twice, and the binding reverts it in
+  // its own tear-down — so the right granularity is once per *test*, and both
+  // halves of that are load-bearing: converting twice in one test throws
+  // "Surface already converted", and assuming it survives into the next test
+  // throws "Call convertFlutterSurfaceToImage() before taking a screenshot".
   var surfaceConverted = false;
+  setUp(() => surfaceConverted = false);
 
   /// Lets the device settle, then captures.
   ///

@@ -35,13 +35,20 @@ abstract class AppColors {
   /// Pale wash, for soft fills behind brand elements.
   static const Color primaryLight = Color(0xFFCCE7E6);
 
-  /// Teal darkened until it reads as text on the paper ground (5.5:1).
+  /// The brand, deepened, for anywhere a fixed token is needed rather than a
+  /// derived one.
   ///
-  /// Deep teal is closer to legible than the reference amber ever was, but
-  /// `#0E7C7B` on `#F4F6F7` is 4.35:1 — under the floor by a hair, which is
-  /// exactly the kind of near-miss that ships. Every brand-coloured *word* in
-  /// light mode is this; every brand-coloured *fill* is [primary].
-  /// `BrandPalette.ink` / `.fill` make that choice for you.
+  /// Light mode does not need it: `#0E7C7B` on `#F4F6F7` measures 4.63:1 and
+  /// clears the floor on its own, so `BrandPalette.ink(Brightness.light)`
+  /// returns the brand untouched. **Dark mode is where the derivation earns
+  /// its keep** — the same teal on `#0C1114` is 3.79:1, and `ink` lightens it
+  /// to roughly `#119392` to pass.
+  ///
+  /// Which is the general case, not a quirk of this brand: a mid-luminance
+  /// colour usually passes against one of the two grounds and fails against
+  /// the other, and which one it fails against is not predictable from
+  /// looking at it. Read `BrandPalette.ink` / `.fill` rather than either
+  /// token.
   static const Color primaryInk = Color(0xFF0A5F5E);
 
   /// Accent — ledger blue. Anything billed that is not a clinical state:

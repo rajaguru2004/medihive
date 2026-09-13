@@ -50,10 +50,12 @@ missed appointment is amber — an administrative problem, not a patient one.
 | `primaryLight` | `#CCE7E6` | Soft fills behind brand elements |
 | `accent` | `#0070C0` | Ledger blue — billing, never a clinical state |
 
-`#0E7C7B` on the paper ground is **4.35:1** — under the 4.5 floor by a hair,
-which is exactly the kind of near-miss that ships. So the brand is never used
-as text directly. `BrandPalette` derives two roles against the ground each will
-actually sit on:
+`#0E7C7B` measures **4.63:1** on the paper ground and passes; the same value on
+the deep-slate ground is **3.79:1** and does not. That asymmetry is the whole
+argument: a brand that looks fine in the mode its designer was working in is
+unreadable in the other one, and which way round it fails is not predictable
+from looking at it. So the brand is never used as text directly. `BrandPalette`
+derives two roles against the ground each will actually sit on:
 
 - **`ink`** — the brand as words and icons, walked toward the ground's opposite
   until it clears 4.5:1. `brandInkColor(context)`.

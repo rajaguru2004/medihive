@@ -17,11 +17,15 @@ import 'app_colors.dart';
 /// ## Why this class computes colours instead of listing them
 ///
 /// A palette that stores one `primary` and uses it for both fills and text
-/// works for a navy and fails completely for a mid-luminance brand: the
-/// default teal `#0E7C7B` on the clinical paper ground is 4.35:1, which is
-/// under the floor by a hair — exactly the kind of near-miss that ships. The
-/// naive fix — store a second hand-picked "text" colour per preset — breaks
-/// the moment a site sets `custom` to a colour nobody hand-picked for.
+/// works for a navy and fails for a mid-luminance brand — and fails
+/// *asymmetrically*, which is the part that catches people out. The default
+/// teal `#0E7C7B` measures 4.63:1 on the light ground and passes; the same
+/// value on the dark ground is 3.79:1 and does not. A brand that looks fine
+/// in the mode its designer was working in is unreadable in the other one.
+///
+/// The naive fix — store a second hand-picked "text" colour per preset —
+/// breaks the moment a site sets `custom` to a colour nobody hand-picked for,
+/// and it still has to be picked twice.
 ///
 /// So the palette stores the brand and *derives* the two roles it is asked
 /// for, each against the ground it will actually sit on:
