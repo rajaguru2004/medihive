@@ -1672,7 +1672,13 @@ class ActionCard extends StatelessWidget {
                   child: FilledButton(
                     onPressed: onAction,
                     style: FilledButton.styleFrom(
-                      backgroundColor: accent,
+                      // The brand, even on a critical card. The tint is what
+                      // says "this is serious"; a red *button* says red is an
+                      // affordance colour, and on a ward board red already
+                      // means a deteriorating patient. The one exception is a
+                      // genuinely destructive action, which uses
+                      // `ConfirmDialog`, not this.
+                      backgroundColor: brandFillColor(context),
                       foregroundColor:
                           accent.computeLuminance() > 0.45
                               ? const Color(0xFF17130B)
