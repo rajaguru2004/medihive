@@ -213,6 +213,19 @@ class _Filters extends StatelessWidget {
   }
 }
 
+/// `follow_up` and `followup` both arrive from this backend; neither is a word.
+String _visitTypeLabel(String raw) {
+  final value = raw.trim().toLowerCase().replaceAll('_', '');
+  return switch (value) {
+    'followup' => 'Follow-up',
+    'outpatient' => 'Outpatient',
+    'inpatient' => 'Inpatient',
+    'emergency' => 'Emergency',
+    '' => '—',
+    _ => CaseStatus.labelOf(raw),
+  };
+}
+
 class _ConsultationRow extends StatelessWidget {
   const _ConsultationRow({super.key, required this.consultation});
 
@@ -240,7 +253,17 @@ class _ConsultationRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         mainAxisSize: MainAxisSize.min,
         children: [
-          StatusPill(status: consultation.visitType, compact: true),
+          StatusPill(
+            status: consultation.visitType,
+            label: _visitTypeLabel(consultation.visitType),
+            // A visit type is a category, not a clinical state, so it takes
+            // one neutral tint rather than going through the acuity ramp.
+            // Routed through `CaseStatus` it would paint an emergency-
+            // department visit red — and on a ward board red means a
+            // deteriorating patient, not a door somebody came through.
+            color: AppColors.acuityRoutine,
+            compact: true,
+          ),
           const SizedBox(height: 4),
           Text(
             Formatters.dateMedium(consultation.visitDate),

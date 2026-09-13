@@ -37,7 +37,14 @@ it looks.
    label. A pill that is only a colour is unreadable to eight percent of men,
    to every screenshot, and to anyone reading a ward screen across a corridor.
 
-A fourth, narrower: **`VitalRange` is the only place that decides whether an
+A fourth: **a category is not a state.** `CaseStatus` resolves clinical
+states — a triage level, an admission state, an appointment state. A *visit
+type*, a ward type, a bed type and a service area are categories, and routing
+one through the ramp paints it with a meaning it does not have: `emergency` as
+a visit type means "came through the ED", and the ramp reads it as "immediate".
+Give a category one neutral tint and let the word carry it.
+
+A fifth, narrower: **`VitalRange` is the only place that decides whether an
 observation is normal.** Three screens each judging for themselves is three
 screens that eventually disagree, and a clinician who has learned to trust the
 colour is one the third screen misleads.
