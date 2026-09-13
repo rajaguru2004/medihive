@@ -25,14 +25,22 @@ import '../support/pump.dart';
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
+  // `convertFlutterSurfaceToImage` swaps the Android surface for one that can
+  // be read back, and asserts if it is called twice. Once per process, not
+  // once per capture — the assertion is the whole reason this flag exists.
+  var surfaceConverted = false;
+
   /// Lets the device settle, then captures.
   ///
-  /// The delay is not superstition: `convertFlutterSurfaceToImage` needs a
+  /// The pause before the capture is not superstition: the readback needs a
   /// frame in which nothing is animating, and a capture taken mid-transition
   /// is a blurred half-screen.
   Future<void> shoot(WidgetTester tester, String name) async {
     await tester.pumpUntilRouteSettled();
-    await binding.convertFlutterSurfaceToImage();
+    if (!surfaceConverted) {
+      await binding.convertFlutterSurfaceToImage();
+      surfaceConverted = true;
+    }
     await tester.pumpUntil(
       () => tester.binding.transientCallbackCount == 0,
       reason: 'the tree was still animating at capture time',
