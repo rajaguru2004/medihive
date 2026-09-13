@@ -56,6 +56,11 @@ part 'app_routes.dart';
 /// or a push from a sub-screen can open it directly. Inside the shell its
 /// controller is already registered `permanent`, so the binding's `lazyPut`
 /// finds the live instance rather than building a second one.
+///
+/// Those three pass `embedded: false`. A tab body drawn inside the shell has
+/// no scaffold and no bottom clearance of its own — the shell provides both —
+/// so a pushed copy that forgets the flag is a screen with no app bar, no
+/// back button, and its last row under the system navigation bar.
 class AppPages {
   AppPages._();
 
@@ -105,7 +110,7 @@ class AppPages {
     // ── Queue ─────────────────────────────────────────────────────────────
     GetPage(
       name: _Paths.QUEUE,
-      page: () => const QueueView(),
+      page: () => const QueueView(embedded: false),
       binding: QueueBinding(),
       middlewares: _auth,
       transition: _push,
@@ -121,7 +126,7 @@ class AppPages {
     // ── Clinic ────────────────────────────────────────────────────────────
     GetPage(
       name: _Paths.APPOINTMENTS,
-      page: () => const AppointmentsView(),
+      page: () => const AppointmentsView(embedded: false),
       binding: AppointmentsBinding(),
       middlewares: _auth,
       transition: _push,
@@ -187,7 +192,7 @@ class AppPages {
     // ── Inpatient ─────────────────────────────────────────────────────────
     GetPage(
       name: _Paths.INPATIENT,
-      page: () => const InpatientView(),
+      page: () => const InpatientView(embedded: false),
       binding: InpatientBinding(),
       middlewares: _auth,
       transition: _push,

@@ -140,9 +140,9 @@ abstract final class World {
       ],
     });
 
-    // The dashboard also asks for the organisation. Same route family, and
-    // the app tolerates either shape.
-    api.json('GET', '/api/organization', {
+    // The dashboard also asks for the organisation. It hangs off the settings
+    // route family rather than having one of its own.
+    api.json('GET', '/api/settings/organization', {
       'name': 'St Aidan’s General',
       'logoUrl': '',
     });
@@ -407,6 +407,10 @@ abstract final class World {
 
   static void _lookups(FakeApi api) {
     api.page('GET', '/api/patients', _patients);
+    // Clinicians come from the staff route, filtered by role. Registered under
+    // the path the services actually call rather than the one the endpoint
+    // table would suggest.
+    api.json('GET', '/api/users/staff', _doctors);
     api.json('GET', '/api/users', _doctors);
     api.page('GET', '/api/queue/waiting', _liveQueue);
   }
