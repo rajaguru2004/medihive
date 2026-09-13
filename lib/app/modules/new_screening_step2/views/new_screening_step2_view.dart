@@ -82,7 +82,12 @@ class NewScreeningStep2View extends GetView<NewScreeningStep2Controller> {
                                 validator: controller.validateComplaint,
                                 required: true,
                                 maxLines: 2,
-                                autofocus: true,
+                                // No autofocus. Step one earns it — the name
+                                // is the first thing typed and the screen is
+                                // short. Here the keyboard would cover the
+                                // observations the nurse is about to
+                                // transcribe, and they are reading a chart
+                                // before they are typing anything.
                                 textCapitalization:
                                     TextCapitalization.sentences,
                                 hint: 'In their own words where you can',

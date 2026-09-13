@@ -61,17 +61,11 @@ class NewScreeningStep2Controller extends GetxController {
   ///
   /// Drives the banner at the top of the form: a nurse who has just typed a
   /// temperature of 39.8 should be told before they tap save, not after.
-  Color? get worstFlag {
-    final flags = [
-      VitalRange.temperature(temperature),
-      VitalRange.pulse(pulse),
-      VitalRange.bloodPressure(systolic, diastolic),
-    ].whereType<Color>();
-    if (flags.isEmpty) return null;
-    return flags.contains(AppColors.acuityCritical)
-        ? AppColors.acuityCritical
-        : AppColors.acuityUrgent;
-  }
+  Color? get worstFlag => VitalRange.worst([
+        VitalRange.temperature(temperature),
+        VitalRange.pulse(pulse),
+        VitalRange.bloodPressure(systolic, diastolic),
+      ]);
 
   @override
   void onInit() {

@@ -1079,6 +1079,21 @@ abstract final class VitalRange {
     return null;
   }
 
+  /// The most serious flag across several readings, or null when every one of
+  /// them is in range.
+  ///
+  /// The reduction lives here rather than in each screen that needs it. A form
+  /// that escalates on a critical reading and a detail screen that does not is
+  /// two screens disagreeing about the same patient, which is the failure this
+  /// whole class exists to prevent.
+  static Color? worst(Iterable<Color?> flags) {
+    final raised = flags.whereType<Color>();
+    if (raised.isEmpty) return null;
+    return raised.contains(AppColors.acuityCritical)
+        ? AppColors.acuityCritical
+        : AppColors.acuityUrgent;
+  }
+
   /// The normal range as words, for the caption under a reading.
   static const captions = <String, String>{
     'temperature': '36.0–38.0 °C',

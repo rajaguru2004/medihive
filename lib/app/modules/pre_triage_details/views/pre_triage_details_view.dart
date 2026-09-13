@@ -209,10 +209,32 @@ class _Vitals extends StatelessWidget {
         ),
     ];
 
+    // The same judgement the triage form makes while the readings are typed.
+    // Without it this screen carries the flag as a tile colour and nothing
+    // else — unreadable to a colour-blind reader, and to anyone scanning the
+    // record rather than studying it.
+    final flag = VitalRange.worst([
+      VitalRange.temperature(screening.temperature),
+      VitalRange.pulse(screening.pulse),
+      VitalRange.bloodPressure(screening.bpSystolic, screening.bpDiastolic),
+    ]);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SectionHeader(title: 'Observations'),
+        if (flag != null) ...[
+          NoticeBanner(
+            key: PreTriageKeys.detailFlag,
+            message: flag == AppColors.acuityCritical
+                ? 'One of these readings is well outside the normal adult '
+                    'range. Consider escalating.'
+                : 'One of these readings is outside the normal adult range.',
+            icon: Icons.monitor_heart_outlined,
+            tint: flag,
+          ),
+          const SizedBox(height: BentoSpace.action),
+        ],
         BentoCard(
           key: PreTriageKeys.detailVitals,
           child: tiles.isEmpty
