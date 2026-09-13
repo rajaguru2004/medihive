@@ -46,6 +46,7 @@ class NewScreeningStep1View extends GetView<NewScreeningStep1Controller> {
                                 textCapitalization: TextCapitalization.words,
                               ),
                               BentoInput(
+                                fieldKey: ScreeningKeys.lastNameField,
                                 label: 'Last name',
                                 controller: controller.lastNameController,
                                 textInputAction: TextInputAction.next,

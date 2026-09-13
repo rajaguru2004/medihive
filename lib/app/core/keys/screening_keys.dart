@@ -9,6 +9,7 @@ abstract final class ScreeningKeys {
   // ── Step 1: who ───────────────────────────────────────────────────────────
   static const step1 = Key('screening_step1_screen');
   static const nameField = Key('screening_name');
+  static const lastNameField = Key('screening_last_name');
   static const ageField = Key('screening_age');
   static const sexPicker = Key('screening_sex');
 

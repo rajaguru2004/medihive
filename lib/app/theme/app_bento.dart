@@ -847,14 +847,31 @@ abstract final class CaseStatus {
     return AppColors.acuityRoutine;
   }
 
+  /// Stored states whose literal reading is too long for a pill.
+  ///
+  /// A pill sits at the end of a row and takes its width from its label, so
+  /// every character it spends is a character taken off the patient's name.
+  /// `registered_as_patient` reads as "Registered as patient" and pushes
+  /// "Grace Mwangi" to "Grace Mwa…" — the name is what the row is *for*.
+  static const Map<String, String> _shortLabels = {
+    'registered_as_patient': 'Registered',
+    'awaiting_review': 'Review',
+    'pending_review': 'Review',
+    'transferred_out': 'Transferred',
+    'did_not_attend': 'No show',
+  };
+
   /// The status as a reader should see it: `checked_in` → `Checked in`.
   ///
   /// The underscore matters. This backend stores `checked_in`, `in_service`
   /// and `no_show`, and a pill that prints the stored value has leaked a
   /// database convention onto a ward board.
   static String labelOf(String? status) {
-    final s = normalise(status).replaceAll('_', ' ');
-    if (s.isEmpty) return '—';
+    final raw = normalise(status);
+    if (raw.isEmpty) return '—';
+    final short = _shortLabels[raw];
+    if (short != null) return short;
+    final s = raw.replaceAll('_', ' ');
     return s[0].toUpperCase() + s.substring(1);
   }
 
