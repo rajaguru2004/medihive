@@ -189,6 +189,13 @@ class InpatientView extends GetView<InpatientController> {
   }
 }
 
+/// `general` → `General`. One word, so no need for anything cleverer.
+String _titleCase(String raw) {
+  final value = raw.trim();
+  if (value.isEmpty) return '';
+  return value[0].toUpperCase() + value.substring(1).toLowerCase();
+}
+
 /// One ward, with its occupancy as a bar rather than a fraction.
 ///
 /// Shared with the wards screen: a ward reads the same wherever it appears, so
@@ -203,9 +210,15 @@ class WardRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final full = ward.availableBeds <= 0;
+    // The type is stored lowercase (`icu`, `general`), and printed raw it
+    // reads as "ICU · icu" — a database value sitting next to the code that
+    // already says it. Dropped entirely when the code already carries it.
+    final type = _titleCase(ward.type);
     final facts = [
       if (ward.code.trim().isNotEmpty) ward.code,
-      if (ward.type.trim().isNotEmpty) ward.type,
+      if (type.isNotEmpty &&
+          type.toLowerCase() != ward.code.trim().toLowerCase())
+        type,
     ].join(' · ');
 
     return BentoRow(
