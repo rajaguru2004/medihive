@@ -1,306 +1,270 @@
-import 'package:flutter/foundation.dart';
-
-import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 
+import '../../../core/app_clock.dart';
 import '../../../data/models/queue_item.dart';
+import '../../../data/services/data_bus.dart';
 import '../../../data/services/queue_service.dart';
+import '../../../data/services/settings_service.dart';
+import '../../../data/utils/error_handler.dart';
+import '../../../data/utils/load_state.dart';
+import '../../../theme/theme.dart';
 
-enum QueueLoadState { idle, loading, success, error }
+/// Which half of the board is showing.
+enum QueueBoard {
+  /// Waiting, called and in service — everyone still on the floor.
+  live,
 
-class QueueController extends GetxController {
+  /// Seen, cancelled and no-show — today, already dealt with.
+  history,
+}
+
+/// The queue board.
+///
+/// The one screen in this app where ordering is the entire product. A queue
+/// sorted by arrival alone will seat a sprained ankle ahead of a chest pain
+/// that walked in two minutes later, so [displayed] sorts on acuity first and
+/// arrival second — the same rule a triage nurse applies out loud.
+class QueueController extends GetxController with LoadStateMixin {
+  static QueueController get to => Get.find<QueueController>();
+
   final _queueService = Get.find<QueueService>();
 
-  // ─── Observables ───────────────────────────────────────────────────────────
-  final _loadState = QueueLoadState.idle.obs;
-  final _errorMessage = ''.obs;
+  final live = <QueueItem>[].obs;
+  final history = <QueueItem>[].obs;
 
-  final liveQueueItems = <QueueItem>[].obs;
-  final historyQueueItems = <QueueItem>[].obs;
+  final board = QueueBoard.live.obs;
+  final serviceArea = _allAreas.obs;
+  final acuity = _allAcuities.obs;
 
-  // Selected filters
-  final selectedServiceArea = 'All Areas'.obs;
-  final selectedPriority = 'All Priorities'.obs;
-  final activeTab = 'Live Queue'.obs; // 'Live Queue' or 'History'
+  static const _allAreas = 'All areas';
+  static const _allAcuities = 'All acuities';
 
-  // ─── Getters ────────────────────────────────────────────────────────────────
-  QueueLoadState get loadState => _loadState.value;
-  String get errorMessage => _errorMessage.value;
-  bool get isLoading => _loadState.value == QueueLoadState.loading;
-  bool get hasError => _loadState.value == QueueLoadState.error;
+  /// The areas this site actually has patients in, plus the "all" option.
+  ///
+  /// Derived from the data rather than hard-coded: a site with no psychiatric
+  /// unit should not be offered a psychiatric filter that always returns
+  /// nothing.
+  List<String> get serviceAreas => [
+        _allAreas,
+        ...{
+          for (final item in [...live, ...history])
+            if (item.serviceArea.trim().isNotEmpty) item.serviceArea.trim(),
+        }.toList()
+          ..sort(),
+      ];
 
-  // Stats computed from full (unfiltered) lists
-  int get waitingCount =>
-      liveQueueItems.where((x) => x.status.toLowerCase() == 'waiting').length;
-  int get calledCount =>
-      liveQueueItems.where((x) => x.status.toLowerCase() == 'called').length;
-  int get inServiceCount => liveQueueItems
-      .where((x) => x.status.toLowerCase() == 'in_service')
-      .length;
-  int get completedCount => historyQueueItems
-      .where((x) => x.status.toLowerCase() == 'completed')
-      .length;
+  List<String> get acuities => [
+        _allAcuities,
+        ...{
+          for (final item in [...live, ...history])
+            if (item.priority.trim().isNotEmpty) item.priority.trim(),
+        }.toList()
+          ..sort((a, b) =>
+              CaseStatus.priorityOf(a).compareTo(CaseStatus.priorityOf(b))),
+      ];
 
-  // Filtered lists for rendering
-  List<QueueItem> get displayedQueueItems {
-    final list =
-        activeTab.value == 'Live Queue' ? liveQueueItems : historyQueueItems;
-    return list.where((item) {
-      // 1. Service Area filter
-      if (selectedServiceArea.value != 'All Areas') {
-        final areaVal = _mapServiceArea(selectedServiceArea.value);
-        if (item.serviceArea.toLowerCase() != areaVal.toLowerCase()) {
-          return false;
-        }
+  // ── Counts ────────────────────────────────────────────────────────────────
+  //
+  // Computed from the unfiltered lists, so a filter narrows what is shown
+  // without quietly changing what the board claims is happening.
+
+  int get waitingCount => live.where((x) => _is(x, 'waiting')).length;
+  int get calledCount => live.where((x) => _is(x, 'called')).length;
+  int get inServiceCount => live.where((x) => _is(x, 'in_service')).length;
+  int get completedCount => history.where((x) => _is(x, 'completed')).length;
+
+  /// How many have waited past the site's escalation threshold.
+  int get breachedCount {
+    final limit = SettingsService.to.waitBreachMinutes;
+    if (limit <= 0) return 0;
+    return live
+        .where((x) => _is(x, 'waiting') && waitedBy(x).inMinutes >= limit)
+        .length;
+  }
+
+  int get breachMinutes => SettingsService.to.waitBreachMinutes;
+
+  /// How long this person has been waiting.
+  ///
+  /// Computed from `joinedQueueAt` rather than trusting the server's
+  /// `waitTime`, which is a snapshot taken when the row was serialised and is
+  /// already stale by the time a board has been open thirty seconds.
+  Duration waitedBy(QueueItem item) =>
+      AppClock.now().difference(item.joinedQueueAt.toLocal());
+
+  /// The rows on screen: filtered, then sorted.
+  List<QueueItem> get displayed {
+    final source = board.value == QueueBoard.live ? live : history;
+
+    final rows = source.where((item) {
+      if (serviceArea.value != _allAreas &&
+          item.serviceArea.trim().toLowerCase() !=
+              serviceArea.value.trim().toLowerCase()) {
+        return false;
       }
-      // 2. Priority filter
-      if (selectedPriority.value != 'All Priorities') {
-        if (item.priority.toLowerCase() !=
-            selectedPriority.value.toLowerCase()) {
-          return false;
-        }
+      if (acuity.value != _allAcuities &&
+          item.priority.trim().toLowerCase() !=
+              acuity.value.trim().toLowerCase()) {
+        return false;
       }
       return true;
     }).toList();
-  }
 
-  @override
-  void onInit() {
-    super.onInit();
-    fetchQueueData();
-  }
-
-  // ─── API Actions ────────────────────────────────────────────────────────────
-  Future<void> fetchQueueData() async {
-    _loadState.value = QueueLoadState.loading;
-    _errorMessage.value = '';
-
-    try {
-      final results = await Future.wait([
-        _queueService.fetchQueueItems(statuses: 'waiting,called,in_service'),
-        _queueService.fetchQueueItems(statuses: 'completed,cancelled'),
-      ]);
-
-      final liveRes = results[0];
-      final historyRes = results[1];
-
-      if (liveRes.data != null && liveRes.data['success'] == true) {
-        final List<dynamic> list = liveRes.data['data']['data'] ?? [];
-        liveQueueItems.assignAll(
-            list.map((e) => QueueItem.fromJson(e as Map<String, dynamic>)));
+    rows.sort((a, b) {
+      // History reads newest-first: it is a log, and the last thing that
+      // happened is the thing somebody is checking.
+      if (board.value == QueueBoard.history) {
+        return b.joinedQueueAt.compareTo(a.joinedQueueAt);
       }
-
-      if (historyRes.data != null && historyRes.data['success'] == true) {
-        final List<dynamic> list = historyRes.data['data']['data'] ?? [];
-        historyQueueItems.assignAll(
-            list.map((e) => QueueItem.fromJson(e as Map<String, dynamic>)));
-      }
-
-      _loadState.value = QueueLoadState.success;
-    } on DioException catch (e) {
-      _loadState.value = QueueLoadState.error;
-      _errorMessage.value = e.message ?? 'Network error. Please try again.';
-      if (kDebugMode) {
-        debugPrint('[QueueController] DioException: ${e.message}');
-      }
-    } catch (e) {
-      _loadState.value = QueueLoadState.error;
-      _errorMessage.value = 'Failed to load queue. Please try again.';
-      if (kDebugMode) {
-        debugPrint('[QueueController] Error: $e');
-      }
-    }
-  }
-
-  /// Refreshes data cleanly
-  Future<void> onRefresh() async {
-    await fetchQueueData();
-  }
-
-  /// Change active tab: Live Queue / History
-  void setActiveTab(String tabName) {
-    activeTab.value = tabName;
-  }
-
-  /// Change active service area filter
-  void setServiceAreaFilter(String area) {
-    selectedServiceArea.value = area;
-  }
-
-  /// Change active priority filter
-  void setPriorityFilter(String priority) {
-    selectedPriority.value = priority;
-  }
-
-  /// Call Next: Find the first patient in 'waiting' status, sorted by priority (Urgent > Normal > Low > Routine)
-  /// and joinedQueueAt (FIFO), and mark them as 'called'
-  Future<void> callNextPatient() async {
-    final waitingList = liveQueueItems
-        .where((x) => x.status.toLowerCase() == 'waiting')
-        .toList();
-    if (waitingList.isEmpty) {
-      Get.snackbar(
-        'Call Next',
-        'No patients waiting in queue.',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return;
-    }
-
-    // Sort by priority weight, then by joinedQueueAt
-    waitingList.sort((a, b) {
-      final pA = _getPriorityWeight(a.priority);
-      final pB = _getPriorityWeight(b.priority);
-      if (pA != pB) {
-        return pB.compareTo(pA); // Descending (higher weight first)
-      }
-      return a.joinedQueueAt
-          .compareTo(b.joinedQueueAt); // Ascending (older first)
+      final byAcuity = CaseStatus.priorityOf(a.priority)
+          .compareTo(CaseStatus.priorityOf(b.priority));
+      if (byAcuity != 0) return byAcuity;
+      return a.joinedQueueAt.compareTo(b.joinedQueueAt);
     });
 
-    final nextPatient = waitingList.first;
-    await updateStatus(nextPatient.id, 'called',
-        patientName: nextPatient.patient.fullName);
+    return rows;
   }
 
-  /// Updates status of a patient in queue
-  Future<void> updateStatus(String id, String status,
-      {required String patientName}) async {
+  bool get isFiltered =>
+      serviceArea.value != _allAreas || acuity.value != _allAcuities;
+
+  @override
+  void onReady() {
+    super.onReady();
+    load();
+    if (Get.isRegistered<DataBus>()) {
+      ever<int>(DataBus.to.tick('queue'), (_) {
+        if (!isLoading) load(silent: true);
+      });
+    }
+  }
+
+  Future<void> load({bool silent = false}) => runGuarded(
+        () async {
+          final results = await Future.wait([
+            _queueService.fetchQueueItems(statuses: 'waiting,called,in_service'),
+            _queueService.fetchQueueItems(statuses: 'completed,cancelled,no_show'),
+          ]);
+
+          live.assignAll(_rowsFrom(results[0].data));
+          history.assignAll(_rowsFrom(results[1].data));
+        },
+        fallback: "Couldn't load the queue.",
+        silent: silent,
+      );
+
+  Future<void> reload() => load(silent: true);
+
+  void showBoard(QueueBoard next) => board.value = next;
+  void filterByArea(String area) => serviceArea.value = area;
+  void filterByAcuity(String value) => acuity.value = value;
+
+  void clearFilters() {
+    serviceArea.value = _allAreas;
+    acuity.value = _allAcuities;
+  }
+
+  // ── Actions ───────────────────────────────────────────────────────────────
+
+  /// Calls whoever is next by the board's own ordering.
+  ///
+  /// Deliberately reuses [displayed]'s sort rather than re-deriving one: a
+  /// "call next" that disagrees with the order on screen is the worst possible
+  /// outcome here, because the person calling it is watching the list.
+  Future<void> callNext() async {
+    final next = live
+        .where((x) => _is(x, 'waiting'))
+        .toList()
+      ..sort((a, b) {
+        final byAcuity = CaseStatus.priorityOf(a.priority)
+            .compareTo(CaseStatus.priorityOf(b.priority));
+        if (byAcuity != 0) return byAcuity;
+        return a.joinedQueueAt.compareTo(b.joinedQueueAt);
+      });
+
+    if (next.isEmpty) {
+      showBentoToast('Nobody is waiting.', tone: ToastTone.info);
+      return;
+    }
+    await setStatus(next.first, 'called');
+  }
+
+  Future<void> setStatus(QueueItem item, String status) async {
+    final name = item.patient.fullName;
     try {
-      final res = await _queueService.updateQueueStatus(id, status);
-      if (res.statusCode == 200 ||
-          res.statusCode == 204 ||
-          (res.data is Map && res.data['success'] == true)) {
-        final displayStatus = status.replaceAll('_', ' ');
-        Get.snackbar(
-          'Queue Update',
-          '$patientName is now marked as $displayStatus.',
-          snackPosition: SnackPosition.BOTTOM,
+      final response = await _queueService.updateQueueStatus(item.id, status);
+      final body = response.data;
+      final envelope = body is Map ? body.cast<String, dynamic>() : null;
+      final ok = response.statusCode == 200 ||
+          response.statusCode == 204 ||
+          envelope?['success'] == true;
+
+      if (!ok) {
+        showBentoToast(
+          envelope?['message'] as String? ?? "Couldn't update $name.",
+          tone: ToastTone.failure,
         );
-        await fetchQueueData();
-      } else {
-        final errorMsg = (res.data is Map) ? res.data['message'] : null;
-        Get.snackbar(
-          'Queue Update Failed',
-          errorMsg ?? 'Could not update patient status.',
-          snackPosition: SnackPosition.BOTTOM,
-        );
+        return;
       }
+
+      showBentoToast('$name is now ${_spoken(status)}.');
+      if (Get.isRegistered<DataBus>()) DataBus.to.changedRecord('queue');
+      await load(silent: true);
     } catch (e) {
-      debugPrint('[QueueController] error updating status: $e');
-      String msg = 'An unexpected error occurred.';
-      if (e is DioException) {
-        msg = e.response?.data?['message'] as String? ?? e.message ?? msg;
-      }
-      Get.snackbar(
-        'Error',
-        msg,
-        snackPosition: SnackPosition.BOTTOM,
+      showBentoToast(
+        parseErrorMessage(e, "Couldn't update $name."),
+        tone: ToastTone.failure,
       );
     }
   }
 
-  /// Removes patient completely from queue
-  Future<void> removeFromQueue(String id, {required String patientName}) async {
+  Future<void> removeFromQueue(QueueItem item) async {
+    final name = item.patient.fullName;
     try {
-      final res = await _queueService.deleteQueueItem(id);
-      if (res.statusCode == 200 ||
-          res.statusCode == 204 ||
-          (res.data is Map && res.data['success'] == true)) {
-        Get.snackbar(
-          'Queue Update',
-          '$patientName has been removed from queue.',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-        await fetchQueueData();
-      } else {
-        final errorMsg = (res.data is Map) ? res.data['message'] : null;
-        Get.snackbar(
-          'Queue Update Failed',
-          errorMsg ?? 'Could not remove patient.',
-          snackPosition: SnackPosition.BOTTOM,
-        );
+      final response = await _queueService.deleteQueueItem(item.id);
+      final body = response.data;
+      final envelope = body is Map ? body.cast<String, dynamic>() : null;
+      final ok = response.statusCode == 200 ||
+          response.statusCode == 204 ||
+          envelope?['success'] == true;
+
+      if (!ok) {
+        showBentoToast("Couldn't remove $name.", tone: ToastTone.failure);
+        return;
       }
+
+      showBentoToast('$name has been removed from the queue.');
+      if (Get.isRegistered<DataBus>()) DataBus.to.changedRecord('queue');
+      await load(silent: true);
     } catch (e) {
-      debugPrint('[QueueController] error removing from queue: $e');
-      String msg = 'An unexpected error occurred.';
-      if (e is DioException) {
-        msg = e.response?.data?['message'] as String? ?? e.message ?? msg;
-      }
-      Get.snackbar(
-        'Error',
-        msg,
-        snackPosition: SnackPosition.BOTTOM,
+      showBentoToast(
+        parseErrorMessage(e, "Couldn't remove $name."),
+        tone: ToastTone.failure,
       );
     }
   }
 
-  /// Call patient action
-  Future<void> callPatient(String id, String patientName) async {
-    await updateStatus(id, 'called', patientName: patientName);
-  }
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
-  /// Start service action
-  Future<void> startService(String id, String patientName) async {
-    await updateStatus(id, 'in_service', patientName: patientName);
-  }
+  bool _is(QueueItem item, String status) =>
+      item.status.trim().toLowerCase() == status;
 
-  /// Mark patient as no-show
-  Future<void> markNoShow(String id, String patientName) async {
-    await updateStatus(id, 'no_show', patientName: patientName);
-  }
+  /// `in_service` → `in service`. What a toast should say out loud.
+  static String _spoken(String status) => status.replaceAll('_', ' ');
 
-  /// Mark service as complete
-  Future<void> markComplete(String id, String patientName) async {
-    await updateStatus(id, 'completed', patientName: patientName);
-  }
+  /// Pulls rows out of the two shapes this endpoint answers with: the
+  /// envelope's `data.data` page, and a bare list.
+  List<QueueItem> _rowsFrom(dynamic body) {
+    if (body is! Map) return const [];
+    if (body['success'] != true) return const [];
 
-  /// Cancel queue item
-  Future<void> cancelQueueItem(String id, String patientName) async {
-    await updateStatus(id, 'cancelled', patientName: patientName);
-  }
+    final payload = body['data'];
+    final rows = payload is Map ? payload['data'] : payload;
+    if (rows is! List) return const [];
 
-  /// Delete queue item
-  Future<void> deleteQueueItem(String id, String patientName) async {
-    await removeFromQueue(id, patientName: patientName);
-  }
-
-  // ─── Helpers ───────────────────────────────────────────────────────────────
-  int _getPriorityWeight(String p) {
-    switch (p.toLowerCase()) {
-      case 'urgent':
-        return 4;
-      case 'normal':
-        return 3;
-      case 'low':
-        return 2;
-      case 'routine':
-        return 1;
-      default:
-        return 0;
-    }
-  }
-
-  String _mapServiceArea(String display) {
-    switch (display) {
-      case 'OPD':
-        return 'opd';
-      case 'Emergency':
-        return 'emergency';
-      case 'MCH':
-        return 'mch';
-      case 'Psychiatric':
-        return 'psychiatric';
-      case 'Laboratory':
-        return 'laboratory';
-      case 'Pharmacy':
-        return 'pharmacy';
-      case 'Radiology':
-        return 'radiology';
-      case 'Pediatric':
-        return 'pediatric';
-      default:
-        return display.toLowerCase();
-    }
+    return rows
+        .whereType<Map>()
+        .map((e) => QueueItem.fromJson(e.cast<String, dynamic>()))
+        .toList();
   }
 }

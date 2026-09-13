@@ -1,360 +1,253 @@
-import 'package:flutter/foundation.dart';
-
-import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 
+import '../../../core/app_clock.dart';
 import '../../../data/models/appointment_model.dart';
 import '../../../data/services/appointment_service.dart';
+import '../../../data/services/data_bus.dart';
+import '../../../data/utils/error_handler.dart';
+import '../../../data/utils/load_state.dart';
 import '../../../theme/theme.dart';
 
-class AppointmentsController extends GetxController {
+/// Which cut of the clinic is showing.
+enum ClinicView {
+  /// Everything booked for today, in time order. What a clinic desk opens on.
+  today,
+
+  /// One chosen day, picked from a month.
+  day,
+
+  /// Everything, searchable.
+  all,
+}
+
+class AppointmentsController extends GetxController with LoadStateMixin {
+  static AppointmentsController get to => Get.find<AppointmentsController>();
+
   final _service = Get.find<AppointmentService>();
 
-  // ─── Controller State ──────────────────────────────────────────────────────
-  List<AppointmentModel> allAppointments = [];
-  List<AppointmentModel> filteredAppointments = [];
-  List<AppointmentDoctor> doctors = [];
+  final appointments = <AppointmentModel>[].obs;
+  final doctors = <AppointmentDoctor>[].obs;
 
-  bool isLoading = false;
-  String errorMessage = '';
+  final view = ClinicView.today.obs;
+  final query = ''.obs;
+  final statusFilter = allStatuses.obs;
+  final doctorFilter = allDoctors.obs;
+  final selectedDay = Rx<DateTime>(AppClock.now());
 
-  // Active View Tab (0: Calendar View, 1: List View, 2: Today's Schedule)
-  int activeViewTab = 0;
+  static const allStatuses = 'All statuses';
+  static const allDoctors = 'All clinicians';
 
-  // Filter States
-  String searchQuery = '';
-  DateTime? selectedFilterDate;
-  String selectedStatusFilter = 'All Statuses';
-  String selectedDoctorFilter = 'All Doctors';
+  // ── Today ─────────────────────────────────────────────────────────────────
 
-  // Calendar States
-  DateTime calendarSelectedDate = DateTime.now();
-  List<AppointmentModel> calendarAppointmentsForDate = [];
+  List<AppointmentModel> get today => appointments
+      .where((a) => _sameDay(a.appointmentDate, AppClock.now()))
+      .toList();
 
-  // ─── Getters ───────────────────────────────────────────────────────────────
-  int get todayTotalCount => _getTodayCountForStatus(null);
-  int get todayConfirmedCount => _getTodayCountForStatus('confirmed');
-  int get todayCheckedInCount => _getTodayCountForStatus('checked_in');
-  int get todayInProgressCount => _getTodayCountForStatus('in_progress');
-  int get todayCompletedCount => _getTodayCountForStatus('completed');
-  int get todayCancelledCount => _getTodayCountForStatus('cancelled');
-  int get todayNoShowCount => _getTodayCountForStatus('no_show');
-  int get todayScheduledCount => _getTodayCountForStatus('scheduled');
+  int countToday(String? status) => status == null
+      ? today.length
+      : today.where((a) => _is(a, status)).length;
 
-  List<AppointmentModel> get todayCurrentAndUpcoming =>
-      allAppointments.where((a) {
-        final now = DateTime.now();
-        final isToday = _isSameDay(a.appointmentDate, now);
-        if (!isToday) return false;
-        final status = a.status.toLowerCase();
-        return status == 'scheduled' ||
-            status == 'confirmed' ||
-            status == 'checked_in' ||
-            status == 'in_progress';
-      }).toList();
-
-  List<AppointmentModel> get todayCompletedAndOthers =>
-      allAppointments.where((a) {
-        final now = DateTime.now();
-        final isToday = _isSameDay(a.appointmentDate, now);
-        if (!isToday) return false;
-        final status = a.status.toLowerCase();
-        return status == 'completed' ||
-            status == 'cancelled' ||
-            status == 'no_show';
-      }).toList();
-
-  @override
-  void onInit() {
-    super.onInit();
-    refreshData();
+  /// Still to happen: booked, arrived, or with the clinician now.
+  ///
+  /// The distinction matters because a clinic desk is only ever asked one
+  /// question — who is still to be seen — and a list that mixes the seen in
+  /// with the waiting cannot answer it.
+  List<AppointmentModel> get todayOpen {
+    final rows = today
+        .where((a) => const {
+              'scheduled',
+              'confirmed',
+              'checked_in',
+              'in_progress',
+            }.contains(a.status.trim().toLowerCase()))
+        .toList()
+      ..sort(_byTime);
+    return rows;
   }
 
-  // ─── Fetching Data ─────────────────────────────────────────────────────────
-  Future<void> refreshData() async {
-    isLoading = true;
-    errorMessage = '';
-    update();
-
-    try {
-      await Future.wait([
-        fetchAppointmentsInternal(),
-        fetchDoctorsInternal(),
-      ]);
-      applyFilters();
-      // Initialize calendar list with selected date
-      calendarAppointmentsForDate = allAppointments
-          .where((a) => _isSameDay(a.appointmentDate, calendarSelectedDate))
-          .toList();
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('[AppointmentsController] Refresh error: $e');
-      }
-    } finally {
-      isLoading = false;
-      update();
-    }
+  /// Dealt with: seen, cancelled, or did not attend.
+  List<AppointmentModel> get todayClosed {
+    final rows = today
+        .where((a) => !todayOpen.contains(a))
+        .toList()
+      ..sort(_byTime);
+    return rows;
   }
 
-  Future<void> fetchAppointments() async {
-    isLoading = true;
-    update();
-    try {
-      await fetchAppointmentsInternal();
-      applyFilters();
-      calendarAppointmentsForDate = allAppointments
-          .where((a) => _isSameDay(a.appointmentDate, calendarSelectedDate))
-          .toList();
-    } finally {
-      isLoading = false;
-      update();
-    }
-  }
+  // ── Filters ───────────────────────────────────────────────────────────────
 
-  Future<void> fetchAppointmentsInternal() async {
-    try {
-      final res = await _service.fetchAppointments();
-      if (res.data != null && res.data['success'] == true) {
-        final List<dynamic> list = res.data['data']['data'] ?? [];
-        allAppointments = list
-            .map((e) => AppointmentModel.fromJson(e as Map<String, dynamic>))
-            .toList();
+  /// Statuses actually present, so a filter never offers an empty result.
+  List<String> get statuses => [
+        allStatuses,
+        ...{
+          for (final a in appointments)
+            if (a.status.trim().isNotEmpty) a.status.trim(),
+        }.toList()
+          ..sort(),
+      ];
 
-        // Sort chronologically by date then time
-        allAppointments.sort((a, b) {
-          final dateCompare = a.appointmentDate.compareTo(b.appointmentDate);
-          if (dateCompare != 0) return dateCompare;
-          return a.appointmentTime.compareTo(b.appointmentTime);
-        });
+  List<AppointmentModel> get displayed {
+    final rows = switch (view.value) {
+      ClinicView.today => today,
+      ClinicView.day => appointments
+          .where((a) => _sameDay(a.appointmentDate, selectedDay.value))
+          .toList(),
+      ClinicView.all => appointments.toList(),
+    };
+
+    final text = query.value.trim().toLowerCase();
+
+    final filtered = rows.where((a) {
+      if (text.isNotEmpty) {
+        final haystack = [
+          a.patient.fullName,
+          a.patient.mrn,
+          a.doctor.fullName,
+          a.chiefComplaint,
+        ].join(' ').toLowerCase();
+        if (!haystack.contains(text)) return false;
       }
-    } on DioException catch (e) {
-      errorMessage = e.message ?? 'Network error. Please try again.';
-      rethrow;
-    } catch (e) {
-      errorMessage = 'Failed to load appointments';
-      rethrow;
-    }
-  }
-
-  Future<void> fetchDoctorsInternal() async {
-    try {
-      final res = await _service.fetchDoctors();
-      if (res.data != null && res.data['success'] == true) {
-        final List<dynamic> list = res.data['data'] ?? [];
-        doctors = list
-            .map((e) => AppointmentDoctor.fromJson(e as Map<String, dynamic>))
-            .toList();
+      if (statusFilter.value != allStatuses &&
+          a.status.trim().toLowerCase() !=
+              statusFilter.value.trim().toLowerCase()) {
+        return false;
       }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('[AppointmentsController] Error fetching doctors: $e');
+      if (doctorFilter.value != allDoctors && a.doctorId != doctorFilter.value) {
+        return false;
       }
-    }
-  }
-
-  // ─── Filter Logic ──────────────────────────────────────────────────────────
-  void applyFilters() {
-    filteredAppointments = allAppointments.where((a) {
-      // 1. Search Query
-      if (searchQuery.isNotEmpty) {
-        final q = searchQuery.toLowerCase();
-        final patientName = a.patient.fullName.toLowerCase();
-        final patientMrn = a.patient.mrn.toLowerCase();
-        final docName = a.doctor.fullName.toLowerCase();
-        final complaint = a.chiefComplaint.toLowerCase();
-        if (!patientName.contains(q) &&
-            !patientMrn.contains(q) &&
-            !docName.contains(q) &&
-            !complaint.contains(q)) {
-          return false;
-        }
-      }
-
-      // 2. Date Filter
-      if (selectedFilterDate != null) {
-        if (!_isSameDay(a.appointmentDate, selectedFilterDate!)) {
-          return false;
-        }
-      }
-
-      // 3. Status Filter
-      if (selectedStatusFilter != 'All Statuses') {
-        if (a.status.toLowerCase() != selectedStatusFilter.toLowerCase()) {
-          return false;
-        }
-      }
-
-      // 4. Doctor Filter
-      if (selectedDoctorFilter != 'All Doctors') {
-        if (a.doctorId != selectedDoctorFilter) {
-          return false;
-        }
-      }
-
       return true;
     }).toList();
+
+    filtered.sort(view.value == ClinicView.all
+        ? (a, b) {
+            final byDate = b.appointmentDate.compareTo(a.appointmentDate);
+            return byDate != 0 ? byDate : _byTime(a, b);
+          }
+        : _byTime);
+
+    return filtered;
   }
 
-  void setSearchQuery(String query) {
-    searchQuery = query;
-    applyFilters();
-    update();
+  bool get isFiltered =>
+      query.value.trim().isNotEmpty ||
+      statusFilter.value != allStatuses ||
+      doctorFilter.value != allDoctors;
+
+  /// How many appointments each day of [month] holds, for the month grid.
+  Map<int, int> countsForMonth(DateTime month) {
+    final counts = <int, int>{};
+    for (final a in appointments) {
+      final date = a.appointmentDate.toLocal();
+      if (date.year != month.year || date.month != month.month) continue;
+      counts[date.day] = (counts[date.day] ?? 0) + 1;
+    }
+    return counts;
   }
 
-  void setFilterDate(DateTime? date) {
-    selectedFilterDate = date;
-    applyFilters();
-    update();
+  @override
+  void onReady() {
+    super.onReady();
+    load();
+    if (Get.isRegistered<DataBus>()) {
+      ever<int>(DataBus.to.tick('appointments'), (_) {
+        if (!isLoading) load(silent: true);
+      });
+    }
   }
 
-  void setStatusFilter(String status) {
-    selectedStatusFilter = status;
-    applyFilters();
-    update();
+  Future<void> load({bool silent = false}) => runGuarded(
+        () async {
+          final results = await Future.wait([
+            _service.fetchAppointments(),
+            _service.fetchDoctors(),
+          ]);
+
+          appointments.assignAll(
+            _rowsFrom(results[0].data)
+                .map(AppointmentModel.fromJson)
+                .toList(),
+          );
+          doctors.assignAll(
+            _rowsFrom(results[1].data)
+                .map(AppointmentDoctor.fromJson)
+                .toList(),
+          );
+        },
+        fallback: "Couldn't load the clinic list.",
+        silent: silent,
+      );
+
+  Future<void> reload() => load(silent: true);
+
+  void showView(ClinicView next) => view.value = next;
+  void search(String text) => query.value = text;
+  void filterByStatus(String status) => statusFilter.value = status;
+  void filterByDoctor(String id) => doctorFilter.value = id;
+
+  void selectDay(DateTime date) {
+    selectedDay.value = date;
+    view.value = ClinicView.day;
   }
 
-  void setDoctorFilter(String docId) {
-    selectedDoctorFilter = docId;
-    applyFilters();
-    update();
+  void clearFilters() {
+    query.value = '';
+    statusFilter.value = allStatuses;
+    doctorFilter.value = allDoctors;
   }
 
-  void resetFilters() {
-    searchQuery = '';
-    selectedFilterDate = null;
-    selectedStatusFilter = 'All Statuses';
-    selectedDoctorFilter = 'All Doctors';
-    applyFilters();
-    update();
-  }
+  // ── Actions ───────────────────────────────────────────────────────────────
 
-  // ─── Calendar / Switcher Actions ──────────────────────────────────────────
-  void setActiveTab(int index) {
-    activeViewTab = index;
-    update();
-  }
-
-  void setCalendarSelectedDate(DateTime date) {
-    calendarSelectedDate = date;
-    calendarAppointmentsForDate = allAppointments
-        .where((a) => _isSameDay(a.appointmentDate, date))
-        .toList();
-    update();
-  }
-
-  // ─── API Mutator Actions ───────────────────────────────────────────────────
-  Future<void> updateStatus(String id, String status,
-      {Map<String, dynamic>? additionalData}) async {
-    isLoading = true;
-    update();
+  Future<void> setStatus(AppointmentModel appointment, String status) async {
+    final name = appointment.patient.fullName;
     try {
-      await _service.updateAppointmentStatus(id, status,
-          additionalData: additionalData);
-      Get.snackbar(
-        'Success',
-        'Appointment status updated to ${status.replaceAll('_', ' ')}',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: AppColors.secondary.withValues(alpha: 0.15),
-        colorText: AppColors.primary,
-      );
-      await fetchAppointmentsInternal();
-      applyFilters();
-      calendarAppointmentsForDate = allAppointments
-          .where((a) => _isSameDay(a.appointmentDate, calendarSelectedDate))
-          .toList();
-    } on DioException catch (e) {
-      Get.snackbar(
-        'Error',
-        e.response?.data['message'] ?? 'Failed to update appointment status',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: AppColors.error.withValues(alpha: 0.15),
-        colorText: AppColors.error,
-      );
+      await _service.updateAppointmentStatus(appointment.id, status);
+      showBentoToast('$name is now ${status.replaceAll('_', ' ')}.');
+      if (Get.isRegistered<DataBus>()) {
+        DataBus.to.changedRecord('appointments');
+      }
+      await load(silent: true);
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Something went wrong',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: AppColors.error.withValues(alpha: 0.15),
-        colorText: AppColors.error,
+      showBentoToast(
+        parseErrorMessage(e, "Couldn't update $name's appointment."),
+        tone: ToastTone.failure,
       );
-    } finally {
-      isLoading = false;
-      update();
     }
   }
 
-  Future<void> sendReminder(String id) async {
-    isLoading = true;
-    update();
-    try {
-      await _service.sendReminder(id);
-      Get.snackbar(
-        'Reminder Sent',
-        'Appointment reminder sent successfully',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: AppColors.secondary.withValues(alpha: 0.15),
-        colorText: AppColors.primary,
-      );
-      await fetchAppointmentsInternal();
-      applyFilters();
-    } on DioException catch (e) {
-      Get.snackbar(
-        'Error',
-        e.response?.data['message'] ?? 'Failed to send reminder',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: AppColors.error.withValues(alpha: 0.15),
-        colorText: AppColors.error,
-      );
-    } finally {
-      isLoading = false;
-      update();
-    }
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  bool _is(AppointmentModel a, String status) =>
+      a.status.trim().toLowerCase() == status;
+
+  static bool _sameDay(DateTime a, DateTime b) {
+    final x = a.toLocal();
+    final y = b.toLocal();
+    return x.year == y.year && x.month == y.month && x.day == y.day;
   }
 
-  Future<void> reschedule(String id, DateTime date, String time) async {
-    isLoading = true;
-    update();
-    try {
-      await _service.rescheduleAppointment(id, date, time);
-      Get.snackbar(
-        'Rescheduled',
-        'Appointment rescheduled successfully',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: AppColors.secondary.withValues(alpha: 0.15),
-        colorText: AppColors.primary,
-      );
-      await fetchAppointmentsInternal();
-      applyFilters();
-      calendarAppointmentsForDate = allAppointments
-          .where((a) => _isSameDay(a.appointmentDate, calendarSelectedDate))
-          .toList();
-    } on DioException catch (e) {
-      Get.snackbar(
-        'Error',
-        e.response?.data['message'] ?? 'Failed to reschedule',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: AppColors.error.withValues(alpha: 0.15),
-        colorText: AppColors.error,
-      );
-    } finally {
-      isLoading = false;
-      update();
-    }
+  /// Sorts on the stored `"HH:mm"` string.
+  ///
+  /// Lexicographic, which is correct only because the backend zero-pads the
+  /// hour — `"09:30"`, never `"9:30"`. Parsed rather than trusted, so a row
+  /// that is not padded sorts by its number instead of landing after `"1:00"`.
+  static int _byTime(AppointmentModel a, AppointmentModel b) =>
+      _minutes(a.appointmentTime).compareTo(_minutes(b.appointmentTime));
+
+  static int _minutes(String time) {
+    final parts = time.trim().split(':');
+    if (parts.length < 2) return 0;
+    final hours = int.tryParse(parts[0]) ?? 0;
+    final minutes = int.tryParse(parts[1]) ?? 0;
+    return hours * 60 + minutes;
   }
 
-  // ─── Helpers ───────────────────────────────────────────────────────────────
-  bool _isSameDay(DateTime d1, DateTime d2) {
-    return d1.year == d2.year && d1.month == d2.month && d1.day == d2.day;
-  }
-
-  int _getTodayCountForStatus(String? status) {
-    final now = DateTime.now();
-    return allAppointments.where((a) {
-      final isSame = _isSameDay(a.appointmentDate, now);
-      if (!isSame) return false;
-      if (status == null) return true;
-      return a.status.toLowerCase() == status.toLowerCase();
-    }).length;
+  /// Pulls rows out of the shapes this API answers with: `data.data` for a
+  /// paged collection, `data` for a plain list.
+  List<Map<String, dynamic>> _rowsFrom(dynamic body) {
+    if (body is! Map || body['success'] != true) return const [];
+    final payload = body['data'];
+    final rows = payload is Map ? payload['data'] : payload;
+    if (rows is! List) return const [];
+    return rows.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
   }
 }
