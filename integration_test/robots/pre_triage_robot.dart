@@ -42,12 +42,6 @@ final class PreTriageRobot extends Robot {
     seeNoErrorBanner();
   }
 
-  void seeScreening(String id) => expect(
-        find.byKey(PreTriageKeys.row(id)),
-        findsOneWidget,
-        reason: 'expected screening $id on the board',
-      );
-
   // ── Step one: who ─────────────────────────────────────────────────────────
 
   /// Starts a screening from the board's own button, rather than by pushing the

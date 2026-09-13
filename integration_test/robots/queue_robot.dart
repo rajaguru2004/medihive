@@ -52,8 +52,6 @@ final class QueueRobot extends Robot with ShellTab {
     return [for (final row in rows) row.id];
   }
 
-  int get rowCount => _rowElements.length;
-
   void seeRowOrder(List<String> ids) => expect(
         rowIdsInOrder(),
         ids,

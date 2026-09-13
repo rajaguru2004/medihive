@@ -22,11 +22,4 @@ final class AppointmentsRobot extends Robot with ShellTab {
     await assertVisible();
     seeNoErrorBanner();
   }
-
-  /// One appointment's row, by id.
-  void seeRow(String id) => expect(
-        find.byKey(AppointmentsKeys.row(id)),
-        findsOneWidget,
-        reason: 'expected appointment $id on the clinic list',
-      );
 }

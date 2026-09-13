@@ -31,13 +31,14 @@ password reset in this app, because neither is something this app can do.
 
 ## The test suite
 
-Three tiers. The first needs no device.
+Four tiers. The first two need no device.
 
 ```sh
 flutter analyze                      # must be clean — the baseline is zero
+flutter test test/                   # pure logic; no device
 
-# every flow against a fake server, on a real device
-flutter test integration_test/
+# every behavioural flow against a fake server, on a real device
+flutter test integration_test/suites/smoke_suite.dart -d <device>
 
 # screenshots for a design pass, written to .review/
 flutter drive \

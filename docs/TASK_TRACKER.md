@@ -89,8 +89,8 @@ kit. 22 screens.
 |---|---|---|---|
 | 4.1 | `integration_test/support/` harness | ✅ | `app_harness` boots the real app; `pump` (no `pumpAndSettle`); fake secure storage |
 | 4.2 | Fake API adapter + fixtures | ✅ | Adapter sits below the interceptor chain; one coherent `World`; unstubbed call fails the test |
-| 4.3 | Robots | 🔄 | Base `Robot` ported; per-screen robots follow the first flow test that needs them |
-| 4.4 | Flow tests | ⬜ | Not written — the screenshot suite is the verification tier delivered |
+| 4.3 | Robots | ✅ | `Login`, `Home`, `Dashboard`, `Queue`, `Appointments`, `Inpatient`, `PreTriage`, plus a `ShellTab` mixin for the four screens that live in the `IndexedStack` |
+| 4.4 | Flow tests | ✅ | 12 flows over auth, the shell, the queue, the bed map and pre-triage; `integration_test/suites/smoke_suite.dart` runs the set |
 | 4.5 | Screenshot driver | ✅ | `test_driver/screenshot_driver.dart` → `.review/` |
 | 4.6 | Screenshot test | ✅ | 20 screens × 2 themes |
 
@@ -102,6 +102,7 @@ kit. 22 screens.
 | 5.2 | Screenshot round 1 on Pixel 6 Pro | ✅ | 8/8 tests, 40 captures. Surfaced 6 defects |
 | 5.3 | Fix defects found | ✅ | Truncated BP, red CTA, false red on empty data, ellipsised labels, empty capacity bar, fixture incoherence |
 | 5.4 | Screenshot round 2 | ✅ | 8/8 tests, 40 captures, defects confirmed fixed |
+| 5.5 | Flow suite on Pixel 6 Pro | ✅ | 12/12. Surfaced the unflagged screening detail below |
 
 ## Phase 6 — Documentation
 
@@ -218,6 +219,18 @@ the three tab views had the flag inverted on top of that.
 **`Opacity` over live text is a contrast bug.** Two screens muted a whole row
 with `Opacity`, which composites the text colour toward the ground: a
 6.5:1 subtitle became 2.8:1. Muting is a token change, not an alpha change.
+
+**The screening detail carried its flag in colour alone.** The triage form
+warns in words the moment a reading goes out of range; the detail screen that
+the same record opens into did not. It tinted the figure on the vital tile and
+said nothing — so Tom Whitfield's pulse of 128 and 168/96 read as three ordinary
+numbers to a colour-blind clinician, to a printed board, and to anyone scanning
+the record rather than studying it. That breaks the third clinical rule: a
+clinical state is colour *and* rank *and* word. The detail now raises the same
+`NoticeBanner`, and the reduction that picks the worst of several readings
+moved into `VitalRange.worst` so the form and the detail cannot drift apart —
+the fourth rule, that `VitalRange` is the only thing deciding what is normal.
+Found by writing the flow test for it.
 
 ## Open items
 

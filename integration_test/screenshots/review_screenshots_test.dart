@@ -4,7 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:medihive/app/core/keys/app_keys.dart';
+import 'package:medihive/app/modules/home/controllers/home_controller.dart';
 import 'package:medihive/app/routes/app_pages.dart';
+import 'package:medihive/app/theme/theme.dart';
 
 import '../support/app_harness.dart';
 import '../support/pump.dart';
@@ -240,6 +242,29 @@ void main() {
         find.byKey(PlaceholderKeys.screen('pharmacy')),
       );
       await shootBoth(tester, harness, '20-placeholder');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+    });
+  });
+
+  group('sheets', () {
+    // Sheets were the one surface this contact sheet did not cover, and that
+    // is exactly where a defect hid: `Get.bottomSheet` ignores
+    // `ThemeData.bottomSheetTheme`, so every sheet in the app rendered with no
+    // surface behind it until `SheetShell` started painting its own. A screen
+    // that is never captured is a screen nobody looks at.
+    testWidgets('the queue actions sheet', (tester) async {
+      final harness = await AppHarness.bootSignedIn(tester, fonts: true);
+
+      HomeController.to.selectRoute(Routes.QUEUE);
+      await tester.pumpUntilRouteSettled();
+
+      await tester.tapKey(QueueKeys.advance('q-1'));
+      await tester.pumpUntilFound(find.byType(SheetShell));
+      await shootBoth(tester, harness, '21-sheet');
+
+      // Closed explicitly: a sheet owns tickers that `flutter_test` checks for
+      // at the end of the test *body*, earlier than `addTearDown`.
       Get.back<void>();
       await tester.pumpUntilRouteSettled();
     });

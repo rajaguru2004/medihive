@@ -396,7 +396,28 @@ class SheetShell extends StatelessWidget {
     final lift =
         ModalRoute.of(context) is GetModalBottomSheetRoute ? 0.0 : insets;
 
-    return SafeArea(
+    // The sheet paints its own surface.
+    //
+    // It cannot rely on the route to do it: `Get.bottomSheet` does not read
+    // `ThemeData.bottomSheetTheme`, so the `backgroundColor` set there never
+    // reaches it and the sheet renders straight onto the barrier — the rows
+    // legible, the ground behind them showing through, and the whole thing
+    // reading as a rendering fault. Painting here rather than at the fifteen
+    // call sites also means a sheet shown with Flutter's own
+    // `showModalBottomSheet` looks identical.
+    //
+    // `Material` rather than a `DecoratedBox`: the rows inside are `InkWell`s
+    // and their splashes need something to paint on.
+    return Material(
+      color: surfaceColor(context),
+      surfaceTintColor: Colors.transparent,
+      clipBehavior: Clip.antiAlias,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(BentoSheetRadius.top),
+        ),
+      ),
+      child: SafeArea(
       top: false,
       child: ConstrainedBox(
         // A ceiling, and the reason it has to be here rather than at each call
@@ -426,9 +447,24 @@ class SheetShell extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // The grab handle. Drawn here for the same reason as the
+              // surface: the theme's `showDragHandle` belongs to Flutter's
+              // sheet route, not to GetX's, so without this there is nothing
+              // saying the sheet can be dragged away.
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(top: 10, bottom: 10),
+                  decoration: BoxDecoration(
+                    color: tertiaryLabelColor(context).withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(BentoSheetRadius.handle),
+                  ),
+                ),
+              ),
               if (title != null)
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                 child: Text(
                   title!,
                   style: isDark
@@ -446,8 +482,19 @@ class SheetShell extends StatelessWidget {
           ),
         ),
       ),
+      ),
     );
   }
+}
+
+/// The two radii a sheet needs, kept here because `app_bento.dart` imports
+/// this file rather than the other way round.
+abstract final class BentoSheetRadius {
+  /// The top corners of the sheet itself.
+  static const double top = 28;
+
+  /// The grab handle.
+  static const double handle = 2;
 }
 
 /// One tappable row inside a [SheetShell] or an [InsetSurface].
