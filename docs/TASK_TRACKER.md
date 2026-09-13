@@ -99,9 +99,9 @@ kit. 22 screens.
 | # | Task | Status | Notes |
 |---|---|---|---|
 | 5.1 | `flutter analyze` clean | ✅ | Zero issues across lib/, integration_test/ and test_driver/ |
-| 5.2 | Screenshot round 1 on Pixel 6 Pro | ⬜ | `emulator-5554`, light + dark |
-| 5.3 | Fix defects found | ⬜ | One batch |
-| 5.4 | Screenshot round 2 | ⬜ | Confirm; then stop |
+| 5.2 | Screenshot round 1 on Pixel 6 Pro | ✅ | 8/8 tests, 40 captures. Surfaced 6 defects |
+| 5.3 | Fix defects found | ✅ | Truncated BP, red CTA, false red on empty data, ellipsised labels, empty capacity bar, fixture incoherence |
+| 5.4 | Screenshot round 2 | ✅ | 8/8 tests, 40 captures, defects confirmed fixed |
 
 ## Phase 6 — Documentation
 
@@ -140,8 +140,8 @@ patient. This is the single rule most likely to be broken by a later change.
 |---|---|---|---|
 | 7.1 | Unit tests for pure logic | ✅ | 116 tests across 7 files: BrandPalette, CaseStatus, VitalRange, BedState, MoneyFormat, Formatters, ApiEnvelope |
 | 7.2 | Craft review of all 45 module files | ✅ | Zero contract violations; 10 craft defects found |
-| 7.3 | Make form validation work | 🔄 | `BentoInput`/`BentoPicker` are not `FormField`s, so every `validate()` returns true |
-| 7.4 | Layout and contrast fixes | 🔄 | Inverted `bottomClearance`, `Opacity` over live text, sub-48 tap targets, missing retries |
+| 7.3 | Make form validation work | ✅ | `BentoInput`/`BentoPicker` take a `validator:` and wrap a `FormField`; 14 validators wired |
+| 7.4 | Layout and contrast fixes | ✅ | `bottomClearance`, `Opacity` over text, 4 tap targets, 2 missing retries, 1 stale index |
 
 ## Bugs this port found
 
@@ -198,9 +198,11 @@ with `Opacity`, which composites the text colour toward the ground: a
 
 - `.claude/settings.json` permission allowlist — declined by the user; not
   added.
-- **Flow tests (4.4)** — not written. The screenshot suite exercises every
-  screen's first paint against the fake server, which is what verified this
-  work, but it asserts nothing about behaviour. The harness, the fixtures and
-  the base `Robot` are all in place for them.
-- **Unit tests** — none. `BrandPalette.readable`, `CaseStatus.priorityOf`,
-  `VitalRange.*` and `MoneyFormat` are all pure and all worth covering.
+- **The dashboard's bed denominator is `occupied + available`**, because
+  `DashboardStats` carries no total. That under-counts by the reserved and
+  blocked beds, so the board says "26 of 37" where the ward screen says 40. The
+  ward screen is right; the dashboard is honest about the two numbers it has.
+  Fix properly by adding `totalBeds` to the dashboard payload.
+- **`DashboardData.fromJson` reads `json['data']`** — the model knows about the
+  envelope, which is why a caller cannot pass it the unwrapped payload. Every
+  other model in the app takes the object. Worth aligning.
