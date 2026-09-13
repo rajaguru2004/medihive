@@ -1,460 +1,317 @@
 import 'package:flutter/material.dart';
-
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
 
-import '../../../data/models/appointment_model.dart';
+import '../../../core/keys/app_keys.dart';
+import '../../../data/utils/formatters.dart';
 import '../../../theme/theme.dart';
 import '../controllers/discharge_patient_controller.dart';
 
+/// Discharge a patient.
+///
+/// The patient's identity sits at the top and stays there, because this is the
+/// one screen where acting on the wrong record has a consequence that cannot
+/// be taken back from the app. The confirm dialog names them again.
 class DischargePatientView extends GetView<DischargePatientController> {
   const DischargePatientView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-
     return Scaffold(
-      backgroundColor:
-          isDark ? AppColors.darkBackground : AppColors.lightBackground,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            child: Container(
-              margin: const EdgeInsets.all(AppSpacing.md),
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-                borderRadius: AppDecorations.borderLG,
-                border: Border.all(
-                  color: isDark
-                      ? AppColors.darkSurfaceVariant
-                      : AppColors.lightSurfaceVariant,
-                ),
-                boxShadow: AppDecorations.elevation2(isDark),
-              ),
-              child: GetBuilder<DischargePatientController>(
-                builder: (controller) {
-                  final patientName = controller.admission.patient.fullName;
-                  final bedNumber = controller.admission.bed.bedNumber;
+      appBar: const DetailHeader(title: 'Discharge'),
+      body: BentoGround(
+        child: SafeArea(
+          child: Obx(() {
+            if (controller.isLoading && controller.rxFirstLoad.value) {
+              return const Padding(
+                padding: EdgeInsets.all(BentoSpace.page),
+                child: BentoSkeleton(rows: 4),
+              );
+            }
 
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header Row: Title, Heartbeat Icon & Close Button
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.show_chart_rounded,
-                            color: AppColors.secondary,
-                            size: AppSpacing.iconMD * 1.2,
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: Text(
-                              'Discharge Patient',
-                              style:
-                                  AppTextStyles.titleLarge(AppColors.secondary)
-                                      .copyWith(
-                                fontWeight: FontWeight.bold,
+            final admission = controller.admission.value;
+            if (admission == null) {
+              return Padding(
+                padding: const EdgeInsets.all(BentoSpace.page),
+                child: EmptyState(
+                  key: DischargePatientKeys.error,
+                  icon: Icons.search_off_rounded,
+                  title: 'Admission not found',
+                  message: controller.rxLoadError.value ??
+                      'It may already have been closed by somebody else.',
+                  actionLabel: 'Go back',
+                  onAction: Get.back,
+                ),
+              );
+            }
+
+            return Form(
+              key: controller.formKey,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(BentoSpace.page),
+                      child: MaxWidthBody(
+                        maxWidth: 520,
+                        child: Column(
+                          key: DischargePatientKeys.screen,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Obx(() {
+                              final error = controller.errorMessage.value;
+                              if (error == null) {
+                                return const SizedBox.shrink();
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 14),
+                                child: NoticeBanner(
+                                  message: error,
+                                  icon: Icons.error_outline_rounded,
+                                  tint: AppColors.error,
+                                ),
+                              );
+                            }),
+
+                            BentoCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  PatientIdentityBand(
+                                    name: admission.patient.fullName,
+                                    mrn: admission.patient.mrn,
+                                    age: Formatters.age(
+                                      admission.patient.dateOfBirth,
+                                    ),
+                                    sex: admission.patient.gender,
+                                  ),
+                                  const SizedBox(height: 14),
+                                  const Hairline(),
+                                  const SizedBox(height: 6),
+                                  FactRow(
+                                    label: 'Bed',
+                                    value: [
+                                      admission.bed.ward?.name ?? '',
+                                      'bed ${admission.bed.bedNumber}',
+                                    ].where((s) => s.isNotEmpty).join(' · '),
+                                  ),
+                                  FactRow(
+                                    label: 'Admitted',
+                                    value: Formatters.dateMedium(
+                                      admission.admissionDate,
+                                    ),
+                                  ),
+                                  FactRow(
+                                    label: 'Length of stay',
+                                    value: () {
+                                      final days =
+                                          Formatters.lengthOfStayDays(
+                                        admission.admissionDate,
+                                      );
+                                      return days == 0
+                                          ? 'Same day'
+                                          : days == 1
+                                              ? '1 day'
+                                              : '$days days';
+                                    }(),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
-                          IconButton(
-                            icon: Icon(
-                              Icons.close_rounded,
-                              color: textSecondary.withValues(alpha: 0.6),
-                            ),
-                            onPressed: () => Get.back(),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        'Record discharge summary and follow-up directives for $patientName.',
-                        style: AppTextStyles.bodyMedium(
-                            textSecondary.withValues(alpha: 0.8)),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
 
-                      // Row 1: Discharge Reason * & Discharging Doctor *
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            const SizedBox(height: BentoSpace.section),
+
+                            FormCard(
+                              title: 'Discharge',
                               children: [
-                                _buildLabel('Discharge Reason *', isDark),
-                                const SizedBox(height: AppSpacing.xs),
-                                _buildReasonField(controller, isDark),
+                                Obx(
+                                  () => BentoPicker(
+                                    key: DischargePatientKeys.outcomePicker,
+                                    label: 'Outcome',
+                                    required: true,
+                                    value: controller.outcome.value,
+                                    onTap: () => _openOutcomePicker(controller),
+                                  ),
+                                ),
+                                BentoInput(
+                                  label: 'Reason',
+                                  controller: controller.reasonController,
+                                  required: true,
+                                  maxLines: 2,
+                                  hint: 'In a line, for the record',
+                                ),
+                                BentoInput(
+                                  fieldKey: DischargePatientKeys.summaryField,
+                                  label: 'Discharge summary',
+                                  controller: controller.summaryController,
+                                  maxLines: 5,
+                                  hint: 'What happened during the stay, and '
+                                      'what happens next. Leave blank to use '
+                                      'the reason above.',
+                                ),
+                                Obx(
+                                  () => BentoPicker(
+                                    label: 'Discharging clinician',
+                                    value: controller
+                                        .dischargingDoctor.value?.fullName,
+                                    placeholder: 'Who signed this off',
+                                    onTap: () => _openDoctorPicker(controller),
+                                  ),
+                                ),
                               ],
                             ),
-                          ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildLabel('Discharging Doctor *', isDark),
-                                const SizedBox(height: AppSpacing.xs),
-                                _buildDoctorDropdown(controller, isDark),
-                              ],
-                            ),
-                          ),
-                        ],
+
+                            // Follow-up, only where it applies. Asking for a
+                            // follow-up appointment after a death is the kind
+                            // of thing software does that people do not.
+                            Obx(() {
+                              if (!controller.wantsFollowUp) {
+                                return const SizedBox.shrink();
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.only(
+                                  top: BentoSpace.section,
+                                ),
+                                child: FormCard(
+                                  title: 'Follow-up',
+                                  children: [
+                                    Obx(
+                                      () => BentoPicker(
+                                        key: DischargePatientKeys.dateField,
+                                        label: 'Date',
+                                        value: controller.followUpDate.value ==
+                                                null
+                                            ? null
+                                            : Formatters.dateMedium(
+                                                controller.followUpDate.value,
+                                              ),
+                                        placeholder: 'None booked',
+                                        onTap: () => controller
+                                            .pickFollowUpDate(context),
+                                      ),
+                                    ),
+                                    BentoInput(
+                                      fieldKey:
+                                          DischargePatientKeys.followUpField,
+                                      label: 'Notes',
+                                      controller:
+                                          controller.followUpNotesController,
+                                      maxLines: 3,
+                                      hint: 'What the follow-up is for',
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: AppSpacing.md),
-
-                      // Discharge Summary *
-                      _buildLabel('Discharge Summary *', isDark),
-                      const SizedBox(height: AppSpacing.xs),
-                      _buildSummaryField(controller, isDark),
-                      const SizedBox(height: AppSpacing.md),
-
-                      // Row 2: Follow-up Date & Follow-up Directives
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildLabel('Follow-up Date', isDark),
-                                const SizedBox(height: AppSpacing.xs),
-                                _buildFollowUpDatePicker(
-                                    context, controller, isDark),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildLabel('Follow-up Directives', isDark),
-                                const SizedBox(height: AppSpacing.xs),
-                                _buildDirectivesField(controller, isDark),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-
-                      // Information Alert Banner
-                      _buildAlertBanner(bedNumber, isDark),
-                      const SizedBox(height: AppSpacing.lg),
-
-                      // Bottom Actions: Cancel & Confirm Discharge
-                      _buildActionButtons(controller, isDark),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLabel(String text, bool isDark) {
-    final textColor =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    return RichText(
-      text: TextSpan(
-        text: text.replaceAll('*', '').trim(),
-        style: AppTextStyles.labelMedium(textColor).copyWith(
-          fontWeight: FontWeight.w600,
-        ),
-        children: [
-          if (text.contains('*'))
-            const TextSpan(
-              text: ' *',
-              style: TextStyle(color: AppColors.error),
-            ),
-        ],
-      ),
-    );
-  }
-
-  InputDecoration _getInputDecoration(
-    bool isDark, {
-    String? hintText,
-    IconData? prefixIcon,
-  }) {
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.black.withValues(alpha: 0.08);
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-
-    return InputDecoration(
-      hintText: hintText,
-      hintStyle: AppTextStyles.bodyMedium(textSecondary.withValues(alpha: 0.4)),
-      filled: true,
-      fillColor: isDark
-          ? Colors.white.withValues(alpha: 0.06)
-          : Colors.white.withValues(alpha: 0.7),
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.md,
-      ),
-      border: OutlineInputBorder(
-        borderRadius: AppDecorations.borderMD,
-        borderSide: BorderSide(color: borderColor),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: AppDecorations.borderMD,
-        borderSide: BorderSide(color: borderColor),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: AppDecorations.borderMD,
-        borderSide: const BorderSide(color: AppColors.secondary, width: 1.5),
-      ),
-      prefixIcon: prefixIcon != null
-          ? Icon(
-              prefixIcon,
-              size: AppSpacing.iconSM,
-              color: textSecondary.withValues(alpha: 0.5),
-            )
-          : null,
-    );
-  }
-
-  Widget _buildReasonField(DischargePatientController controller, bool isDark) {
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    return TextFormField(
-      controller: controller.reasonController,
-      style: AppTextStyles.bodyMedium(textPrimary),
-      decoration: _getInputDecoration(
-        isDark,
-        hintText: 'e.g. Fully recovered',
-      ),
-    );
-  }
-
-  Widget _buildDoctorDropdown(
-      DischargePatientController controller, bool isDark) {
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-
-    return DropdownButtonFormField<AppointmentDoctor>(
-      initialValue: controller.selectedDoctor,
-      hint: Text(
-        controller.isLoadingDoctors ? 'Loading doctors...' : 'Choose Doctor',
-        style: AppTextStyles.bodyMedium(textSecondary.withValues(alpha: 0.4)),
-      ),
-      icon: const Icon(
-        Icons.keyboard_arrow_down_rounded,
-        color: AppColors.primary,
-      ),
-      dropdownColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-      style: AppTextStyles.bodyMedium(textPrimary),
-      onChanged: controller.isLoadingDoctors ? null : controller.selectDoctor,
-      items: controller.doctors
-          .map<DropdownMenuItem<AppointmentDoctor>>((AppointmentDoctor doc) {
-        final specialization =
-            doc.specialization != null && doc.specialization!.isNotEmpty
-                ? ' (${doc.specialization})'
-                : '';
-        return DropdownMenuItem<AppointmentDoctor>(
-          value: doc,
-          child: Text(
-            'Dr. ${doc.fullName}$specialization',
-            overflow: TextOverflow.ellipsis,
-          ),
-        );
-      }).toList(),
-      decoration: _getInputDecoration(isDark),
-      isExpanded: true,
-    );
-  }
-
-  Widget _buildSummaryField(
-      DischargePatientController controller, bool isDark) {
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    return TextFormField(
-      controller: controller.summaryController,
-      maxLines: 4,
-      style: AppTextStyles.bodyMedium(textPrimary),
-      decoration: _getInputDecoration(
-        isDark,
-        hintText:
-            'Enter detailed summary of course in hospital, treatment given, and condition on discharge...',
-      ),
-    );
-  }
-
-  Widget _buildFollowUpDatePicker(
-    BuildContext context,
-    DischargePatientController controller,
-    bool isDark,
-  ) {
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-
-    final dateText = controller.selectedFollowUpDate != null
-        ? DateFormat('dd/MM/yyyy').format(controller.selectedFollowUpDate!)
-        : 'Select Date';
-
-    return InkWell(
-      onTap: () => controller.selectFollowUpDate(context),
-      borderRadius: AppDecorations.borderMD,
-      child: InputDecorator(
-        decoration: _getInputDecoration(
-          isDark,
-          prefixIcon: Icons.calendar_today_outlined,
-        ),
-        child: Text(
-          dateText,
-          style: AppTextStyles.bodyMedium(
-            controller.selectedFollowUpDate != null
-                ? textPrimary
-                : textSecondary.withValues(alpha: 0.4),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDirectivesField(
-      DischargePatientController controller, bool isDark) {
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    return TextFormField(
-      controller: controller.directivesController,
-      style: AppTextStyles.bodyMedium(textPrimary),
-      decoration: _getInputDecoration(
-        isDark,
-        hintText: 'e.g. Return in 1 week',
-      ),
-    );
-  }
-
-  Widget _buildAlertBanner(String bedNumber, bool isDark) {
-    final bannerBg = isDark
-        ? const Color(0xFF14532D).withValues(alpha: 0.25)
-        : const Color(0xFFF0FDF4);
-    final bannerBorder = isDark
-        ? const Color(0xFF166534).withValues(alpha: 0.4)
-        : const Color(0xFFDCFCE7);
-    final bannerText =
-        isDark ? const Color(0xFF4ADE80) : const Color(0xFF15803D);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
-      ),
-      decoration: BoxDecoration(
-        color: bannerBg,
-        borderRadius: AppDecorations.borderMD,
-        border: Border.all(color: bannerBorder),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.info_outline_rounded,
-            color: bannerText,
-            size: AppSpacing.iconSM,
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: RichText(
-              text: TextSpan(
-                style: AppTextStyles.bodySmall(bannerText).copyWith(
-                  fontWeight: FontWeight.w500,
-                  height: 1.4,
-                ),
-                children: [
-                  const TextSpan(
-                      text:
-                          'Discharging this patient will automatically free up bed '),
-                  TextSpan(
-                    text: bedNumber,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
-                  const TextSpan(text: ' and mark it as available.'),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      BentoSpace.page,
+                      0,
+                      BentoSpace.page,
+                      BentoSpace.page,
+                    ),
+                    child: MaxWidthBody(
+                      maxWidth: 520,
+                      child: Obx(
+                        () => PrimaryBar(
+                          key: DischargePatientKeys.submit,
+                          label: 'Discharge patient',
+                          busy: controller.isSubmitting.value,
+                          onPressed: () async {
+                            if (!(controller.formKey.currentState
+                                    ?.validate() ??
+                                false)) {
+                              return;
+                            }
+                            final confirmed = await ConfirmDialog.show(
+                              context,
+                              confirmKey: DischargePatientKeys.confirm,
+                              title:
+                                  'Discharge ${admission.patient.fullName}?',
+                              message:
+                                  'Bed ${admission.bed.bedNumber} is freed and '
+                                  'the admission is closed. This cannot be '
+                                  'undone from the app.',
+                              confirmLabel: 'Discharge',
+                              cancelLabel: 'Not yet',
+                              destructive: true,
+                            );
+                            if (confirmed) await controller.submit();
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
-            ),
-          ),
-        ],
+            );
+          }),
+        ),
       ),
     );
   }
+}
 
-  Widget _buildActionButtons(
-      DischargePatientController controller, bool isDark) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        OutlinedButton(
-          onPressed: () => Get.back(),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size(100, 40),
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            shape: RoundedRectangleBorder(
-              borderRadius: AppDecorations.borderMD,
+Future<void> _openOutcomePicker(DischargePatientController controller) {
+  return Get.bottomSheet<void>(
+    SheetShell(
+      title: 'Outcome',
+      scrollable: true,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final outcome in DischargePatientController.outcomes)
+            SheetRow(
+              icon: switch (outcome) {
+                'Recovered' => Icons.check_circle_outline_rounded,
+                'Improved' => Icons.trending_up_rounded,
+                'Referred on' => Icons.call_made_rounded,
+                'Transferred' => Icons.swap_horiz_rounded,
+                'Self-discharge' => Icons.directions_walk_rounded,
+                _ => Icons.remove_circle_outline_rounded,
+              },
+              label: outcome,
+              selected: controller.outcome.value == outcome,
+              onTap: () {
+                controller.outcome.value = outcome;
+                Get.back<void>();
+              },
             ),
-            side: BorderSide(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.12)
-                  : Colors.black.withValues(alpha: 0.08),
+        ],
+      ),
+    ),
+    isScrollControlled: true,
+  );
+}
+
+Future<void> _openDoctorPicker(DischargePatientController controller) {
+  return Get.bottomSheet<void>(
+    SheetShell(
+      title: 'Discharging clinician',
+      scrollable: true,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final doctor in controller.doctors)
+            SheetRow(
+              icon: Icons.badge_outlined,
+              label: doctor.fullName,
+              sublabel: doctor.specialization,
+              selected: controller.dischargingDoctor.value?.id == doctor.id,
+              onTap: () {
+                controller.dischargingDoctor.value = doctor;
+                Get.back<void>();
+              },
             ),
-          ),
-          child: Text(
-            'Cancel',
-            style: AppTextStyles.labelMedium(
-              isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-            ).copyWith(fontWeight: FontWeight.w600),
-          ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        ElevatedButton(
-          onPressed:
-              controller.isSubmitting ? null : controller.submitDischarge,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.secondary,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(140, 40),
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            shape: RoundedRectangleBorder(
-              borderRadius: AppDecorations.borderMD,
-            ),
-            elevation: 0,
-          ),
-          child: controller.isSubmitting
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                )
-              : Text(
-                  'Confirm Discharge',
-                  style: AppTextStyles.labelMedium(Colors.white).copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-        ),
-      ],
-    );
-  }
+        ],
+      ),
+    ),
+    isScrollControlled: true,
+  );
 }

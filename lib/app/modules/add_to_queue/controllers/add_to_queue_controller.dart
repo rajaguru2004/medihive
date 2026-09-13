@@ -1,253 +1,142 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-
-import 'package:dio/dio.dart';
-import 'package:get/get.dart';
-
-import 'package:medihive/app/theme/theme.dart';
+import 'package:get/get.dart' hide Response;
 
 import '../../../data/models/patient_lookup.dart';
+import '../../../data/services/data_bus.dart';
 import '../../../data/services/queue_service.dart';
-import '../../queue/controllers/queue_controller.dart';
+import '../../../data/utils/error_handler.dart';
+import '../../../data/utils/legacy_envelope.dart';
+import '../../../theme/theme.dart';
 
+/// Put somebody on the queue.
 class AddToQueueController extends GetxController {
+  static AddToQueueController get to => Get.find<AddToQueueController>();
+
   final _queueService = Get.find<QueueService>();
 
-  final searchController = TextEditingController();
+  final formKey = GlobalKey<FormState>();
   final serviceTypeController = TextEditingController();
-  final assignedRoomController = TextEditingController();
+  final roomController = TextEditingController();
 
-  // State fields (Plain variables, no Rx / Obx)
-  List<PatientLookup> patientsList = [];
-  PatientLookup? selectedPatient;
-  String selectedServiceArea = '';
-  String selectedPriority = 'Normal'; // default selected priority
+  final patients = <PatientLookup>[].obs;
+  final patient = Rxn<PatientLookup>();
+  final serviceArea = RxnString();
+  final acuity = 'P4'.obs;
 
-  bool isLoadingPatients = false;
-  bool isSaving = false;
-  String? errorMessage;
+  final isSearching = false.obs;
+  final isSubmitting = false.obs;
+  final errorMessage = RxnString();
 
-  final List<String> serviceAreas = [
-    'OPD',
-    'Emergency',
-    'MCH',
-    'Psychiatric',
-    'Laboratory',
-    'Pharmacy',
-    'Radiology',
-  ];
+  /// Debounces the patient search.
+  ///
+  /// Without it a seven-letter surname is seven requests, and on hospital wifi
+  /// the answers arrive out of order — so the list settles on the results for
+  /// "Steve" while the field reads "Stevenson".
+  Timer? _searchDebounce;
 
-  final List<String> priorities = [
-    'Urgent',
-    'Normal',
-    'Low',
-    'Routine',
-  ];
+  static const serviceAreas = <String, String>{
+    'OPD': 'opd',
+    'Emergency': 'emergency',
+    'MCH': 'mch',
+    'Psychiatric': 'psychiatric',
+    'Laboratory': 'laboratory',
+    'Pharmacy': 'pharmacy',
+    'Radiology': 'radiology',
+  };
+
+  /// The triage levels offered here, in urgency order.
+  ///
+  /// Codes rather than words, so what this screen writes is what the queue
+  /// board sorts on. `CaseStatus` turns them back into words.
+  static const acuityCodes = ['P1', 'P2', 'P3', 'P4', 'P5'];
+
+  bool get canSubmit => patient.value != null && serviceArea.value != null;
 
   @override
-  void onInit() {
-    super.onInit();
-    // Default select first service area
-    selectedServiceArea = serviceAreas.first;
-    // Initial fetch of patients list
-    fetchPatients('');
+  void onReady() {
+    super.onReady();
+    searchPatients('');
   }
 
-  /// Fetches patient list for search matching
-  Future<void> fetchPatients(String query) async {
-    isLoadingPatients = true;
-    errorMessage = null;
-    update();
+  void onSearchChanged(String query) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 300),
+      () => searchPatients(query),
+    );
+  }
 
+  Future<void> searchPatients(String query) async {
+    isSearching.value = true;
     try {
-      final res = await _queueService.fetchPatients(query: query);
-      if (res.data != null && res.data['success'] == true) {
-        final List<dynamic> rawList = res.data['data']['data'] ?? [];
-        patientsList = rawList
-            .map((e) => PatientLookup.fromJson(e as Map<String, dynamic>))
-            .toList();
-      }
-    } catch (e) {
-      errorMessage = 'Failed to load patients list.';
-    } finally {
-      isLoadingPatients = false;
-      update();
-    }
-  }
-
-  /// Handles patient search field changes
-  void onPatientSearchChanged(String val) {
-    fetchPatients(val);
-  }
-
-  /// Sets selected patient
-  void selectPatient(PatientLookup patient) {
-    selectedPatient = patient;
-    searchController.text = patient.fullName;
-    patientsList = []; // Clear list to dismiss search results
-    update();
-  }
-
-  /// Clears selected patient
-  void clearSelectedPatient() {
-    selectedPatient = null;
-    searchController.clear();
-    fetchPatients('');
-    update();
-  }
-
-  /// Sets service area dropdown selection
-  void selectServiceArea(String area) {
-    selectedServiceArea = area;
-    update();
-  }
-
-  /// Sets priority dropdown selection
-  void selectPriority(String priority) {
-    selectedPriority = priority;
-    update();
-  }
-
-  /// Validates and submits patient registration to queue
-  Future<void> submit(FormState? formState, BuildContext context) async {
-    // 1. Patient Validation
-    if (selectedPatient == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please select a patient.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
-
-    // 2. Service Area Validation
-    if (selectedServiceArea.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please select a service area.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
-
-    // 3. Priority Validation
-    if (selectedPriority.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please select a priority.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
-
-    if (!(formState?.validate() ?? false)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please fill all required fields correctly.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
-
-    isSaving = true;
-    update();
-
-    try {
-      final serviceAreaKey = _mapServiceAreaToKey(selectedServiceArea);
-      final priorityKey = selectedPriority.toLowerCase();
-
-      final res = await _queueService.addToQueue(
-        patientId: selectedPatient!.id,
-        serviceArea: serviceAreaKey,
-        serviceType: serviceTypeController.text.trim().isNotEmpty
-            ? serviceTypeController.text.trim()
-            : null,
-        priority: priorityKey,
-        assignedRoom: assignedRoomController.text.trim().isNotEmpty
-            ? assignedRoomController.text.trim()
-            : null,
-      );
-
-      if (!context.mounted) return;
-
-      if (res.data != null && res.data['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Patient added to queue successfully.'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-
-        // Refresh Queue Controller and automatically select the added patient's department tab
-        if (Get.isRegistered<QueueController>()) {
-          final queueCtrl = Get.find<QueueController>();
-          queueCtrl.selectedServiceArea.value = selectedServiceArea;
-          await queueCtrl.fetchQueueData();
-        }
-
-        // Navigate back to Queue Management
-        Get.back();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content:
-                Text(res.data['message'] ?? 'Could not add patient to queue.'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    } on DioException catch (e) {
-      if (!context.mounted) return;
-      final msg = e.response?.data?['message'] as String?;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(msg ?? 'Network error occurred.'),
-          backgroundColor: AppColors.error,
-        ),
+      final response = await _queueService.fetchPatients(query: query.trim());
+      patients.assignAll(
+        envelopeRows(response.data).map(PatientLookup.fromJson).toList(),
       );
     } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Something went wrong. Please try again.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      errorMessage.value =
+          parseErrorMessage(e, "Couldn't search for patients.");
     } finally {
-      isSaving = false;
-      update();
+      isSearching.value = false;
     }
   }
 
-  String _mapServiceAreaToKey(String name) {
-    switch (name) {
-      case 'OPD':
-        return 'opd';
-      case 'Emergency':
-        return 'emergency';
-      case 'MCH':
-        return 'mch';
-      case 'Psychiatric':
-        return 'psychiatric';
-      case 'Laboratory':
-        return 'laboratory';
-      case 'Pharmacy':
-        return 'pharmacy';
-      case 'Radiology':
-        return 'radiology';
-      default:
-        return name.toLowerCase();
+  Future<void> submit() async {
+    if (isSubmitting.value) return;
+    if (!(formKey.currentState?.validate() ?? false)) return;
+
+    if (patient.value == null) {
+      errorMessage.value = 'Choose the patient to add.';
+      return;
+    }
+    if (serviceArea.value == null) {
+      errorMessage.value = 'Choose which service they are waiting for.';
+      return;
+    }
+
+    FocusManager.instance.primaryFocus?.unfocus();
+    isSubmitting.value = true;
+    errorMessage.value = null;
+
+    final name = patient.value!.fullName;
+
+    try {
+      final response = await _queueService.addToQueue(
+        patientId: patient.value!.id,
+        serviceArea: serviceAreas[serviceArea.value] ?? 'opd',
+        serviceType: serviceTypeController.text.trim().isEmpty
+            ? null
+            : serviceTypeController.text.trim(),
+        priority: acuity.value.toLowerCase(),
+        assignedRoom: roomController.text.trim().isEmpty
+            ? null
+            : roomController.text.trim(),
+      );
+
+      if (!envelopeOk(response.data, statusCode: response.statusCode)) {
+        errorMessage.value =
+            envelopeMessage(response.data) ?? "Couldn't add $name to the queue.";
+        return;
+      }
+
+      if (Get.isRegistered<DataBus>()) DataBus.to.changedRecord('queue');
+      Get.back<void>();
+      showBentoToast('$name added to the ${serviceArea.value} queue.');
+    } catch (e) {
+      errorMessage.value =
+          parseErrorMessage(e, "Couldn't add $name to the queue.");
+    } finally {
+      isSubmitting.value = false;
     }
   }
 
   @override
   void onClose() {
-    searchController.dispose();
+    _searchDebounce?.cancel();
     serviceTypeController.dispose();
-    assignedRoomController.dispose();
+    roomController.dispose();
     super.onClose();
   }
 }

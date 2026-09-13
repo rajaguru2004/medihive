@@ -1,516 +1,358 @@
 import 'package:flutter/material.dart';
-
 import 'package:get/get.dart';
 
-import 'package:medihive/app/theme/theme.dart';
-
+import '../../../core/keys/app_keys.dart';
+import '../../../data/utils/formatters.dart';
+import '../../../theme/theme.dart';
 import '../controllers/add_to_queue_controller.dart';
 
-class AddToQueueView extends StatefulWidget {
+/// Add somebody to the queue.
+///
+/// Acuity is a segmented control rather than a picker, because it is the one
+/// field on this form that changes where the patient lands in the order — and
+/// a choice with a consequence should be visible without opening anything.
+class AddToQueueView extends GetView<AddToQueueController> {
   const AddToQueueView({super.key});
 
   @override
-  State<AddToQueueView> createState() => _AddToQueueViewState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: const DetailHeader(title: 'Add to queue'),
+      body: BentoGround(
+        child: SafeArea(
+          child: Form(
+            key: controller.formKey,
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(BentoSpace.page),
+                    child: MaxWidthBody(
+                      maxWidth: 520,
+                      child: Column(
+                        key: AddToQueueKeys.screen,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Obx(() {
+                            final error = controller.errorMessage.value;
+                            if (error == null) return const SizedBox.shrink();
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 14),
+                              child: NoticeBanner(
+                                key: AddToQueueKeys.error,
+                                message: error,
+                                icon: Icons.error_outline_rounded,
+                                tint: AppColors.error,
+                              ),
+                            );
+                          }),
+
+                          FormCard(
+                            title: 'Patient',
+                            children: [
+                              Obx(
+                                () => BentoPicker(
+                                  key: AddToQueueKeys.patientPicker,
+                                  label: 'Patient',
+                                  required: true,
+                                  value: controller.patient.value?.fullName,
+                                  placeholder: 'Search by name or MRN',
+                                  onTap: () => _openPatientPicker(controller),
+                                ),
+                              ),
+                              Obx(() {
+                                final patient = controller.patient.value;
+                                if (patient == null) {
+                                  return const SizedBox.shrink();
+                                }
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: InsetSurface(
+                                    padding: const EdgeInsets.all(14),
+                                    child: PatientIdentityBand(
+                                      name: patient.fullName,
+                                      mrn: patient.mrn,
+                                      age: Formatters.age(patient.dateOfBirth),
+                                      sex: patient.gender,
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ],
+                          ),
+
+                          const SizedBox(height: BentoSpace.section),
+
+                          // ── Acuity ──────────────────────────────────────
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SectionHeader(title: 'Triage'),
+                              BentoCard(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Obx(
+                                      () => Row(
+                                        children: [
+                                          for (var i = 0;
+                                              i <
+                                                  AddToQueueController
+                                                      .acuityCodes.length;
+                                              i++) ...[
+                                            if (i > 0)
+                                              const SizedBox(width: 6),
+                                            Expanded(
+                                              child: _AcuityButton(
+                                                code: AddToQueueController
+                                                    .acuityCodes[i],
+                                                selected: controller
+                                                        .acuity.value ==
+                                                    AddToQueueController
+                                                        .acuityCodes[i],
+                                                onTap: () => controller.acuity
+                                                        .value =
+                                                    AddToQueueController
+                                                        .acuityCodes[i],
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Obx(
+                                      () => Text(
+                                        CaseStatus.labelOfCode(
+                                          controller.acuity.value,
+                                        ),
+                                        style: Theme.of(context).brightness ==
+                                                Brightness.dark
+                                            ? AppTextStyles.darkSubheadline(
+                                                weight: FontWeight.w600,
+                                              )
+                                            : AppTextStyles.lightSubheadline(
+                                                weight: FontWeight.w600,
+                                              ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: BentoSpace.section),
+
+                          FormCard(
+                            title: 'Where',
+                            children: [
+                              Obx(
+                                () => BentoPicker(
+                                  key: AddToQueueKeys.departmentPicker,
+                                  label: 'Service',
+                                  required: true,
+                                  value: controller.serviceArea.value,
+                                  placeholder: 'Which desk are they waiting '
+                                      'for?',
+                                  onTap: () => _openServicePicker(controller),
+                                ),
+                              ),
+                              BentoInput(
+                                fieldKey: AddToQueueKeys.reasonField,
+                                label: 'Reason',
+                                controller: controller.serviceTypeController,
+                                hint: 'Optional — what they are here for',
+                              ),
+                              BentoInput(
+                                label: 'Room',
+                                controller: controller.roomController,
+                                hint: 'Optional — if a room is already '
+                                    'assigned',
+                                textInputAction: TextInputAction.done,
+                                onSubmitted: (_) => controller.submit(),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    BentoSpace.page,
+                    0,
+                    BentoSpace.page,
+                    BentoSpace.page,
+                  ),
+                  child: MaxWidthBody(
+                    maxWidth: 520,
+                    child: Obx(
+                      () => PrimaryBar(
+                        key: AddToQueueKeys.submit,
+                        label: 'Add to queue',
+                        busy: controller.isSubmitting.value,
+                        onPressed: controller.submit,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class _AddToQueueViewState extends State<AddToQueueView> {
-  final _formKey = GlobalKey<FormState>();
+/// One triage level, as a button carrying its own colour.
+class _AcuityButton extends StatelessWidget {
+  const _AcuityButton({
+    required this.code,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String code;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? AppColors.darkBackground : AppColors.lightBackground;
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final tint = CaseStatus.colorOfCode(code);
+    final ink = semanticInk(context, tint);
 
-    return Scaffold(
-      backgroundColor: bg,
-      appBar: AppBar(
-        backgroundColor:
-            isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            Icons.close_rounded,
-            color: textPrimary,
-            size: AppSpacing.iconLG,
-          ),
-          onPressed: () => Get.back(),
-        ),
-        title: Row(
-          children: [
-            const Icon(
-              Icons.add_circle_outline_rounded,
-              color: AppColors.secondary,
-              size: AppSpacing.iconLG,
+    return Semantics(
+      selected: selected,
+      button: true,
+      label: CaseStatus.labelOfCode(code),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(BentoRadius.control),
+        child: AnimatedContainer(
+          duration: motionDuration(context),
+          curve: Curves.easeOutCubic,
+          height: AppTheme.minTapTarget,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: tint.withValues(alpha: selected ? 0.22 : 0.08),
+            borderRadius: BorderRadius.circular(BentoRadius.control),
+            border: Border.all(
+              color: tint.withValues(alpha: selected ? 0.8 : 0.22),
+              width: selected ? 1.5 : 1,
             ),
-            const SizedBox(width: AppSpacing.sm),
-            Text(
-              'Add to Queue',
-              style: AppTextStyles.titleLarge(textPrimary)
-                  .copyWith(fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-      ),
-      body: GetBuilder<AddToQueueController>(
-        builder: (controller) {
-          return Form(
-            key: _formKey,
-            child: ListView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.xl,
-                vertical: AppSpacing.xl,
-              ),
-              children: [
-                // 1. Patient Dropdown / Search field
-                _buildSectionHeader('Patient *', isDark),
-                const SizedBox(height: AppSpacing.sm),
-                if (controller.selectedPatient != null)
-                  _buildSelectedPatientCard(controller, isDark)
-                else
-                  _buildPatientSearchField(controller, isDark),
-                const SizedBox(height: AppSpacing.xl),
-
-                // 2. Service Area Dropdown
-                _buildSectionHeader('Service Area *', isDark),
-                const SizedBox(height: AppSpacing.sm),
-                _buildServiceAreaDropdown(controller, isDark),
-                const SizedBox(height: AppSpacing.xl),
-
-                // 3. Service Type & Priority (Same Row)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      flex: 5,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildSectionHeader('Service Type', isDark),
-                          const SizedBox(height: AppSpacing.sm),
-                          _buildServiceTypeField(controller, isDark),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      flex: 5,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildSectionHeader('Priority *', isDark),
-                          const SizedBox(height: AppSpacing.sm),
-                          _buildPriorityDropdown(controller, isDark),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.xl),
-
-                // 4. Assigned Room
-                _buildSectionHeader('Assigned Room', isDark),
-                const SizedBox(height: AppSpacing.sm),
-                _buildAssignedRoomField(controller, isDark),
-                const SizedBox(height: AppSpacing.xxl + AppSpacing.xl),
-
-                // 5. Actions row
-                _buildActionsRow(controller, isDark, _formKey),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // ─── Input Builders ────────────────────────────────────────────────────────
-
-  Widget _buildSectionHeader(String title, bool isDark) {
-    final textColor =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    return Text(
-      title,
-      style: AppTextStyles.labelMedium(textColor)
-          .copyWith(fontWeight: FontWeight.w600),
-    );
-  }
-
-  Widget _buildSelectedPatientCard(
-      AddToQueueController controller, bool isDark) {
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-    final cardBg = isDark ? AppColors.darkSurface : AppColors.lightSurface;
-    final patient = controller.selectedPatient!;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: AppDecorations.borderMD,
-        border: Border.all(
-            color: AppColors.primary.withValues(alpha: 0.3), width: 1),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.sm),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.person_rounded, color: AppColors.primary),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  patient.fullName,
-                  style: AppTextStyles.titleSmall(textPrimary)
-                      .copyWith(fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  patient.mrn,
-                  style: AppTextStyles.numeric(textSecondary, fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: Icon(Icons.close_rounded,
-                color: isDark
-                    ? AppColors.darkTextSecondary
-                    : AppColors.lightTextSecondary),
-            onPressed: () => controller.clearSelectedPatient(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPatientSearchField(
-      AddToQueueController controller, bool isDark) {
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.black.withValues(alpha: 0.08);
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-
-    return Column(
-      children: [
-        TextFormField(
-          controller: controller.searchController,
-          onChanged: controller.onPatientSearchChanged,
-          style: AppTextStyles.bodyMedium(textPrimary),
-          decoration: InputDecoration(
-            hintText: 'Search patient by name or MRN...',
-            hintStyle:
-                AppTextStyles.bodyMedium(textSecondary.withValues(alpha: 0.5)),
-            filled: true,
-            fillColor: isDark
-                ? Colors.white.withValues(alpha: 0.06)
-                : Colors.white.withValues(alpha: 0.7),
-            prefixIcon: const Icon(Icons.search_rounded,
-                color: AppColors.primary, size: 18),
-            suffixIcon: controller.isLoadingPatients
-                ? const Padding(
-                    padding: EdgeInsets.all(AppSpacing.md),
-                    child: SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: AppColors.primary),
-                    ),
-                  )
-                : null,
-            border: OutlineInputBorder(
-              borderRadius: AppDecorations.borderMD,
-              borderSide: BorderSide(color: borderColor),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: AppDecorations.borderMD,
-              borderSide: BorderSide(color: borderColor),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: AppDecorations.borderMD,
-              borderSide:
-                  const BorderSide(color: AppColors.primary, width: 1.5),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.lg, vertical: AppSpacing.md),
-          ),
-        ),
-        if (controller.patientsList.isNotEmpty) ...[
-          const SizedBox(height: AppSpacing.xs),
-          Container(
-            constraints: const BoxConstraints(maxHeight: 220),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-              borderRadius: AppDecorations.borderMD,
-              boxShadow: AppDecorations.elevation2(isDark),
-              border: Border.all(color: borderColor),
-            ),
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: controller.patientsList.length,
-              itemBuilder: (context, index) {
-                final p = controller.patientsList[index];
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                    child: Text(
-                      p.fullName.isNotEmpty ? p.fullName[0].toUpperCase() : '',
-                      style: AppTextStyles.labelMedium(AppColors.primary),
-                    ),
-                  ),
-                  title: Text(p.fullName,
-                      style: AppTextStyles.bodyMedium(textPrimary)
-                          .copyWith(fontWeight: FontWeight.w600)),
-                  subtitle: Text(p.mrn,
-                      style:
-                          AppTextStyles.numeric(textSecondary, fontSize: 11)),
-                  trailing: Icon(Icons.keyboard_arrow_right_rounded,
-                      color: textSecondary, size: 18),
-                  onTap: () => controller.selectPatient(p),
-                );
-              },
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildServiceAreaDropdown(
-      AddToQueueController controller, bool isDark) {
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.black.withValues(alpha: 0.08);
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-
-    return DropdownButtonFormField<String>(
-      initialValue: controller.selectedServiceArea,
-      icon: const Icon(Icons.keyboard_arrow_down_rounded,
-          color: AppColors.primary),
-      dropdownColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-      style: AppTextStyles.bodyMedium(textPrimary),
-      onChanged: (val) {
-        if (val != null) controller.selectServiceArea(val);
-      },
-      items:
-          controller.serviceAreas.map<DropdownMenuItem<String>>((String val) {
-        return DropdownMenuItem<String>(
-          value: val,
-          child: Text(val),
-        );
-      }).toList(),
-      validator: (val) =>
-          val == null || val.isEmpty ? 'Service area is required' : null,
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: isDark
-            ? Colors.white.withValues(alpha: 0.06)
-            : Colors.white.withValues(alpha: 0.7),
-        border: OutlineInputBorder(
-          borderRadius: AppDecorations.borderMD,
-          borderSide: BorderSide(color: borderColor),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: AppDecorations.borderMD,
-          borderSide: BorderSide(color: borderColor),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: AppDecorations.borderMD,
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg, vertical: AppSpacing.md),
-      ),
-    );
-  }
-
-  Widget _buildServiceTypeField(AddToQueueController controller, bool isDark) {
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.black.withValues(alpha: 0.08);
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-
-    return TextFormField(
-      controller: controller.serviceTypeController,
-      style: AppTextStyles.bodyMedium(textPrimary),
-      decoration: InputDecoration(
-        hintText: 'e.g. consultation',
-        hintStyle:
-            AppTextStyles.bodyMedium(textSecondary.withValues(alpha: 0.5)),
-        filled: true,
-        fillColor: isDark
-            ? Colors.white.withValues(alpha: 0.06)
-            : Colors.white.withValues(alpha: 0.7),
-        border: OutlineInputBorder(
-          borderRadius: AppDecorations.borderMD,
-          borderSide: BorderSide(color: borderColor),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: AppDecorations.borderMD,
-          borderSide: BorderSide(color: borderColor),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: AppDecorations.borderMD,
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg, vertical: AppSpacing.md),
-      ),
-    );
-  }
-
-  Widget _buildPriorityDropdown(AddToQueueController controller, bool isDark) {
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.black.withValues(alpha: 0.08);
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-
-    return DropdownButtonFormField<String>(
-      initialValue: controller.selectedPriority,
-      icon: const Icon(Icons.keyboard_arrow_down_rounded,
-          color: AppColors.primary),
-      dropdownColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-      style: AppTextStyles.bodyMedium(textPrimary),
-      onChanged: (val) {
-        if (val != null) controller.selectPriority(val);
-      },
-      items: controller.priorities.map<DropdownMenuItem<String>>((String val) {
-        return DropdownMenuItem<String>(
-          value: val,
-          child: Text(val),
-        );
-      }).toList(),
-      validator: (val) =>
-          val == null || val.isEmpty ? 'Priority is required' : null,
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: isDark
-            ? Colors.white.withValues(alpha: 0.06)
-            : Colors.white.withValues(alpha: 0.7),
-        border: OutlineInputBorder(
-          borderRadius: AppDecorations.borderMD,
-          borderSide: BorderSide(color: borderColor),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: AppDecorations.borderMD,
-          borderSide: BorderSide(color: borderColor),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: AppDecorations.borderMD,
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg, vertical: AppSpacing.md),
-      ),
-    );
-  }
-
-  Widget _buildAssignedRoomField(AddToQueueController controller, bool isDark) {
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.black.withValues(alpha: 0.08);
-    final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-
-    return TextFormField(
-      controller: controller.assignedRoomController,
-      style: AppTextStyles.bodyMedium(textPrimary),
-      decoration: InputDecoration(
-        hintText: 'e.g. Room 3',
-        hintStyle:
-            AppTextStyles.bodyMedium(textSecondary.withValues(alpha: 0.5)),
-        filled: true,
-        fillColor: isDark
-            ? Colors.white.withValues(alpha: 0.06)
-            : Colors.white.withValues(alpha: 0.7),
-        border: OutlineInputBorder(
-          borderRadius: AppDecorations.borderMD,
-          borderSide: BorderSide(color: borderColor),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: AppDecorations.borderMD,
-          borderSide: BorderSide(color: borderColor),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: AppDecorations.borderMD,
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg, vertical: AppSpacing.md),
-      ),
-    );
-  }
-
-  Widget _buildActionsRow(AddToQueueController controller, bool isDark,
-      GlobalKey<FormState> formKey) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        // Cancel Button
-        OutlinedButton(
-          onPressed: () => Get.back(),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size(120, 52),
-            side: BorderSide(
-                color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.xxl, vertical: AppSpacing.md),
-            shape:
-                RoundedRectangleBorder(borderRadius: AppDecorations.borderMD),
           ),
           child: Text(
-            'Cancel',
-            style: AppTextStyles.labelLarge(isDark
-                ? AppColors.darkTextPrimary
-                : AppColors.lightTextPrimary),
+            code,
+            style: AppFonts.numeric(
+              fontSize: 14,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+              color: ink,
+              height: 1.0,
+            ),
           ),
         ),
-        const SizedBox(width: AppSpacing.md),
-        // Add to Queue Button
-        ElevatedButton.icon(
-          onPressed: controller.isSaving
-              ? null
-              : () => controller.submit(formKey.currentState, context),
-          icon: controller.isSaving
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                      color: Colors.white, strokeWidth: 2),
-                )
-              : const Icon(Icons.add_circle_outline_rounded, size: 18),
-          label: const Text('Add to Queue'),
-          style: ElevatedButton.styleFrom(
-            minimumSize: const Size(160, 52),
-            backgroundColor: AppColors.secondary,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.xxl, vertical: AppSpacing.md),
-            shape:
-                RoundedRectangleBorder(borderRadius: AppDecorations.borderMD),
-          ),
-        ),
-      ],
+      ),
     );
   }
+}
+
+Future<void> _openPatientPicker(AddToQueueController controller) {
+  return Get.bottomSheet<void>(
+    SheetShell(
+      title: 'Patient',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SearchField(
+            hint: 'Name or MRN',
+            onChanged: controller.onSearchChanged,
+          ),
+          const SizedBox(height: 12),
+          Flexible(
+            child: Obx(() {
+              if (controller.isSearching.value &&
+                  controller.patients.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: BentoSkeleton(rows: 3),
+                );
+              }
+
+              final rows = controller.patients.take(40).toList();
+              if (rows.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: EmptyState(
+                    compact: true,
+                    icon: Icons.person_search_outlined,
+                    title: 'No patient matches that',
+                  ),
+                );
+              }
+
+              return ListView.separated(
+                shrinkWrap: true,
+                itemCount: rows.length,
+                separatorBuilder: (_, _) => const Hairline(),
+                itemBuilder: (context, i) => SheetRow(
+                  icon: Icons.person_outline_rounded,
+                  label: rows[i].fullName,
+                  sublabel: [
+                    if (rows[i].mrn.isNotEmpty) 'MRN ${rows[i].mrn}',
+                    Formatters.age(rows[i].dateOfBirth),
+                    if (rows[i].gender?.isNotEmpty ?? false) rows[i].gender!,
+                  ].where((s) => s != '—').join(' · '),
+                  selected: controller.patient.value?.id == rows[i].id,
+                  onTap: () {
+                    controller.patient.value = rows[i];
+                    Get.back<void>();
+                  },
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
+    ),
+    isScrollControlled: true,
+  );
+}
+
+Future<void> _openServicePicker(AddToQueueController controller) {
+  return Get.bottomSheet<void>(
+    SheetShell(
+      title: 'Service',
+      scrollable: true,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final area in AddToQueueController.serviceAreas.keys)
+            SheetRow(
+              icon: switch (area) {
+                'Emergency' => Icons.emergency_outlined,
+                'Laboratory' => Icons.science_outlined,
+                'Pharmacy' => Icons.medication_outlined,
+                'Radiology' => Icons.monitor_heart_outlined,
+                'MCH' => Icons.pregnant_woman_outlined,
+                'Psychiatric' => Icons.psychology_outlined,
+                _ => Icons.meeting_room_outlined,
+              },
+              label: area,
+              selected: controller.serviceArea.value == area,
+              onTap: () {
+                controller.serviceArea.value = area;
+                Get.back<void>();
+              },
+            ),
+        ],
+      ),
+    ),
+    isScrollControlled: true,
+  );
 }

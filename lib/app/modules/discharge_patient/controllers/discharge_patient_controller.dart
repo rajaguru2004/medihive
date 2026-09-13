@@ -1,240 +1,168 @@
 import 'package:flutter/material.dart';
-
-import 'package:dio/dio.dart';
 import 'package:get/get.dart' hide Response;
 
+import '../../../core/app_clock.dart';
 import '../../../data/models/admission_model.dart';
 import '../../../data/models/appointment_model.dart';
+import '../../../data/services/data_bus.dart';
 import '../../../data/services/inpatient_service.dart';
-import '../../inpatient/controllers/inpatient_controller.dart';
-import '../../inpatient_admissions/controllers/inpatient_admissions_controller.dart';
-import '../../inpatient_beds_grid/controllers/inpatient_beds_grid_controller.dart';
-import '../../inpatient_overview/controllers/inpatient_overview_controller.dart';
-import '../../inpatient_wards/controllers/inpatient_wards_controller.dart';
-import '../../../data/models/discharge_patient_model.dart';
+import '../../../data/utils/error_handler.dart';
+import '../../../data/utils/legacy_envelope.dart';
+import '../../../data/utils/load_state.dart';
+import '../../../theme/theme.dart';
 
-class DischargePatientController extends GetxController {
+/// Discharge a patient.
+///
+/// The one screen in this app that ends a record rather than starting one, and
+/// the only one that asks for confirmation before it writes: a discharge frees
+/// a bed, closes an admission and cannot be undone from the app.
+class DischargePatientController extends GetxController with LoadStateMixin {
+  static DischargePatientController get to =>
+      Get.find<DischargePatientController>();
+
   final _service = Get.find<InpatientService>();
 
-  late final AdmissionModel admission;
-
-  // Controllers
+  final formKey = GlobalKey<FormState>();
   final reasonController = TextEditingController();
   final summaryController = TextEditingController();
-  final directivesController = TextEditingController();
+  final followUpNotesController = TextEditingController();
 
-  // Selected values
-  AppointmentDoctor? selectedDoctor;
-  DateTime? selectedFollowUpDate;
+  final admission = Rxn<AdmissionModel>();
+  final doctors = <AppointmentDoctor>[].obs;
+  final dischargingDoctor = Rxn<AppointmentDoctor>();
+  final followUpDate = Rxn<DateTime>();
+  final outcome = 'Recovered'.obs;
 
-  // State flags
-  bool isLoadingDoctors = false;
-  bool isSubmitting = false;
+  final isSubmitting = false.obs;
+  final errorMessage = RxnString();
 
-  List<AppointmentDoctor> doctors = [];
+  /// Discharge outcomes, and what the API stores.
+  ///
+  /// "Died" is on the list because it is a real outcome and an app that omits
+  /// it forces somebody to record a death as "other". It is deliberately last.
+  static const outcomeValues = <String, String>{
+    'Recovered': 'recovered',
+    'Improved': 'improved',
+    'Referred on': 'referred',
+    'Transferred': 'transferred',
+    'Self-discharge': 'self_discharge',
+    'Died': 'died',
+  };
+
+  static List<String> get outcomes => outcomeValues.keys.toList();
+
+  /// Whether a follow-up makes sense for the chosen outcome.
+  bool get wantsFollowUp =>
+      outcome.value != 'Died' && outcome.value != 'Transferred';
 
   @override
-  void onInit() {
-    super.onInit();
-    // Retrieve argument passed
-    if (Get.arguments is AdmissionModel) {
-      admission = Get.arguments as AdmissionModel;
-    } else {
-      // Fallback/Safety (should not happen if args passed properly)
-      debugPrint(
-          '[DischargePatientController] Warning: No admission argument provided.');
+  void onReady() {
+    super.onReady();
+    load();
+  }
+
+  Future<void> load() => runGuarded(
+        () async {
+          final argument = Get.arguments;
+          final admissionId = argument is Map ? argument['admissionId'] : null;
+
+          final results = await Future.wait([
+            _service.fetchAdmissions(),
+            _service.fetchDoctors(),
+          ]);
+
+          final rows = envelopeRows(results[0].data)
+              .map(AdmissionModel.fromJson)
+              .toList();
+          admission.value = admissionId is String
+              ? rows.firstWhereOrNull((a) => a.id == admissionId)
+              : null;
+
+          doctors.assignAll(
+            envelopeRows(results[1].data)
+                .map(AppointmentDoctor.fromJson)
+                .toList(),
+          );
+
+          if (admission.value == null) {
+            throw const FormatException(
+              'That admission could not be found. It may already be closed.',
+            );
+          }
+        },
+        fallback: "Couldn't load the admission.",
+      );
+
+  String? validateReason(String? value) =>
+      (value ?? '').trim().isEmpty ? 'Why is this patient going home?' : null;
+
+  Future<void> pickFollowUpDate(BuildContext context) async {
+    final now = AppClock.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: followUpDate.value ?? now.add(const Duration(days: 7)),
+      // No past dates: a follow-up already in the past is a typo, and the
+      // picker is the cheapest place to catch it.
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365)),
+    );
+    if (picked != null) followUpDate.value = picked;
+  }
+
+  void clearFollowUp() => followUpDate.value = null;
+
+  Future<void> submit() async {
+    if (isSubmitting.value) return;
+    if (!(formKey.currentState?.validate() ?? false)) return;
+
+    final record = admission.value;
+    if (record == null) {
+      errorMessage.value = 'No admission loaded.';
+      return;
     }
-    _loadDoctors();
+
+    FocusManager.instance.primaryFocus?.unfocus();
+    isSubmitting.value = true;
+    errorMessage.value = null;
+
+    final name = record.patient.fullName;
+
+    try {
+      final response = await _service.dischargePatient(
+        admissionId: record.id,
+        dischargeReason: outcomeValues[outcome.value] ?? 'recovered',
+        dischargeSummary: summaryController.text.trim().isEmpty
+            ? reasonController.text.trim()
+            : summaryController.text.trim(),
+        dischargeDoctorId: dischargingDoctor.value?.id ?? '',
+        followUpDate: wantsFollowUp ? followUpDate.value : null,
+        followUpNotes:
+            wantsFollowUp ? followUpNotesController.text.trim() : null,
+      );
+
+      if (!envelopeOk(response.data, statusCode: response.statusCode)) {
+        errorMessage.value =
+            envelopeMessage(response.data) ?? "Couldn't discharge $name.";
+        return;
+      }
+
+      if (Get.isRegistered<DataBus>()) DataBus.to.changedBed();
+      Get.back<void>();
+      showBentoToast(
+        '$name discharged. Bed ${record.bed.bedNumber} is free.',
+      );
+    } catch (e) {
+      errorMessage.value = parseErrorMessage(e, "Couldn't discharge $name.");
+    } finally {
+      isSubmitting.value = false;
+    }
   }
 
   @override
   void onClose() {
     reasonController.dispose();
     summaryController.dispose();
-    directivesController.dispose();
+    followUpNotesController.dispose();
     super.onClose();
-  }
-
-  Future<void> _loadDoctors() async {
-    isLoadingDoctors = true;
-    update();
-
-    try {
-      final res = await _service.fetchDoctors();
-      if (res.data != null && res.data['success'] == true) {
-        final List<dynamic> rawList = res.data['data'] ?? [];
-        doctors = rawList
-            .map((e) => AppointmentDoctor.fromJson(e as Map<String, dynamic>))
-            .toList();
-      }
-    } catch (e) {
-      debugPrint('[DischargePatientController] Error loading doctors: $e');
-    } finally {
-      isLoadingDoctors = false;
-      update();
-    }
-  }
-
-  void selectDoctor(AppointmentDoctor? doc) {
-    selectedDoctor = doc;
-    update();
-  }
-
-  Future<void> selectFollowUpDate(BuildContext context) async {
-    final now = DateTime.now();
-    final firstDate = now;
-    final lastDate = now.add(const Duration(days: 365));
-
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: selectedFollowUpDate ?? now,
-      firstDate: firstDate,
-      lastDate: lastDate,
-      builder: (context, child) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        return Theme(
-          data: isDark
-              ? ThemeData.dark().copyWith(
-                  colorScheme: const ColorScheme.dark(
-                    primary: Color(0xFF30D158),
-                    onPrimary: Colors.white,
-                    surface: Color(0xFF1C1C1E),
-                    onSurface: Colors.white,
-                  ),
-                )
-              : ThemeData.light().copyWith(
-                  colorScheme: const ColorScheme.light(
-                    primary: Color(0xFF30D158),
-                    onPrimary: Colors.white,
-                    surface: Colors.white,
-                    onSurface: Colors.black,
-                  ),
-                ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      selectedFollowUpDate = picked;
-      update();
-    }
-  }
-
-  Future<void> submitDischarge() async {
-    if (isSubmitting) return;
-
-    final reason = reasonController.text.trim();
-    final summary = summaryController.text.trim();
-    final directives = directivesController.text.trim();
-
-    // Validation
-    if (reason.isEmpty) {
-      _showValidationError('Discharge reason is required');
-      return;
-    }
-    if (selectedDoctor == null) {
-      _showValidationError('Please select a discharging doctor');
-      return;
-    }
-    if (summary.isEmpty) {
-      _showValidationError('Discharge summary is required');
-      return;
-    }
-
-    isSubmitting = true;
-    update();
-
-    // Instantiate separate model for patient discharge data
-    final dischargeData = DischargePatientModel(
-      admissionId: admission.id,
-      dischargeReason: reason,
-      dischargeSummary: summary,
-      dischargeDoctorId: selectedDoctor!.id,
-      followUpDate: selectedFollowUpDate,
-      followUpNotes: directives,
-    );
-
-    try {
-      final res = await _service.dischargePatient(
-        admissionId: dischargeData.admissionId,
-        dischargeReason: dischargeData.dischargeReason,
-        dischargeSummary: dischargeData.dischargeSummary,
-        dischargeDoctorId: dischargeData.dischargeDoctorId,
-        followUpDate: dischargeData.followUpDate,
-        followUpNotes: dischargeData.followUpNotes,
-      );
-
-      if (res.data != null && res.data['success'] == true) {
-        // Navigate back first
-        Get.back();
-
-        Get.snackbar(
-          'Success',
-          res.data['message'] ?? 'Patient discharged successfully.',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: const Color(0xFF30D158).withValues(alpha: 0.9),
-          colorText: Colors.white,
-        );
-
-        // Refresh all data
-        if (Get.isRegistered<InpatientController>()) {
-          Get.find<InpatientController>().refreshAllData();
-        }
-        if (Get.isRegistered<InpatientWardsController>()) {
-          Get.find<InpatientWardsController>().refreshAllData();
-        }
-        if (Get.isRegistered<InpatientOverviewController>()) {
-          Get.find<InpatientOverviewController>().refreshData();
-        }
-        if (Get.isRegistered<InpatientAdmissionsController>()) {
-          Get.find<InpatientAdmissionsController>().refreshAllData();
-        }
-        if (Get.isRegistered<InpatientBedsGridController>()) {
-          Get.find<InpatientBedsGridController>().refreshAllData();
-        }
-      } else {
-        final msg = res.data != null ? res.data['message'] as String? : null;
-        Get.snackbar(
-          'Error',
-          msg ?? 'Failed to discharge patient.',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: const Color(0xFFFF453A).withValues(alpha: 0.9),
-          colorText: Colors.white,
-        );
-      }
-    } on DioException catch (e) {
-      final msg = e.response?.data?['message'] ??
-          e.message ??
-          'Network error. Please try again.';
-      Get.snackbar(
-        'Error',
-        msg,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: const Color(0xFFFF453A).withValues(alpha: 0.9),
-        colorText: Colors.white,
-      );
-    } catch (e) {
-      Get.snackbar(
-        'Error',
-        'An error occurred. Please try again.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: const Color(0xFFFF453A).withValues(alpha: 0.9),
-        colorText: Colors.white,
-      );
-    } finally {
-      isSubmitting = false;
-      update();
-    }
-  }
-
-  void _showValidationError(String message) {
-    Get.snackbar(
-      'Validation Error',
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: const Color(0xFFFF9F0A).withValues(alpha: 0.9),
-      colorText: Colors.white,
-    );
   }
 }
