@@ -43,3 +43,12 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Screenshots from a design pass. Evidence of one build, not an artefact of
+# the repo — regenerate with the drive command in README.md.
+/.review/
+
+# Analyzer scratch output from before the port. Kept out rather than deleted
+# in case somebody is mid-diff against it.
+/analyze_output.txt
+/analyze_utf8.txt
