@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart' show GetModalBottomSheetRoute;
+import 'package:get/get.dart';
 
 import 'app_colors.dart';
 import 'app_fonts.dart';
 import 'app_text_styles.dart';
+import 'app_theme_controller.dart';
 import 'brand_palette.dart';
+import 'theme_service.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// MediHive — Surfaces
@@ -396,6 +398,32 @@ class SheetShell extends StatelessWidget {
     final lift =
         ModalRoute.of(context) is GetModalBottomSheetRoute ? 0.0 : insets;
 
+    // Re-assert the mode the app is actually in.
+    //
+    // `Get.bottomSheet` snapshots `Theme.of(...)` when the route is pushed and
+    // wraps the sheet in it for the route's whole life. A sheet therefore does
+    // not follow a later theme change — it keeps the mode it was opened in,
+    // and renders a white sheet over a dark app. The same staleness applies
+    // when `ThemeService` rebuilds the theme for new site branding while a
+    // sheet is open.
+    //
+    // `AppThemeController` is the source of truth for the mode (it resolves
+    // "system" too, which `Get.isDarkMode` reads off the snapshotted theme and
+    // so gets wrong here). Falls back to the inherited theme when the
+    // controller is not registered, which is the case in a bare widget test.
+    final themeMode = Get.isRegistered<AppThemeController>() &&
+            Get.isRegistered<ThemeService>()
+        ? (AppThemeController.to.isDark
+            ? ThemeService.to.darkTheme
+            : ThemeService.to.lightTheme)
+        : null;
+    if (themeMode != null && themeMode.brightness != Theme.of(context).brightness) {
+      return Theme(
+        data: themeMode,
+        child: SheetShell(title: title, scrollable: scrollable, child: child),
+      );
+    }
+
     // The sheet paints its own surface.
     //
     // It cannot rely on the route to do it: `Get.bottomSheet` does not read
@@ -464,7 +492,12 @@ class SheetShell extends StatelessWidget {
               ),
               if (title != null)
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                padding: const EdgeInsets.fromLTRB(
+                  kSheetInset,
+                  0,
+                  kSheetInset,
+                  12,
+                ),
                 child: Text(
                   title!,
                   style: isDark
@@ -489,12 +522,40 @@ class SheetShell extends StatelessWidget {
 
 /// The two radii a sheet needs, kept here because `app_bento.dart` imports
 /// this file rather than the other way round.
+/// The horizontal inset a sheet's own content sits at.
+///
+/// `SheetRow` pads itself — it needs its ink to reach wider than its text —
+/// so [SheetShell] leaves its child alone and anything that is *not* a row
+/// goes through [SheetSection] to line up with them.
+const double kSheetInset = 20;
+
 abstract final class BentoSheetRadius {
   /// The top corners of the sheet itself.
   static const double top = 28;
 
   /// The grab handle.
   static const double handle = 2;
+}
+
+/// Non-row content inside a [SheetShell], at the sheet's own inset.
+///
+/// Exists because a sheet's rows pad themselves and its headers do not, so an
+/// identity band dropped straight into a [SheetShell] sits flush against the
+/// screen edge while the rows beneath it are inset — and anything on its right,
+/// an acuity pill in particular, runs off the edge entirely.
+class SheetSection extends StatelessWidget {
+  const SheetSection({super.key, required this.child, this.bottom = 0});
+
+  final Widget child;
+
+  /// Space under the section. For separating a header from the rows.
+  final double bottom;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: EdgeInsets.fromLTRB(kSheetInset, 0, kSheetInset, bottom),
+        child: child,
+      );
 }
 
 /// One tappable row inside a [SheetShell] or an [InsetSurface].
