@@ -222,7 +222,10 @@ class _Vitals extends StatelessWidget {
                   title: 'No observations recorded',
                   message: 'Add them by editing this screening.',
                 )
-              : VitalsGrid(tiles: tiles, columns: 3),
+              // Two across, not three. A blood pressure is a compound value —
+              // "168/96" is twice the width of a pulse — and at three columns
+              // on a 411dp phone it is the one reading that has to shrink.
+              : VitalsGrid(tiles: tiles, columns: 2),
         ),
       ],
     );

@@ -197,15 +197,23 @@ class VitalFigure extends StatelessWidget {
       textBaseline: TextBaseline.alphabetic,
       children: [
         Flexible(
-          child: Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.vital(
-              brightness,
-              size: size,
-              weight: weight,
-              color: tone == null ? null : semanticInk(context, tone!),
+          // Shrink, never ellipsise. A truncated reading is worse than no
+          // reading: "16…" could be 160, 168 or 16, and a clinician has no way
+          // to tell which — a blood pressure of 168/96 is the exact case this
+          // component exists to show. `scaleDown` only ever reduces, so a
+          // figure that fits is drawn at its full size.
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: AppTextStyles.vital(
+                brightness,
+                size: size,
+                weight: weight,
+                color: tone == null ? null : semanticInk(context, tone!),
+              ),
             ),
           ),
         ),

@@ -289,11 +289,20 @@ abstract final class World {
     _bed('b-12', 'w-1', '12', 'occupied'),
   ];
 
+  /// One live admission for every bed marked occupied, and no more.
+  ///
+  /// The coherence matters on screen: a bed the map paints as occupied with no
+  /// admission behind it renders the word "Occupied" where its neighbours
+  /// render a name, which reads as a rendering fault rather than as data.
   static final _admissions = [
     _admission('adm-1', 'b-1', '01', 'active', -9, 'p-2', 'MRN-10422', 'Tom', 'Whitfield', 'Male', 'Chest pain, rule out ACS'),
     _admission('adm-2', 'b-2', '02', 'active', -3, 'p-4', 'MRN-10424', 'Grace', 'Mwangi', 'Female', 'Community-acquired pneumonia'),
     _admission('adm-3', 'b-4', '04', 'active', -1, 'p-6', 'MRN-10426', 'Yusuf', 'Adeyemi', 'Male', 'Post-operative observation'),
     _admission('adm-4', 'b-8', '08', 'active', 0, 'p-1', 'MRN-10421', 'Ifeoma', 'Balogun', 'Female', 'Dehydration, IV fluids'),
+    _admission('adm-6', 'b-9', '09', 'active', -21, 'p-3', 'MRN-10423', 'Sana', 'Qureshi', 'Female', 'Bronchiolitis, on oxygen'),
+    _admission('adm-7', 'b-11', '11', 'active', -2, 'p-5', 'MRN-10425', 'Henrik', 'Nilsen', 'Male', 'Cellulitis, IV antibiotics'),
+    _admission('adm-8', 'b-12', '12', 'active', -5, 'p-6', 'MRN-10426', 'Yusuf', 'Adeyemi', 'Male', 'Awaiting social care package'),
+    // Closed, so the ward round excludes it and the register still shows it.
     _admission('adm-5', 'b-3', '03', 'discharged', -14, 'p-5', 'MRN-10425', 'Henrik', 'Nilsen', 'Male', 'Elective knee repair'),
   ];
 
