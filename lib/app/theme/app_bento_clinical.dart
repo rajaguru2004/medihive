@@ -929,10 +929,17 @@ class PatientIdentityBand extends StatelessWidget {
     final brightness = Theme.of(context).brightness;
     final isDark = brightness == Brightness.dark;
 
+    // An em-dash is what `Formatters.age` returns for an unknown date of
+    // birth. In a fact list that placeholder is honest; joined into an
+    // identity line it reads as "— · Male", which looks like a rendering
+    // fault rather than like a missing date.
+    bool present(String? value) =>
+        value != null && value.trim().isNotEmpty && value.trim() != '—';
+
     final facts = <String>[
-      if (age != null && age!.isNotEmpty) age!,
-      if (sex != null && sex!.isNotEmpty) sex!,
-      if (extra != null && extra!.isNotEmpty) extra!,
+      if (present(age)) age!,
+      if (present(sex)) sex!,
+      if (present(extra)) extra!,
     ];
 
     return Column(

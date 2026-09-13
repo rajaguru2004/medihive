@@ -87,12 +87,19 @@ class DischargePatientView extends GetView<DischargePatientController> {
                                   const SizedBox(height: 14),
                                   const Hairline(),
                                   const SizedBox(height: 6),
+                                  // Two facts rather than one joined string: a
+                                  // FactRow gives its value about half the
+                                  // width, and "Acute Medical · bed 01"
+                                  // truncates to "Acute Medical · be…".
+                                  if (admission.bed.ward?.name.isNotEmpty ??
+                                      false)
+                                    FactRow(
+                                      label: 'Ward',
+                                      value: admission.bed.ward!.name,
+                                    ),
                                   FactRow(
                                     label: 'Bed',
-                                    value: [
-                                      admission.bed.ward?.name ?? '',
-                                      'bed ${admission.bed.bedNumber}',
-                                    ].where((s) => s.isNotEmpty).join(' · '),
+                                    value: admission.bed.bedNumber,
                                   ),
                                   FactRow(
                                     label: 'Admitted',

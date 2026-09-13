@@ -98,12 +98,12 @@ abstract final class World {
         'Laboratory': 3,
       },
       'recentPatients': [
-        _patientRow('p-1', 'MRN-10421', 'Ifeoma', 'Balogun', 'Female', '1991-04-12'),
-        _patientRow('p-2', 'MRN-10422', 'Tom', 'Whitfield', 'Male', '1958-11-02'),
-        _patientRow('p-3', 'MRN-10423', 'Sana', 'Qureshi', 'Female', '2019-07-30'),
-        _patientRow('p-4', 'MRN-10424', 'Grace', 'Mwangi', 'Female', '1976-01-19'),
-        _patientRow('p-5', 'MRN-10425', 'Henrik', 'Nilsen', 'Male', '2002-09-08'),
-        _patientRow('p-6', 'MRN-10426', 'Yusuf', 'Adeyemi', 'Male', '1984-03-25'),
+        _patientRow('p-1', '10421', 'Ifeoma', 'Balogun', 'Female', '1991-04-12'),
+        _patientRow('p-2', '10422', 'Tom', 'Whitfield', 'Male', '1958-11-02'),
+        _patientRow('p-3', '10423', 'Sana', 'Qureshi', 'Female', '2019-07-30'),
+        _patientRow('p-4', '10424', 'Grace', 'Mwangi', 'Female', '1976-01-19'),
+        _patientRow('p-5', '10425', 'Henrik', 'Nilsen', 'Male', '2002-09-08'),
+        _patientRow('p-6', '10426', 'Yusuf', 'Adeyemi', 'Male', '1984-03-25'),
       ],
       'upcomingAppointments': [
         {
@@ -113,7 +113,7 @@ abstract final class World {
           'status': 'confirmed',
           'patient': {
             'id': 'p-1',
-            'mrn': 'MRN-10421',
+            'mrn': '10421',
             'firstName': 'Ifeoma',
             'lastName': 'Balogun',
           },
@@ -125,7 +125,7 @@ abstract final class World {
           'status': 'scheduled',
           'patient': {
             'id': 'p-2',
-            'mrn': 'MRN-10422',
+            'mrn': '10422',
             'firstName': 'Tom',
             'lastName': 'Whitfield',
           },
@@ -137,7 +137,7 @@ abstract final class World {
           'status': 'scheduled',
           'patient': {
             'id': 'p-4',
-            'mrn': 'MRN-10424',
+            'mrn': '10424',
             'firstName': 'Grace',
             'lastName': 'Mwangi',
           },
@@ -169,17 +169,17 @@ abstract final class World {
   /// Deliberately mixed acuity and mixed wait, so the board's sort and its
   /// breach flag are both visible in one screenshot.
   static final _liveQueue = [
-    _queueRow('q-1', 1, 'P1', 'waiting', 'Emergency', 42, 'p-2', 'MRN-10422', 'Tom', 'Whitfield', 'Male'),
-    _queueRow('q-2', 2, 'P3', 'waiting', 'Emergency', 18, 'p-6', 'MRN-10426', 'Yusuf', 'Adeyemi', 'Male'),
-    _queueRow('q-3', 3, 'P4', 'waiting', 'OPD', 35, 'p-1', 'MRN-10421', 'Ifeoma', 'Balogun', 'Female'),
-    _queueRow('q-4', 4, 'P5', 'waiting', 'OPD', 8, 'p-5', 'MRN-10425', 'Henrik', 'Nilsen', 'Male'),
-    _queueRow('q-5', 5, 'P2', 'called', 'Emergency', 12, 'p-3', 'MRN-10423', 'Sana', 'Qureshi', 'Female'),
-    _queueRow('q-6', 6, 'P4', 'in_service', 'Radiology', 24, 'p-4', 'MRN-10424', 'Grace', 'Mwangi', 'Female'),
+    _queueRow('q-1', 1, 'P1', 'waiting', 'Emergency', 42, 'p-2', '10422', 'Tom', 'Whitfield', 'Male'),
+    _queueRow('q-2', 2, 'P3', 'waiting', 'Emergency', 18, 'p-6', '10426', 'Yusuf', 'Adeyemi', 'Male'),
+    _queueRow('q-3', 3, 'P4', 'waiting', 'OPD', 35, 'p-1', '10421', 'Ifeoma', 'Balogun', 'Female'),
+    _queueRow('q-4', 4, 'P5', 'waiting', 'OPD', 8, 'p-5', '10425', 'Henrik', 'Nilsen', 'Male'),
+    _queueRow('q-5', 5, 'P2', 'called', 'Emergency', 12, 'p-3', '10423', 'Sana', 'Qureshi', 'Female'),
+    _queueRow('q-6', 6, 'P4', 'in_service', 'Radiology', 24, 'p-4', '10424', 'Grace', 'Mwangi', 'Female'),
   ];
 
   static final _queueHistory = [
-    _queueRow('q-7', 7, 'P4', 'completed', 'OPD', 31, 'p-1', 'MRN-10421', 'Ifeoma', 'Balogun', 'Female'),
-    _queueRow('q-8', 8, 'P5', 'no_show', 'OPD', 46, 'p-5', 'MRN-10425', 'Henrik', 'Nilsen', 'Male'),
+    _queueRow('q-7', 7, 'P4', 'completed', 'OPD', 31, 'p-1', '10421', 'Ifeoma', 'Balogun', 'Female'),
+    _queueRow('q-8', 8, 'P5', 'no_show', 'OPD', 46, 'p-5', '10425', 'Henrik', 'Nilsen', 'Male'),
   ];
 
   // ── Appointments ──────────────────────────────────────────────────────────
@@ -190,12 +190,12 @@ abstract final class World {
   }
 
   static final _appointmentRows = [
-    _appointmentRow('a-1', '09:15', 'completed', 'p-1', 'MRN-10421', 'Ifeoma', 'Balogun', 'Routine review'),
-    _appointmentRow('a-2', '10:00', 'completed', 'p-6', 'MRN-10426', 'Yusuf', 'Adeyemi', 'Post-op check'),
-    _appointmentRow('a-3', '11:30', 'checked_in', 'p-4', 'MRN-10424', 'Grace', 'Mwangi', 'Persistent cough'),
-    _appointmentRow('a-4', '14:30', 'confirmed', 'p-2', 'MRN-10422', 'Tom', 'Whitfield', 'Chest pain follow-up'),
-    _appointmentRow('a-5', '15:00', 'scheduled', 'p-3', 'MRN-10423', 'Sana', 'Qureshi', 'Six-year check'),
-    _appointmentRow('a-6', '15:45', 'cancelled', 'p-5', 'MRN-10425', 'Henrik', 'Nilsen', 'Knee assessment'),
+    _appointmentRow('a-1', '09:15', 'completed', 'p-1', '10421', 'Ifeoma', 'Balogun', 'Routine review'),
+    _appointmentRow('a-2', '10:00', 'completed', 'p-6', '10426', 'Yusuf', 'Adeyemi', 'Post-op check'),
+    _appointmentRow('a-3', '11:30', 'checked_in', 'p-4', '10424', 'Grace', 'Mwangi', 'Persistent cough'),
+    _appointmentRow('a-4', '14:30', 'confirmed', 'p-2', '10422', 'Tom', 'Whitfield', 'Chest pain follow-up'),
+    _appointmentRow('a-5', '15:00', 'scheduled', 'p-3', '10423', 'Sana', 'Qureshi', 'Six-year check'),
+    _appointmentRow('a-6', '15:45', 'cancelled', 'p-5', '10425', 'Henrik', 'Nilsen', 'Knee assessment'),
   ];
 
   // ── Inpatient ─────────────────────────────────────────────────────────────
@@ -295,15 +295,15 @@ abstract final class World {
   /// admission behind it renders the word "Occupied" where its neighbours
   /// render a name, which reads as a rendering fault rather than as data.
   static final _admissions = [
-    _admission('adm-1', 'b-1', '01', 'active', -9, 'p-2', 'MRN-10422', 'Tom', 'Whitfield', 'Male', 'Chest pain, rule out ACS'),
-    _admission('adm-2', 'b-2', '02', 'active', -3, 'p-4', 'MRN-10424', 'Grace', 'Mwangi', 'Female', 'Community-acquired pneumonia'),
-    _admission('adm-3', 'b-4', '04', 'active', -1, 'p-6', 'MRN-10426', 'Yusuf', 'Adeyemi', 'Male', 'Post-operative observation'),
-    _admission('adm-4', 'b-8', '08', 'active', 0, 'p-1', 'MRN-10421', 'Ifeoma', 'Balogun', 'Female', 'Dehydration, IV fluids'),
-    _admission('adm-6', 'b-9', '09', 'active', -21, 'p-3', 'MRN-10423', 'Sana', 'Qureshi', 'Female', 'Bronchiolitis, on oxygen'),
-    _admission('adm-7', 'b-11', '11', 'active', -2, 'p-5', 'MRN-10425', 'Henrik', 'Nilsen', 'Male', 'Cellulitis, IV antibiotics'),
-    _admission('adm-8', 'b-12', '12', 'active', -5, 'p-7', 'MRN-10427', 'Margaret', 'Okafor', 'Female', 'Awaiting social care package'),
+    _admission('adm-1', 'b-1', '01', 'active', -9, 'p-2', '10422', 'Tom', 'Whitfield', 'Male', 'Chest pain, rule out ACS'),
+    _admission('adm-2', 'b-2', '02', 'active', -3, 'p-4', '10424', 'Grace', 'Mwangi', 'Female', 'Community-acquired pneumonia'),
+    _admission('adm-3', 'b-4', '04', 'active', -1, 'p-6', '10426', 'Yusuf', 'Adeyemi', 'Male', 'Post-operative observation'),
+    _admission('adm-4', 'b-8', '08', 'active', 0, 'p-1', '10421', 'Ifeoma', 'Balogun', 'Female', 'Dehydration, IV fluids'),
+    _admission('adm-6', 'b-9', '09', 'active', -21, 'p-3', '10423', 'Sana', 'Qureshi', 'Female', 'Bronchiolitis, on oxygen'),
+    _admission('adm-7', 'b-11', '11', 'active', -2, 'p-5', '10425', 'Henrik', 'Nilsen', 'Male', 'Cellulitis, IV antibiotics'),
+    _admission('adm-8', 'b-12', '12', 'active', -5, 'p-7', '10427', 'Margaret', 'Okafor', 'Female', 'Awaiting social care package'),
     // Closed, so the ward round excludes it and the register still shows it.
-    _admission('adm-5', 'b-3', '03', 'discharged', -14, 'p-5', 'MRN-10425', 'Henrik', 'Nilsen', 'Male', 'Elective knee repair'),
+    _admission('adm-5', 'b-3', '03', 'discharged', -14, 'p-5', '10425', 'Henrik', 'Nilsen', 'Male', 'Elective knee repair'),
   ];
 
   // ── Pre-triage ────────────────────────────────────────────────────────────
@@ -396,7 +396,7 @@ abstract final class World {
       'bloodPressureSystolic': 126,
       'bloodPressureDiastolic': 80,
       'status': 'registered_as_patient',
-      'patient': {'mrn': 'MRN-10424'},
+      'patient': {'mrn': '10424'},
       'screenedAt': _minutesAgo(260),
     },
   ];
@@ -409,11 +409,11 @@ abstract final class World {
   }
 
   static final _consultationRows = [
-    _consultation('c-1', 'outpatient', 'p-1', 'MRN-10421', 'Ifeoma', 'Balogun', 'Female',
+    _consultation('c-1', 'outpatient', 'p-1', '10421', 'Ifeoma', 'Balogun', 'Female',
         'Viral upper respiratory infection', 'Rest, fluids, paracetamol as needed.'),
-    _consultation('c-2', 'emergency', 'p-2', 'MRN-10422', 'Tom', 'Whitfield', 'Male',
+    _consultation('c-2', 'emergency', 'p-2', '10422', 'Tom', 'Whitfield', 'Male',
         'Unstable angina', 'Admitted to AMU. Aspirin loaded, troponin sent.'),
-    _consultation('c-3', 'followup', 'p-6', 'MRN-10426', 'Yusuf', 'Adeyemi', 'Male',
+    _consultation('c-3', 'followup', 'p-6', '10426', 'Yusuf', 'Adeyemi', 'Male',
         'Healing well post-appendicectomy', 'Wound check in one week.'),
   ];
 
@@ -430,13 +430,13 @@ abstract final class World {
   }
 
   static final _patients = [
-    _patientRow('p-1', 'MRN-10421', 'Ifeoma', 'Balogun', 'Female', '1991-04-12'),
-    _patientRow('p-2', 'MRN-10422', 'Tom', 'Whitfield', 'Male', '1958-11-02'),
-    _patientRow('p-3', 'MRN-10423', 'Sana', 'Qureshi', 'Female', '2019-07-30'),
-    _patientRow('p-4', 'MRN-10424', 'Grace', 'Mwangi', 'Female', '1976-01-19'),
-    _patientRow('p-5', 'MRN-10425', 'Henrik', 'Nilsen', 'Male', '2002-09-08'),
-    _patientRow('p-6', 'MRN-10426', 'Yusuf', 'Adeyemi', 'Male', '1984-03-25'),
-    _patientRow('p-7', 'MRN-10427', 'Margaret', 'Okafor', 'Female', '1941-06-14'),
+    _patientRow('p-1', '10421', 'Ifeoma', 'Balogun', 'Female', '1991-04-12'),
+    _patientRow('p-2', '10422', 'Tom', 'Whitfield', 'Male', '1958-11-02'),
+    _patientRow('p-3', '10423', 'Sana', 'Qureshi', 'Female', '2019-07-30'),
+    _patientRow('p-4', '10424', 'Grace', 'Mwangi', 'Female', '1976-01-19'),
+    _patientRow('p-5', '10425', 'Henrik', 'Nilsen', 'Male', '2002-09-08'),
+    _patientRow('p-6', '10426', 'Yusuf', 'Adeyemi', 'Male', '1984-03-25'),
+    _patientRow('p-7', '10427', 'Margaret', 'Okafor', 'Female', '1941-06-14'),
   ];
 
   static const _doctors = [
@@ -614,6 +614,9 @@ abstract final class World {
           'firstName': first,
           'lastName': last,
           'gender': gender,
+          // Present, because the identity band shows an age and a fixture
+          // without one exercises the absent path on every admission screen.
+          'dateOfBirth': '1958-11-02T00:00:00.000Z',
         },
         'bed': {
           'id': bedId,
