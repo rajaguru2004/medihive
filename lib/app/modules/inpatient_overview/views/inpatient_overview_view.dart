@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/keys/app_keys.dart';
-import '../../../data/utils/formatters.dart';
 import '../../../routes/app_pages.dart';
 import '../../../theme/theme.dart';
 import '../../inpatient_admissions/views/inpatient_admissions_view.dart'
@@ -60,7 +59,7 @@ class InpatientOverviewView extends GetView<InpatientOverviewController> {
                       value: '${controller.active.length}',
                     ),
                     VitalTile(
-                      label: 'Admitted today',
+                      label: 'Admitted',
                       value: '${controller.admittedToday}',
                     ),
                     VitalTile(
@@ -73,7 +72,7 @@ class InpatientOverviewView extends GetView<InpatientOverviewController> {
                           ? AppColors.warning
                           : null,
                       caption: controller.longStayCount > 0
-                          ? 'check discharge plans'
+                          ? 'check plans'
                           : null,
                     ),
                   ],
@@ -120,22 +119,13 @@ class InpatientOverviewView extends GetView<InpatientOverviewController> {
                     children: [
                       for (var i = 0; i < rows.length; i++) ...[
                         if (i > 0) const Hairline(indent: BentoSpace.listPad),
-                        Builder(
-                          builder: (context) {
-                            final days = Formatters.lengthOfStayDays(
-                              rows[i].admissionDate,
-                            );
-                            return AdmissionRow(
-                              key: InpatientKeys.admission(rows[i].id),
-                              admission: rows[i],
-                              onTap: days >= 7
-                                  ? () => Get.toNamed<void>(
-                                        Routes.DISCHARGE_PATIENT,
-                                        arguments: {'admissionId': rows[i].id},
-                                      )
-                                  : null,
-                            );
-                          },
+                        AdmissionRow(
+                          key: InpatientKeys.admission(rows[i].id),
+                          admission: rows[i],
+                          onTap: () => Get.toNamed<void>(
+                            Routes.DISCHARGE_PATIENT,
+                            arguments: {'admissionId': rows[i].id},
+                          ),
                         ),
                       ],
                     ],

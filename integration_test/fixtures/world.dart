@@ -301,7 +301,7 @@ abstract final class World {
     _admission('adm-4', 'b-8', '08', 'active', 0, 'p-1', 'MRN-10421', 'Ifeoma', 'Balogun', 'Female', 'Dehydration, IV fluids'),
     _admission('adm-6', 'b-9', '09', 'active', -21, 'p-3', 'MRN-10423', 'Sana', 'Qureshi', 'Female', 'Bronchiolitis, on oxygen'),
     _admission('adm-7', 'b-11', '11', 'active', -2, 'p-5', 'MRN-10425', 'Henrik', 'Nilsen', 'Male', 'Cellulitis, IV antibiotics'),
-    _admission('adm-8', 'b-12', '12', 'active', -5, 'p-6', 'MRN-10426', 'Yusuf', 'Adeyemi', 'Male', 'Awaiting social care package'),
+    _admission('adm-8', 'b-12', '12', 'active', -5, 'p-7', 'MRN-10427', 'Margaret', 'Okafor', 'Female', 'Awaiting social care package'),
     // Closed, so the ward round excludes it and the register still shows it.
     _admission('adm-5', 'b-3', '03', 'discharged', -14, 'p-5', 'MRN-10425', 'Henrik', 'Nilsen', 'Male', 'Elective knee repair'),
   ];
@@ -436,6 +436,7 @@ abstract final class World {
     _patientRow('p-4', 'MRN-10424', 'Grace', 'Mwangi', 'Female', '1976-01-19'),
     _patientRow('p-5', 'MRN-10425', 'Henrik', 'Nilsen', 'Male', '2002-09-08'),
     _patientRow('p-6', 'MRN-10426', 'Yusuf', 'Adeyemi', 'Male', '1984-03-25'),
+    _patientRow('p-7', 'MRN-10427', 'Margaret', 'Okafor', 'Female', '1941-06-14'),
   ];
 
   static const _doctors = [
