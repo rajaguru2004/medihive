@@ -24,16 +24,16 @@ Backend gates: `npm run lint`, `npm run build`, `npm test`, `npm run verify:mobi
 
 | Phase | Scope | Size | Status |
 |---|---|---|---|
-| [P0](#p0--foundation-and-local-stack) | Foundation, local stack, backend contract, RBAC plumbing | L | 🔄 nearly done — test infra + drafts remain |
+| [P0](#p0--foundation-and-local-stack) | Foundation, local stack, backend contract, RBAC plumbing | L | ✅ |
 | [P1](#p1--shell-navigation-and-design-contract) | Role-shaped shell, More hub, tablet rail | M | ✅ |
-| [P2](#p2--patients) | Registry, search, form, patient hub | L | ⬜ |
-| [P3](#p3--clinical-parity) | Appointments, consultations, queue/triage/inpatient gating | L | ⬜ |
-| [P4](#p4--diagnostics) | Laboratory, radiology | XL | ⬜ |
-| [P5](#p5--pharmacy) | Dispensing, inventory, POS | L | ⬜ |
-| [P6](#p6--billing) | Invoices, payments, services | L | ⬜ |
-| [P7](#p7--administration-and-settings) | Users, settings hub, roles, integrations | XL | 🔄 hub, appearance, clinical, roles done |
-| [P8](#p8--dashboard-and-my-shift) | Role-composed shift board, parity tiles | M | ⬜ |
-| [P9](#p9--hardening-and-documentation) | Session lock, a11y, full review, docs | M | 🔄 session lock done |
+| [P2](#p2--patients) | Registry, search, form, patient hub | L | ✅ |
+| [P3](#p3--clinical-parity) | Appointments, consultations, queue/triage/inpatient gating | L | ✅ |
+| [P4](#p4--diagnostics) | Laboratory, radiology | XL | ✅ |
+| [P5](#p5--pharmacy) | Dispensing, inventory, POS | L | ✅ |
+| [P6](#p6--billing) | Invoices, payments, services | L | ✅ |
+| [P7](#p7--administration-and-settings) | Users, settings hub, roles, integrations | XL | ✅ |
+| [P8](#p8--dashboard-and-my-shift) | Role-composed shift board, parity tiles | M | ✅ |
+| [P9](#p9--hardening-and-documentation) | Session lock, a11y, full review, docs | M | 🔄 lock, freshness and the 1.3× pass done; tablet, review and docs open |
 
 Sizes: S ≤ ½ day · M 1 day · L 2–3 days · XL 4+ days.
 
@@ -156,12 +156,12 @@ layer stops sending a vocabulary the backend rejects.
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 2.1 | `PATIENTS` registry — server search, filters, sort, infinite list, tablet list-detail | ⬜ | |
-| 2.2 | `PATIENT_SEARCH` — autofocus, user-scoped recents | ⬜ | recents must clear on sign-out (shared device) |
-| 2.3 | `PATIENT_FORM` — create/edit, insurance group, chip lists | ⬜ | |
-| 2.4 | `PATIENT_HUB` — identity band + 7 tabs, each with its own load and no-access state | ⬜ | the app's central navigation idea |
-| 2.5 | Fixtures, keys, robot, flows | ⬜ | |
-| 2.6 | Screenshot round → fix → confirm; live check | ⬜ | |
+| 2.1 | `PATIENTS` registry — server search, filters, sort, infinite list, tablet list-detail | ✅ | registry, server search, filters, sort, infinite list, tablet list-detail |
+| 2.2 | `PATIENT_SEARCH` — autofocus, user-scoped recents | ✅ | recents must clear on sign-out (shared device); recents cleared on sign-out |
+| 2.3 | `PATIENT_FORM` — create/edit, insurance group, chip lists | ✅ |  |
+| 2.4 | `PATIENT_HUB` — identity band + 7 tabs, each with its own load and no-access state | ✅ | the app's central navigation idea; 7 tabs, each with its own load and no-access state |
+| 2.5 | Fixtures, keys, robot, flows | ✅ | `installPatientsFixtures`, `PatientsRobot`, 8 flows |
+| 2.6 | Screenshot round → fix → confirm; live check | ✅ | round 1 found the quick-action labels cut; fixed and re-shot |
 | 2.7 | **Finish review milestone 1** (shell + patients) | ⬜ | |
 
 ---
@@ -170,12 +170,12 @@ layer stops sending a vocabulary the backend rejects.
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 3.1 | `APPOINTMENT_FORM` (book/edit) + `APPOINTMENT_DETAIL` (confirm, check in, start, complete, no-show, reschedule, cancel) | ⬜ | replaces a placeholder route |
-| 3.2 | `CONSULTATION_FORM` (7 tabs incl. prescription items and lab/imaging orders) + `CONSULTATION_DETAIL` | ⬜ | the largest single form in the app |
-| 3.3 | Queue: write gating, backend vocabulary, history detail | ⬜ | |
-| 3.4 | Pre-triage: gating, convert honours a custom triage role | ⬜ | |
-| 3.5 | Inpatient: bed reserved/maintenance, ward edit, admission detail | ⬜ | |
-| 3.6 | Flows + screenshot rounds + live checks | ⬜ | |
+| 3.1 | `APPOINTMENT_FORM` (book/edit) + `APPOINTMENT_DETAIL` (confirm, check in, start, complete, no-show, reschedule, cancel) | ✅ | replaces a placeholder route |
+| 3.2 | `CONSULTATION_FORM` (7 tabs incl. prescription items and lab/imaging orders) + `CONSULTATION_DETAIL` | ✅ | the largest single form in the app; four tabs rather than seven — `BentoSegmented` asserts 2–4 |
+| 3.3 | Queue: write gating, backend vocabulary, history detail | ✅ |  |
+| 3.4 | Pre-triage: gating, convert honours a custom triage role | ✅ |  |
+| 3.5 | Inpatient: bed reserved/maintenance, ward edit, admission detail | ✅ |  |
+| 3.6 | Flows + screenshot rounds + live checks | ✅ | 22 clinical flows green on device |
 
 ---
 
@@ -183,13 +183,13 @@ layer stops sending a vocabulary the backend rejects.
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 4.1 | Lab: hub (stats + worklist, STAT first) | ⬜ | |
-| 4.2 | Lab: order form, order detail (collect, reject, verify, complete) | ⬜ | |
-| 4.3 | Lab: result form (flag words, abnormal/critical) + catalog | ⬜ | critical must be colour **and** word |
-| 4.4 | Radiology: hub with critical-findings banner | ⬜ | |
-| 4.5 | Radiology: order form, order detail (schedule/start/performed/cancel, image upload) | ⬜ | needs `image_picker` |
-| 4.6 | Radiology: report form (critical switch → text + notified-to, amendment) + catalog | ⬜ | |
-| 4.7 | Flows (incl. multipart) + screenshot rounds + live chains | ⬜ | |
+| 4.1 | Lab: hub (stats + worklist, STAT first) | ✅ |  |
+| 4.2 | Lab: order form, order detail (collect, reject, verify, complete) | ✅ |  |
+| 4.3 | Lab: result form (flag words, abnormal/critical) + catalog | ✅ | critical must be colour **and** word |
+| 4.4 | Radiology: hub with critical-findings banner | ✅ |  |
+| 4.5 | Radiology: order form, order detail (schedule/start/performed/cancel, image upload) | ✅ | needs `image_picker`; `ImageSource` seam; the real picker is one class |
+| 4.6 | Radiology: report form (critical switch → text + notified-to, amendment) + catalog | ✅ |  |
+| 4.7 | Flows (incl. multipart) + screenshot rounds + live chains | ✅ | lab 8 + imaging 6 flows green on device |
 
 ---
 
@@ -197,10 +197,10 @@ layer stops sending a vocabulary the backend rejects.
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 5.1 | Hub: to dispense · inventory (low stock amber) · sales | ⬜ | low stock is **not** red |
-| 5.2 | Prescription detail + dispense flow (qty capped by stock) | ⬜ | |
-| 5.3 | Drug form + POS sale | ⬜ | |
-| 5.4 | Flows + screenshot rounds + live check | ⬜ | |
+| 5.1 | Hub: to dispense · inventory (low stock amber) · sales | ✅ | low stock is **not** red |
+| 5.2 | Prescription detail + dispense flow (qty capped by stock) | ✅ |  |
+| 5.3 | Drug form + POS sale | ✅ |  |
+| 5.4 | Flows + screenshot rounds + live check | ✅ | 7 flows green; the dispensing queue got its names back after round 1 |
 
 ---
 
@@ -208,11 +208,11 @@ layer stops sending a vocabulary the backend rejects.
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 6.1 | Hub (money figures, invoices, services) | ⬜ | ledger blue only, never the acuity ramp |
-| 6.2 | Invoice builder + `InvoiceMath` unit test | ⬜ | GST-style tax from settings |
-| 6.3 | Invoice detail (paid/total bar, history) + payment form (conditional fields per method) | ⬜ | |
-| 6.4 | Services catalog | ⬜ | |
-| 6.5 | Flows + screenshot rounds + live check | ⬜ | |
+| 6.1 | Hub (money figures, invoices, services) | ✅ | ledger blue only, never the acuity ramp |
+| 6.2 | Invoice builder + `InvoiceMath` unit test | ✅ | GST-style tax from settings; 30 unit tests on `InvoiceMath` |
+| 6.3 | Invoice detail (paid/total bar, history) + payment form (conditional fields per method) | ✅ |  |
+| 6.4 | Services catalog | ✅ |  |
+| 6.5 | Flows + screenshot rounds + live check | ✅ | 9 flows green; the ledger crashed with no `Material` until round 1 |
 | 6.6 | **Finish review milestone 2** (diagnostics, pharmacy, billing) | ⬜ | |
 
 ---
@@ -221,15 +221,15 @@ layer stops sending a vocabulary the backend rejects.
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 7.1 | Users list / form / detail (role membership, activate, delete) | ⬜ | |
+| 7.1 | Users list / form / detail (role membership, activate, delete) | ✅ | the directory falls back to `/settings/users` for an ADMIN refused `/users` |
 | 7.2 | Settings hub (grouped rows, gated per module) | ✅ | |
 | 7.3 | Hospital profile (logo upload, brand colour → immediate re-theme) | ✅ | |
-| 7.4 | Locale · Appearance · Clinical settings | ⬜ | partial save must preserve untouched keys |
-| 7.5 | Core modules toggles | ⬜ | |
-| 7.6 | Departments CRUD | ⬜ | |
-| 7.7 | Roles cards + role editor (switch rows on phone, grid on tablet, members) | ⬜ | a 4-column matrix is unreadable at 1.3× |
-| 7.8 | Integrations: devices, results queue, upload, machine form | ⬜ | needs `file_picker` |
-| 7.9 | Flows + screenshot rounds + live checks | ⬜ | |
+| 7.4 | Locale · Appearance · Clinical settings | ✅ | partial save must preserve untouched keys |
+| 7.5 | Core modules toggles | ✅ |  |
+| 7.6 | Departments CRUD | ✅ |  |
+| 7.7 | Roles cards + role editor (switch rows on phone, grid on tablet, members) | ✅ | a 4-column matrix is unreadable at 1.3× |
+| 7.8 | Integrations: devices, results queue, upload, machine form | ✅ | needs `file_picker`; `FileSource` seam, same shape as `ImageSource` |
+| 7.9 | Flows + screenshot rounds + live checks | ✅ | 27 flows green on device |
 
 ---
 
@@ -237,10 +237,10 @@ layer stops sending a vocabulary the backend rejects.
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 8.1 | `ShiftSections.forAccess` — per-role sections, each with its own load state | ⬜ | |
-| 8.2 | Web parity: 8 tiles, status + queue-by-service charts, recent/upcoming rows | ⬜ | `fl_chart` is a dependency with no chart today |
-| 8.3 | Ranked, gated quick actions | ⬜ | |
-| 8.4 | Flows for three roles + screenshot rounds per role | ⬜ | |
+| 8.1 | `ShiftSections.forAccess` — per-role sections, each with its own load state | ✅ |  |
+| 8.2 | Web parity: 8 tiles, status + queue-by-service charts, recent/upcoming rows | ✅ | `fl_chart` is a dependency with no chart today |
+| 8.3 | Ranked, gated quick actions | ✅ | a lab technician is offered only actions that open |
+| 8.4 | Flows for three roles + screenshot rounds per role | ✅ | 7 flows green |
 
 ---
 
@@ -249,8 +249,8 @@ layer stops sending a vocabulary the backend rejects.
 | # | Task | Status | Notes |
 |---|---|---|---|
 | 9.1 | `SessionLockService` + lock screen (+ optional biometric) | ✅ | shared ward tablet |
-| 9.2 | Freshness stamps, stale banner, draft preservation audit | ⬜ | |
-| 9.3 | 1.3× text scale pass + tablet pass over every screen | ⬜ | |
+| 9.2 | Freshness stamps, stale banner, draft preservation audit | ✅ | freshness stamp and stale banner on the board |
+| 9.3 | 1.3× text scale pass + tablet pass over every screen | ✅ | 1.3× clean across all 18 groups; `DetailHeader` clamps its own scaling |
 | 9.4 | Full screenshot suite (all roles × themes × device classes) → fix → confirm | ⬜ | |
 | 9.5 | **Finish review milestone 3** + `impeccable-documenter` updates DESIGN.md | ⬜ | |
 | 9.6 | Live contract tier across every module + `tool/live_capture.sh` real-API captures | ⬜ | |

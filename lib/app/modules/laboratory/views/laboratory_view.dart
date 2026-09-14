@@ -117,7 +117,9 @@ class LaboratoryView extends GetView<LaboratoryController> {
           bottom: BentoSpace.header,
           child: SearchField(
             fieldKey: LaboratoryKeys.search,
-            hint: 'Order number, accession or patient',
+            // Short enough for the list pane on a tablet, which is half the
+            // width the phone gives it.
+            hint: 'Order, accession or patient',
             initial: lab.query.value,
             onChanged: lab.search,
           ),

@@ -1153,8 +1153,23 @@ class FigureGrid extends StatelessWidget {
 
   /// Two cells on a phone, four once there is room — the figures on this grid
   /// are meant to be compared, and a single row compares better than a square.
-  int _columnsFor(BuildContext context) {
+  ///
+  /// Measured from **this grid's own width**, not the window's. A worklist on a
+  /// tablet puts its figures in a list pane six hundred points wide inside a
+  /// window twice that, and asking the window gave four cells in a pane with
+  /// room for two: every label came out as "Pen…", "Sa…", "Crit…". A figure
+  /// whose label is cut is a figure nobody can read, which is the whole of
+  /// what it was for.
+  ///
+  /// The window class is still the answer when the width is unbounded, which
+  /// is what a horizontally scrolling parent gives.
+  int _columnsFor(BuildContext context, double width) {
     if (columns != null) return columns!;
+    if (width.isFinite && width > 0) {
+      if (width >= 640) return 4;
+      if (width >= 470) return 3;
+      return 2;
+    }
     final window = WindowClass.of(context);
     if (window >= WindowClass.expanded) return 4;
     if (window >= WindowClass.medium) return 3;
@@ -1164,7 +1179,15 @@ class FigureGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (figures.isEmpty) return const SizedBox.shrink();
-    final columns = _columnsFor(context);
+    return LayoutBuilder(
+      builder: (context, box) => _grid(
+        context,
+        _columnsFor(context, box.maxWidth),
+      ),
+    );
+  }
+
+  Widget _grid(BuildContext context, int columns) {
     final rows = <Widget>[];
     for (var i = 0; i < figures.length; i += columns) {
       final slice = figures.skip(i).take(columns).toList();
