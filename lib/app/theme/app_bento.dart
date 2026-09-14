@@ -1943,44 +1943,56 @@ class DetailHeader extends StatelessWidget implements PreferredSizeWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return SafeArea(
       bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 4, 12, 4),
-        child: Row(
-          children: [
-            IconButton(
-              onPressed: onBack ?? () => Navigator.of(context).maybePop(),
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-              style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
-            ),
-            const SizedBox(width: 2),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: isDark
-                        ? AppTextStyles.darkTitle3(weight: FontWeight.w700)
-                        : AppTextStyles.lightTitle3(weight: FontWeight.w700),
-                  ),
-                  if (subtitle != null)
+      // The bar's height is `preferredSize`, which Flutter reads **without a
+      // `BuildContext`** — so it cannot grow with the reader's text size. At
+      // 1.3×, the size a ward tablet is usually left at, a title over a
+      // subtitle needs more than the 52 points inside this box and Flutter
+      // paints the overflow stripes across the screen's own name.
+      //
+      // Clamped here rather than made taller: a header is furniture, the
+      // screen under it honours the full scale, and a bar that grows with the
+      // text eats the top of every screen at the size that needs it most.
+      child: MediaQuery.withClampedTextScaling(
+        maxScaleFactor: 1.1,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 2, 12, 2),
+          child: Row(
+            children: [
+              IconButton(
+                onPressed: onBack ?? () => Navigator.of(context).maybePop(),
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+              ),
+              const SizedBox(width: 2),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     Text(
-                      subtitle!,
+                      title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: isDark
-                          ? AppTextStyles.darkFootnote()
-                          : AppTextStyles.lightFootnote(),
+                          ? AppTextStyles.darkTitle3(weight: FontWeight.w700)
+                          : AppTextStyles.lightTitle3(weight: FontWeight.w700),
                     ),
-                ],
+                    if (subtitle != null)
+                      Text(
+                        subtitle!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: isDark
+                            ? AppTextStyles.darkFootnote()
+                            : AppTextStyles.lightFootnote(),
+                      ),
+                  ],
+                ),
               ),
-            ),
-            ?action,
-          ],
+              ?action,
+            ],
+          ),
         ),
       ),
     );

@@ -124,11 +124,15 @@ abstract final class World {
       // A map of name → count, which is what `DashboardData.fromJson` reads.
       // A list of {name, count} objects is the obvious shape and the wrong
       // one: the cast throws and the whole board renders as an error.
+      // The same six rows `_liveQueue` holds, counted by area: Emergency
+      // q-1/q-2/q-5, OPD q-3/q-4, Radiology q-6. The chart drawing fifteen
+      // people while the board beside it showed six was the world contradicting
+      // itself in one screenshot — and a reader who catches that stops
+      // trusting either number.
       'queueByService': {
-        'Emergency': 4,
-        'OPD': 6,
-        'Radiology': 2,
-        'Laboratory': 3,
+        'Emergency': 3,
+        'OPD': 2,
+        'Radiology': 1,
       },
       'recentPatients': [
         _patientRow('p-1', '10421', 'Ifeoma', 'Balogun', 'Female', '1991-04-12'),
