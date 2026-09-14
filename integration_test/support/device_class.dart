@@ -44,8 +44,12 @@ enum DeviceClass {
 
   /// Selected with `--dart-define=NEX_HIVE_DEVICE_CLASS=tablet`.
   ///
-  /// Defaults to [phone] so an unqualified `flutter test` keeps running the
-  /// viewport the suite has always used.
+  /// Defaults to [phone], which is the viewport a headless run should be
+  /// asserting against — 800×600 is not a device anybody holds.
+  ///
+  /// The device tier does not have to ask for [device]: `AppHarness` pins
+  /// nothing when it is running on Android or iOS, whatever this says, because
+  /// there a pinned size letterboxes rather than resizes.
   static DeviceClass get fromDefine {
     const name = String.fromEnvironment(
       'NEX_HIVE_DEVICE_CLASS',

@@ -132,11 +132,11 @@ class FakeResponse {
     this.contentType = Headers.jsonContentType,
   });
 
-  /// The `{success, result, message}` envelope every endpoint uses.
+  /// The `{success, data, message}` envelope this backend sends.
   ///
-  /// Note `result`, not `data` — matching the backend, so a fixture cannot
-  /// pass while the app's real parser would fail.
-  /// The envelope this backend actually sends: the payload is under `data`.
+  /// `data`, not `result`: `result` is a legacy key `ApiEnvelope` still
+  /// tolerates, and a fixture written in the tolerated dialect tests the
+  /// tolerance rather than the contract.
   factory FakeResponse.ok(Object? result, {String message = ''}) =>
       FakeResponse(200, {
         'success': true,
@@ -150,31 +150,76 @@ class FakeResponse {
   /// every list controller in this app unwraps. Registering a bare list where
   /// the app expects a page is how a fixture passes its own test and the
   /// screen stays empty.
+  ///
+  /// The `meta` block carries **both** dialects, because the queue does.
+  ///
+  /// Most routes answer `{page, limit, total, totalPages, hasNextPage,
+  /// hasPreviousPage}`; the queue adds the console's older `{currentPage,
+  /// perPage, lastPage, prev, next}` in the same object. `Pagination.fromMeta`
+  /// reads either, and a fixture that sent neither — as this one used to,
+  /// with `{page, count, total}` — exercised only its fallbacks, so a board
+  /// that stops after its first page would have passed.
   factory FakeResponse.page(
     List<Object?> rows, {
     int page = 1,
+    int limit = 20,
     int? total,
-  }) =>
-      FakeResponse(200, {
-        'success': true,
-        'data': {
-          'data': rows,
-          'meta': {
-            'page': page,
-            'count': rows.length,
-            'total': total ?? rows.length,
-          },
+    int? totalPages,
+  }) {
+    final count = total ?? rows.length;
+    final pages =
+        totalPages ?? (count <= limit ? 1 : (count + limit - 1) ~/ limit);
+    return FakeResponse(200, {
+      'success': true,
+      'data': {
+        'data': rows,
+        'meta': {
+          'page': page,
+          'limit': limit,
+          'total': count,
+          'totalPages': pages,
+          'hasNextPage': page < pages,
+          'hasPreviousPage': page > 1,
+          'currentPage': page,
+          'perPage': limit,
+          'lastPage': pages,
+          'prev': page > 1 ? page - 1 : null,
+          'next': page < pages ? page + 1 : null,
         },
-        'message': '',
+      },
+      'message': '',
+    });
+  }
+
+  factory FakeResponse.fail(
+    int status,
+    String message, {
+    String errorCode = '',
+  }) =>
+      FakeResponse(status, {
+        'success': false,
+        'data': null,
+        'message': message,
+        // `ApiEnvelope` reads this to tell a refusal apart from a fault; an
+        // envelope without it makes every 4xx look the same to the app.
+        'errorCode': errorCode,
       });
 
-  factory FakeResponse.fail(int status, String message) => FakeResponse(
-        status,
-        {'success': false, 'data': null, 'message': message},
-      );
-
   factory FakeResponse.unauthorized([String message = 'Unauthorized']) =>
-      FakeResponse.fail(401, message);
+      FakeResponse.fail(401, message, errorCode: 'UNAUTHORIZED');
+
+  /// The server refusing for lack of permission, in the words it actually
+  /// uses.
+  ///
+  /// Its own factory because the app answers a 403 differently from every
+  /// other failure — `ApiEnvelope.orThrow` raises `ApiForbiddenException`,
+  /// `LoadStateMixin` routes it to `rxNoAccess`, and the screen shows a locked
+  /// panel rather than a retry. A fixture that sent a plain 500 here would
+  /// test the retry path and call it access control.
+  factory FakeResponse.forbidden([
+    String message = 'Insufficient permissions',
+  ]) =>
+      FakeResponse.fail(403, message, errorCode: 'FORBIDDEN');
 
   /// For `dio.download` — attachment and document-preview flows.
   factory FakeResponse.binary(
@@ -287,6 +332,70 @@ class FakeApi {
   void page(String method, String pattern, List<Object?> rows) {
     on(method, pattern, (_) => FakeResponse.page(rows));
   }
+
+  /// Refuses this route the way the server refuses it: 403, with
+  /// `errorCode: 'FORBIDDEN'`.
+  ///
+  /// The point of a role harness. An access map is a *hint* — the server
+  /// authorises every request on its own, and a screen that hid a button on
+  /// the map must still survive the 403 that arrives anyway, because the map
+  /// in hand can be a minute older than the role it describes. Registered like
+  /// any other route, so a flow refuses one endpoint of the world and leaves
+  /// the rest coherent:
+  ///
+  /// ```dart
+  /// AppHarness.bootSignedIn(
+  ///   tester,
+  ///   role: WorldRole.nurse,
+  ///   overrides: (api) => api.forbid('DELETE', '/api/queue/:id'),
+  /// );
+  /// ```
+  void forbid(
+    String method,
+    String pattern, {
+    String message = 'Insufficient permissions',
+  }) {
+    on(method, pattern, (_) => FakeResponse.forbidden(message));
+  }
+
+  /// Answers this route with [status] for the rest of the test.
+  ///
+  /// For the error paths that are not 403: a 404 on a record deleted under the
+  /// user, a 422 on a write the server validated, a 500 on a route that is
+  /// down. [message] defaults to something the app can actually show, because
+  /// a refusal with an empty message renders as "Request failed" and proves
+  /// only that the screen has an error state.
+  void failWith(
+    String method,
+    String pattern,
+    int status, {
+    String? message,
+  }) {
+    final body = FakeResponse.fail(
+      status,
+      message ?? _defaultMessageFor(status),
+      errorCode: _defaultCodeFor(status),
+    );
+    on(method, pattern, (_) => body);
+  }
+
+  static String _defaultMessageFor(int status) => switch (status) {
+        400 || 422 => 'That request was not valid.',
+        401 => 'Unauthorized',
+        403 => 'Insufficient permissions',
+        404 => 'Not found',
+        409 => 'That has already been done.',
+        _ => 'Something went wrong',
+      };
+
+  static String _defaultCodeFor(int status) => switch (status) {
+        400 || 422 => 'VALIDATION_ERROR',
+        401 => 'UNAUTHORIZED',
+        403 => 'FORBIDDEN',
+        404 => 'NOT_FOUND',
+        409 => 'CONFLICT',
+        _ => 'INTERNAL_ERROR',
+      };
 
   /// Answers with [status] exactly once, then falls through to whatever was
   /// registered before it. This is how error-then-retry flows are written.

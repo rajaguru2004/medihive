@@ -1,6 +1,10 @@
 import 'package:medihive/app/core/app_clock.dart';
 
 import '../fakes/fake_api.dart';
+import 'fake_jwt.dart';
+import 'world_roles.dart';
+
+part 'world_bootstrap.dart';
 
 /// A coherent department, in fixtures.
 ///
@@ -10,14 +14,24 @@ import '../fakes/fake_api.dart';
 /// that could exist, and a flow that walks from one screen to another sees the
 /// same patients on both.
 ///
+/// The department is the same whoever is looking at it; the *account* looking
+/// at it is a [WorldRole], and everything that changes with it — the token,
+/// `/auth/me`, the access map, the site — lives in `world_bootstrap.dart`.
+/// One library in two files, so both halves keep the same builders and the
+/// same frozen clock.
+///
 /// A flow that needs one endpoint different **overrides that one endpoint**
 /// (`api.json(...)`) rather than writing a second world: later registrations
 /// win.
 abstract final class World {
-  /// Registers every route the app calls.
-  static void install(FakeApi api) {
-    _auth(api);
-    _settings(api);
+  /// Registers every route the app calls, answered as [role] would be.
+  ///
+  /// The super admin by default, because that is the account that can reach
+  /// every screen — so a flow about a screen rather than about a role does not
+  /// have to name one, and the twelve that predate roles keep working
+  /// unchanged.
+  static void install(FakeApi api, {WorldRole role = WorldRole.superAdmin}) {
+    _Bootstrap.install(api, role);
     _dashboard(api);
     _queue(api);
     _appointments(api);
@@ -27,43 +41,29 @@ abstract final class World {
     _lookups(api);
   }
 
-  // ── Auth ──────────────────────────────────────────────────────────────────
+  /// The refresh token every session in this world holds.
+  ///
+  /// Opaque on purpose. The server's refresh token is not a JWT the app reads,
+  /// and minting a readable one here would invite a test to decode it.
+  static const String refreshToken = 'fake-refresh-token';
 
-  static const signedInUser = {
-    'id': 'u-1',
-    'name': 'Dr Amara Okonkwo',
-    'email': 'a.okonkwo@example.org',
-    'roleName': 'Consultant',
-    'role': 'r-1',
-    'department': 'Emergency',
-    'permissions': <String>[],
-  };
+  /// The access token [role] signs in with.
+  ///
+  /// Pass a negative [lifetime] for one that is already past its `exp`:
+  /// `AuthService.tryRestoreSession` drops those before the shell paints.
+  static String tokenFor(
+    WorldRole role, {
+    Duration lifetime = kFakeJwtLifetime,
+  }) =>
+      fakeJwtFor(role, lifetime: lifetime);
 
-  static void _auth(FakeApi api) {
-    api.json('POST', '/api/auth/login', {
-      'accessToken': 'fake-token',
-      'refreshToken': 'fake-refresh',
-      'user': signedInUser,
-    });
-    api.json('POST', '/api/auth/logout', null);
-    api.json('GET', '/api/auth/me', signedInUser);
-    api.json('GET', '/api/auth/me/access', signedInUser);
-  }
+  /// [role] as secure storage would hold them after a previous session.
+  static Map<String, Object?> cachedUser(WorldRole role) =>
+      _Bootstrap.cachedUser(role);
 
-  // ── Settings ──────────────────────────────────────────────────────────────
-
-  static void _settings(FakeApi api) {
-    api.json('GET', '/api/settings', [
-      {'settingKey': 'site_name', 'settingValue': 'St Aidan’s General'},
-      {'settingKey': 'theme_preset', 'settingValue': 'default'},
-      {'settingKey': 'theme_font', 'settingValue': 'montserrat'},
-      {'settingKey': 'wait_breach_minutes', 'settingValue': 30},
-      {'settingKey': 'show_patient_names', 'settingValue': true},
-      {'settingKey': 'triage_scale', 'settingValue': 'p1-p5'},
-      {'settingKey': 'currency_symbol', 'settingValue': '₹'},
-      {'settingKey': 'date_format', 'settingValue': 'DD/MM/YYYY'},
-    ]);
-  }
+  /// [role]'s access map, as secure storage would hold it.
+  static Map<String, Object?> cachedAccess(WorldRole role) =>
+      _Bootstrap.cachedAccess(role);
 
   // ── Dashboard ─────────────────────────────────────────────────────────────
 
@@ -143,13 +143,6 @@ abstract final class World {
           },
         },
       ],
-    });
-
-    // The dashboard also asks for the organisation. It hangs off the settings
-    // route family rather than having one of its own.
-    api.json('GET', '/api/settings/organization', {
-      'name': 'St Aidan’s General',
-      'logoUrl': '',
     });
   }
 

@@ -7,12 +7,14 @@ import '../../../data/services/session_manager.dart';
 import '../../../routes/app_pages.dart';
 import '../../appointments/controllers/appointments_controller.dart';
 import '../../appointments/views/appointments_view.dart';
+import '../../consultations/controllers/consultations_controller.dart';
 import '../../consultations/views/consultations_view.dart';
 import '../../dashboard/controllers/dashboard_controller.dart';
 import '../../dashboard/views/dashboard_view.dart';
 import '../../inpatient/controllers/inpatient_controller.dart';
 import '../../inpatient/views/inpatient_view.dart';
 import '../../placeholders/views/placeholder_view.dart';
+import '../../pre_triage/controllers/pre_triage_controller.dart';
 import '../../pre_triage/views/pre_triage_view.dart';
 import '../../queue/controllers/queue_controller.dart';
 import '../../queue/views/queue_view.dart';
@@ -127,7 +129,7 @@ class HomeBinding extends Bindings {
             SessionManager.to.registerScoped<InpatientController>();
           },
         ),
-        const ShellDestination(
+        ShellDestination(
           route: Routes.PRE_TRIAGE,
           label: 'Triage',
           title: 'Pre-triage',
@@ -137,8 +139,13 @@ class HomeBinding extends Bindings {
           module: Modules.preTriage,
           rank: 4,
           body: PreTriageView.new,
+          register: () {
+            Get.put<PreTriageController>(PreTriageController(),
+                permanent: true);
+            SessionManager.to.registerScoped<PreTriageController>();
+          },
         ),
-        const ShellDestination(
+        ShellDestination(
           route: Routes.CONSULTATIONS,
           label: 'Consults',
           title: 'Consultations',
@@ -148,6 +155,11 @@ class HomeBinding extends Bindings {
           module: Modules.consultations,
           rank: 10,
           body: ConsultationsView.new,
+          register: () {
+            Get.put<ConsultationsController>(ConsultationsController(),
+                permanent: true);
+            SessionManager.to.registerScoped<ConsultationsController>();
+          },
         ),
 
         // ── Diagnostics ───────────────────────────────────────────────────

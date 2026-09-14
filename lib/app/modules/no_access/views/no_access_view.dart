@@ -49,6 +49,7 @@ class NoAccessView extends StatelessWidget {
                       'An administrator can give your account access to it.',
                   actionLabel: 'Go to today',
                   onAction: () => Get.offAllNamed<void>(Routes.HOME),
+                  actionKey: NoAccessKeys.home,
                 ),
               ),
             ),

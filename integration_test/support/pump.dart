@@ -211,9 +211,16 @@ extension HarnessPump on WidgetTester {
   ///
   /// Quietly does nothing when there is no scroll view: a sheet that fits, a
   /// dialog, a screen that does not scroll.
-  Future<void> scrollToKey(Key key, {int maxDrags = 60}) async {
-    final finder = find.byKey(key);
+  Future<void> scrollToKey(Key key, {int maxDrags = 60}) =>
+      scrollToFinder(find.byKey(key), maxDrags: maxDrags);
 
+  /// The same, for a widget a test can only name by what it says.
+  ///
+  /// Most targets have a key and should use [scrollToKey]. A few are addressed
+  /// by their label because the label is what the assertion is about — a
+  /// destination in the More hub is "Billing" to the person looking at it, and
+  /// keyed by route to the code that built it.
+  Future<void> scrollToFinder(Finder finder, {int maxDrags = 60}) async {
     if (finder.evaluate().isEmpty) {
       final Finder? view = _topScrollView();
       if (view == null) return;

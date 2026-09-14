@@ -105,33 +105,33 @@ class LabResult {
     // populated document is parsed first and its id used as the fallback.
     final test = LabTest.of(json['test']);
     return LabResult(
-        id: asString(json['id'] ?? json['_id']),
-        organizationId: asStringOrNull(json['organizationId']),
-        orderId: asString(json['orderId']),
-        testId: asString(json['testId'], fallback: test.id),
-        resultValue: asString(json['resultValue']),
-        resultUnit: asStringOrNull(json['resultUnit']),
-        isAbnormal: asBool(json['isAbnormal']),
-        isCritical: asBool(json['isCritical']),
-        flag: asStringOrNull(json['flag']),
-        referenceRangeMin: json['referenceRangeMin'] == null
-            ? null
-            : asDouble(json['referenceRangeMin']),
-        referenceRangeMax: json['referenceRangeMax'] == null
-            ? null
-            : asDouble(json['referenceRangeMax']),
-        referenceRangeText: asStringOrNull(json['referenceRangeText']),
-        qcLevel: asStringOrNull(json['qcLevel']),
-        qcPassed: json['qcPassed'] == null ? null : asBool(json['qcPassed']),
-        methodUsed: asStringOrNull(json['methodUsed']),
-        instrumentUsed: asStringOrNull(json['instrumentUsed']),
-        enteredById: asStringOrNull(json['enteredById']),
-        enteredAt: asDate(json['enteredAt']),
-        verifiedById: asStringOrNull(json['verifiedById']),
-        verifiedAt: asDate(json['verifiedAt']),
-        comment: asStringOrNull(json['comment']),
-        technicianNotes: asStringOrNull(json['technicianNotes']),
-        test: test,
+      id: asString(json['id'] ?? json['_id']),
+      organizationId: asStringOrNull(json['organizationId']),
+      orderId: asString(json['orderId']),
+      testId: asString(json['testId'], fallback: test.id),
+      resultValue: asString(json['resultValue']),
+      resultUnit: asStringOrNull(json['resultUnit']),
+      isAbnormal: asBool(json['isAbnormal']),
+      isCritical: asBool(json['isCritical']),
+      flag: asStringOrNull(json['flag']),
+      referenceRangeMin: json['referenceRangeMin'] == null
+          ? null
+          : asDouble(json['referenceRangeMin']),
+      referenceRangeMax: json['referenceRangeMax'] == null
+          ? null
+          : asDouble(json['referenceRangeMax']),
+      referenceRangeText: asStringOrNull(json['referenceRangeText']),
+      qcLevel: asStringOrNull(json['qcLevel']),
+      qcPassed: json['qcPassed'] == null ? null : asBool(json['qcPassed']),
+      methodUsed: asStringOrNull(json['methodUsed']),
+      instrumentUsed: asStringOrNull(json['instrumentUsed']),
+      enteredById: asStringOrNull(json['enteredById']),
+      enteredAt: asDate(json['enteredAt']),
+      verifiedById: asStringOrNull(json['verifiedById']),
+      verifiedAt: asDate(json['verifiedAt']),
+      comment: asStringOrNull(json['comment']),
+      technicianNotes: asStringOrNull(json['technicianNotes']),
+      test: test,
     );
   }
 

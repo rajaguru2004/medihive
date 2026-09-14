@@ -1393,6 +1393,7 @@ class EmptyState extends StatelessWidget {
     this.message,
     this.actionLabel,
     this.onAction,
+    this.actionKey,
     this.compact = false,
   });
 
@@ -1401,6 +1402,14 @@ class EmptyState extends StatelessWidget {
   final String? message;
   final String? actionLabel;
   final VoidCallback? onAction;
+
+  /// Keys the action button.
+  ///
+  /// The empty state's own key is on the state, not the control inside it, so
+  /// a test that wants to *press* the offered next step has nothing to aim at
+  /// without this.
+  final Key? actionKey;
+
   final bool compact;
 
   @override
@@ -1447,7 +1456,11 @@ class EmptyState extends StatelessWidget {
           ],
           if (actionLabel != null && onAction != null) ...[
             const SizedBox(height: 18),
-            FilledButton(onPressed: onAction, child: Text(actionLabel!)),
+            FilledButton(
+              key: actionKey,
+              onPressed: onAction,
+              child: Text(actionLabel!),
+            ),
           ],
         ],
       ),

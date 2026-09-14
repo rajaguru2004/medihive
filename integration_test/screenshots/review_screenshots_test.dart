@@ -8,6 +8,7 @@ import 'package:medihive/app/modules/home/controllers/home_controller.dart';
 import 'package:medihive/app/routes/app_pages.dart';
 import 'package:medihive/app/theme/theme.dart';
 
+import '../fixtures/world_roles.dart';
 import '../support/app_harness.dart';
 import '../support/pump.dart';
 
@@ -109,6 +110,49 @@ void main() {
       await harness.showTab(Routes.INPATIENT);
       await shootBoth(tester, harness, '05-inpatient');
     });
+  });
+
+  // The shell is the one screen that is a *different screen* per account: its
+  // navigation is resolved from the server's access map, so a nurse and a
+  // receptionist get different bars out of the same build. A contact sheet
+  // that only ever shows the account which can see everything is a contact
+  // sheet of the one case this product never ships to.
+  //
+  // One test per role rather than one test walking four. Each role needs its
+  // own boot — the access map is read from storage before the first frame —
+  // and the surface conversion above is per *test*, so four boots inside one
+  // test would convert once and photograph four screens correctly while a
+  // fifth silently reused a stale surface.
+  group('the shell, by role', () {
+    for (final role in const [
+      WorldRole.superAdmin,
+      WorldRole.nurse,
+      WorldRole.receptionist,
+      WorldRole.labTechnician,
+    ]) {
+      testWidgets('as ${role.roleName}', (tester) async {
+        final harness = await AppHarness.bootSignedIn(
+          tester,
+          role: role,
+          fonts: true,
+        );
+
+        // Today is the one destination every account has, so it is the frame
+        // in which the bars are actually comparable.
+        await tester.pumpUntilFound(find.byKey(HomeKeys.dashboard));
+        await shootBoth(tester, harness, '22-shell-${_slug(role)}');
+
+        // Whatever did not fit on the bar — which for a scoped account is most
+        // of their navigation, and is the half a bar-only screenshot hides.
+        // Skipped where everything fit: there is no More slot then, and no
+        // screen behind it to photograph.
+        if (HomeController.to.hasMore) {
+          await harness.showTab(Routes.MORE);
+          await tester.pumpUntilFound(find.byKey(MoreKeys.screen));
+          await shootBoth(tester, harness, '23-more-${_slug(role)}');
+        }
+      });
+    }
   });
 
   group('inpatient', () {
@@ -277,3 +321,11 @@ void main() {
     });
   });
 }
+
+/// `LAB_TECHNICIAN` → `lab-technician`.
+///
+/// The server's own role name rather than the enum constant, so a reviewer
+/// reading a filename is reading the thing an administrator would have picked
+/// in the console.
+String _slug(WorldRole role) =>
+    role.roleName.toLowerCase().replaceAll('_', '-');
