@@ -46,6 +46,22 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<!-- ─────────────────────────────────────────────────────────────────────
+	     What a patient reads before they decide.
+
+	     iOS shows these three sentences inside the permission dialog, which
+	     makes them the only copy in this app that is read *before* consent
+	     rather than after it. DESIGN.md §9 is the register — plain, specific,
+	     and about the patient rather than about the system. Each one says what
+	     the thing is for and where what it captures goes; none of them says
+	     "to enable functionality".
+	     ───────────────────────────────────────────────────────────────────── -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>So you can answer out loud instead of typing. What you say is written down for the clinician who sees you.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>So you can photograph something you want looked at — a rash, a swelling, the box a medicine came in. The photo is added to your answers.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>So you can attach a photo you have already taken. Only the photos you pick are added to your answers.</string>
+	<!-- ─────────────────────────────────────────────────────────────────────
 	     DEVELOPMENT ONLY. Remove before the first TestFlight or App Store
 	     build, or split this file per configuration.
 

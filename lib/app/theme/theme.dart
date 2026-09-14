@@ -14,6 +14,7 @@ export 'app_async_widgets.dart';
 export 'app_bento.dart';
 export 'app_bento_adaptive.dart';
 export 'app_bento_clinical.dart';
+export 'app_bento_conversation.dart';
 export 'app_bento_crud.dart';
 export 'app_bento_data.dart';
 export 'app_bento_forms.dart';

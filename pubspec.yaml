@@ -38,6 +38,35 @@ dependencies:
   # Census trends and bed-occupancy ramps on the dashboard.
   fl_chart: ^1.2.0
 
+  # ── What a patient hands the device ──────────────────────────────────────
+  #
+  # Each of the three sits behind an interface in `lib/app/data/services/`, so
+  # nothing above that line knows a plugin is there and no test has to answer
+  # a method channel. `image_picker` is a photo of the thing they want looked
+  # at; `file_picker` is a letter or a result they already hold; `record` is
+  # the answer they would rather speak than type.
+  image_picker: ^1.2.3
+
+  # Held at 11.x, and not by preference. Every `file_picker` from 12.0.0 up
+  # reaches Windows through `win32 ^6`, and `flutter_secure_storage 9.2.4` —
+  # which holds the bearer token and the cached session — pins `win32 ^5`.
+  # The two cannot both be satisfied, and the version that would have to move
+  # to break the tie is the one the sign-in depends on. The picker API this
+  # app uses (`FilePicker.platform.pickFiles`, `PlatformFile.bytes`,
+  # `withData:`) is identical across all of them, so the seam loses nothing.
+  file_picker: ^11.0.3
+
+  # Held below 7.x for the same kind of reason. `record` 7.0.0 raised its floor
+  # to Dart 3.12 / Flutter 3.44 and this app is pinned to 3.10.3 / 3.38.4;
+  # moving the toolchain to gain a recorder re-resolves every other package
+  # with it.
+  record: ^6.2.1
+
+  # The runtime grant the three above need, and the only permission_handler
+  # call site in the app is `data/services/media_permissions.dart` — so the
+  # sentence a patient reads when they say no is written once.
+  permission_handler: ^13.0.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

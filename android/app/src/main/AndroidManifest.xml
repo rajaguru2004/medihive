@@ -5,6 +5,48 @@
          with an unexplained network error on every call. -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- Case-taking lets a patient answer out loud instead of typing, which is
+         the difference between a form somebody finishes and one they abandon
+         when they are in pain or holding the phone in one hand. This is the
+         only permission `record` asks for on any Android this app supports. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+
+    <!-- Photographing the thing the patient wants looked at: a rash, a
+         swelling, the box a medicine came in.
+
+         Declaring CAMERA is not free and is not the obvious choice.
+         `image_picker` hands the job to the system camera app, which needs no
+         permission at all — but Android's rule is that an app which *declares*
+         CAMERA must then be granted it at runtime before ACTION_IMAGE_CAPTURE
+         will start, and an app which does not declare it is handed the camera
+         with no prompt. Declared on purpose, and asked for through
+         `MediaAccess`, so the refusal is a sentence the patient can read
+         rather than a picker that opens onto nothing. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+
+    <!-- Attaching a photo the patient already has, split at the API level
+         where Android split it.
+
+         33 and up have per-type media permissions, and the photo picker
+         `image_picker` uses on those releases needs none of them — but
+         `permission_handler`'s `Permission.photos` maps onto READ_MEDIA_IMAGES
+         there, so the declaration is what makes the gate answer honestly
+         instead of reporting permanently-denied for a permission the manifest
+         never asked for.
+
+         32 and below have only the one coarse permission, hence the ceiling:
+         left open-ended it would be requested on releases that have replaced
+         it, which is a scary-sounding prompt for nothing. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
+
+    <!-- `file_picker` needs no storage permission on any of these releases: it
+         opens the Storage Access Framework, and a document the user chose in
+         the system picker is granted to this app by that choice. Noted because
+         the missing line looks like an oversight otherwise. -->
+
     <application
         android:label="MediHive"
         android:name="${applicationName}"

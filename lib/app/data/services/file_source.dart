@@ -7,22 +7,23 @@
 /// platform channel — a picker plugin answers over the method channel, and a
 /// method channel in a widget test is a stub either way.
 ///
-/// **`file_picker` is not a dependency of this app.** This interface is what it
-/// will be wired behind when it becomes one: add the package, write a
-/// `FilePickerFileSource implements FileSource` whose [FileSource.pick]
-/// delegates to it, and register that instead of [StubFileSource] in
-/// `IntegrationsRepositories.register`. Nothing above this line changes.
+/// `file_picker` is a dependency now, and `file_picker_file_source.dart` holds
+/// the `FilePickerFileSource implements FileSource` this interface was written
+/// for. `IntegrationsRepositories.register` registers that instead of
+/// [StubFileSource]; nothing above this line changed when it arrived, which
+/// was the point.
 ///
 /// The same seam `image_source.dart` established for radiology, deliberately
 /// spelled the same way. Two seams that differ only in their vocabulary are two
 /// seams somebody has to read twice.
 ///
-/// Note for that day: `file_picker` hands back a `PlatformFile` whose `bytes`
-/// are **null** on desktop unless the picker is asked to read them
-/// (`withData: true`) — it gives a path instead. A null there arrives here as
-/// an empty part, which the route accepts as a file and the parser then reports
-/// as zero rows, so the failure surfaces as "that file was empty" rather than
-/// as a bug.
+/// The note left here for that day: `file_picker` hands back a `PlatformFile`
+/// whose `bytes` are **null** on desktop unless the picker is asked to read
+/// them (`withData: true`) — it gives a path instead. A null there arrives here
+/// as an empty part, which the route accepts as a file and the parser then
+/// reports as zero rows, so the failure surfaces as "that file was empty"
+/// rather than as a bug. The implementation passes the flag and refuses a null
+/// that still arrives.
 /// ─────────────────────────────────────────────────────────────────────────────
 library;
 

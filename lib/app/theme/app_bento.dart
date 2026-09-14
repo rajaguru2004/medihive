@@ -120,9 +120,10 @@ List<BoxShadow> bentoShadow(BuildContext context, {bool hero = false}) {
 // list is the single most expensive thing a Flutter screen can do, and it is
 // why "glass cards" have a bad name.
 //
-// The floating tab bar is the one surface that spends a real blur, because it
-// is the one surface with content moving underneath it — and
-// `test/one_blur_test.dart` holds the count at one.
+// Not even the floating tab bar spends one. It is the surface with the best
+// claim to a blur — content moves underneath it — and it is built from the
+// same translucent fill and hairline as everything else, which is why the
+// count is zero rather than one. `test/one_blur_test.dart` holds it there.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// The material's switches.

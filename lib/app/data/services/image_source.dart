@@ -7,16 +7,16 @@
 /// without a platform channel — a picker plugin answers over the method
 /// channel, and a method channel in a widget test is a stub either way.
 ///
-/// **`image_picker` is not a dependency of this app.** This interface is what
-/// it will be wired behind when it becomes one: add the package, write an
-/// `ImagePickerImageSource implements ImageSource` whose [pick] delegates to
-/// it, and register that instead of [StubImageSource] in the binding. Nothing
-/// above this line changes.
+/// `image_picker` is a dependency now, and `image_picker_image_source.dart`
+/// holds the `ImagePickerImageSource implements ImageSource` this interface
+/// was written for. A binding registers that instead of [StubImageSource];
+/// nothing above this line changed when it arrived, which was the point.
 ///
-/// Note for that day: `image_picker` exports an `ImageSource` **enum** of its
-/// own, so the implementation file imports it with a prefix or hides one of
-/// the two names. Two types called `ImageSource` in one file is a compile
-/// error, not a subtle bug, so it costs a minute once.
+/// The note left here for that day turned out to be worth its minute, and
+/// understated: `image_picker` exports an `ImageSource` **enum** of its own
+/// *and* a `PickedFile` that collides with `file_source.dart`'s. The
+/// implementation takes the whole package behind a prefix rather than hiding
+/// names one at a time.
 /// ─────────────────────────────────────────────────────────────────────────────
 library;
 
