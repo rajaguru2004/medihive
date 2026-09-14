@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../../core/keys/app_keys.dart';
+import '../../../routes/app_pages.dart';
 import '../../../theme/theme.dart';
 import '../controllers/edit_screening_controller.dart';
 
@@ -16,6 +17,26 @@ class EditScreeningView extends GetView<EditScreeningController> {
 
   @override
   Widget build(BuildContext context) {
+    // Nothing was handed over: a deep link, or a shortcut from a build that
+    // passed the record differently. Saying so beats an empty form whose save
+    // would create a second screening for somebody who meant to correct one.
+    if (controller.isMissingRecord) {
+      return Scaffold(
+        appBar: const DetailHeader(title: 'Edit screening'),
+        body: BentoGround(
+          child: EmptyState(
+            key: ScreeningKeys.editMissing,
+            icon: Icons.help_outline_rounded,
+            title: 'That screening is not here',
+            message: 'Open it from the pre-triage board and the edit screen '
+                'will have the record in front of it.',
+            actionLabel: 'Back to pre-triage',
+            onAction: () => Get.offNamed<void>(Routes.PRE_TRIAGE),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: DetailHeader(
         title: 'Edit screening',

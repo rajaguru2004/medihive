@@ -38,5 +38,8 @@ abstract final class ScreeningKeys {
 
   // ── Edit ──────────────────────────────────────────────────────────────────
   static const edit = Key('screening_edit_screen');
+
+  /// The state this screen opens in when nothing was handed to it.
+  static const editMissing = Key('screening_edit_missing');
   static const editSave = Key('screening_edit_save');
 }

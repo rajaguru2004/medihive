@@ -14,6 +14,7 @@ import '../flows/pharmacy/pharmacy_flow_test.dart';
 import '../flows/pre_triage/screening_flow_test.dart';
 import '../flows/queue/queue_flow_test.dart';
 import '../flows/radiology/radiology_flow_test.dart';
+import '../flows/routes/every_route_builds_test.dart';
 import '../flows/settings/settings_flow_test.dart';
 import '../flows/staff/staff_flow_test.dart';
 
@@ -30,6 +31,11 @@ import '../flows/staff/staff_flow_test.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
+  // First: every screen in the table, opened once. A module flow proves a
+  // module works; this proves nothing in the table lands on the red screen,
+  // which is what an exception during `build` looks like to somebody holding
+  // the phone.
+  registerRouteFlows();
   registerAuthFlows();
   registerShellFlows();
   registerQueueFlows();

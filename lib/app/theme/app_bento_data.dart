@@ -77,76 +77,87 @@ class _SearchFieldState extends State<SearchField> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      // A **minimum**, not a height. A fixed 46 is 46 at every text scale, and
-      // the field's own content needs more than that as soon as the reader
-      // turns their font size up — the glyphs are then clipped mid-letter,
-      // which looks like a broken font rather than a layout that ran out of
-      // room.
-      constraints: const BoxConstraints(minHeight: 46),
-      decoration: BoxDecoration(
-        color: wellColor(context),
-        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-        border: Border.all(color: hairlineColor(context)),
-      ),
-      child: Row(
-        children: [
-          const SizedBox(width: 12),
-          Icon(
-            Icons.search_rounded,
-            size: 19,
-            color: tertiaryLabelColor(context),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: TextField(
-              key: widget.fieldKey,
-              controller: _controller,
-              autofocus: widget.autofocus,
-              onChanged: _onChanged,
-              textInputAction: TextInputAction.search,
-              // Submitting jumps the debounce: somebody who pressed the key
-              // has finished typing and should not wait out a timer.
-              onSubmitted: (value) {
-                _timer?.cancel();
-                widget.onChanged(value);
-              },
-              style: isDark
-                  ? AppTextStyles.darkBody()
-                  : AppTextStyles.lightBody(),
-              decoration: InputDecoration(
-                isDense: true,
-                // Both of these come from the app's `InputDecorationTheme`,
-                // and both are wrong inside a pill that already draws itself:
-                // `filled` paints a second, smaller box within this one, and
-                // the theme's 14-point vertical padding makes the field taller
-                // than the pill — so the text is clipped by the very box that
-                // should not be there. Turned off explicitly rather than left
-                // to inheritance.
-                filled: false,
-                contentPadding: EdgeInsets.zero,
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                hintText: widget.hint,
-                hintStyle:
-                    (isDark
-                            ? AppTextStyles.darkBody()
-                            : AppTextStyles.lightBody())
-                        .copyWith(color: tertiaryLabelColor(context)),
+
+    // `Material`, not a bare `Container`. A `TextField` asserts on a missing
+    // Material ancestor and the assertion is Flutter's **red screen**, not a
+    // degraded field — so a board that dropped this straight into a sliver
+    // rather than inside a `BentoCard` rendered as a crash. The kit's contract
+    // is that a component can go anywhere; carrying its own material is what
+    // makes that true. `type: transparency` so it paints nothing of its own:
+    // the decoration below is still the only thing drawing this pill.
+    return Material(
+      type: MaterialType.transparency,
+      child: Container(
+        // A **minimum**, not a height. A fixed 46 is 46 at every text scale, and
+        // the field's own content needs more than that as soon as the reader
+        // turns their font size up — the glyphs are then clipped mid-letter,
+        // which looks like a broken font rather than a layout that ran out of
+        // room.
+        constraints: const BoxConstraints(minHeight: 46),
+        decoration: BoxDecoration(
+          color: wellColor(context),
+          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+          border: Border.all(color: hairlineColor(context)),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: 12),
+            Icon(
+              Icons.search_rounded,
+              size: 19,
+              color: tertiaryLabelColor(context),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                key: widget.fieldKey,
+                controller: _controller,
+                autofocus: widget.autofocus,
+                onChanged: _onChanged,
+                textInputAction: TextInputAction.search,
+                // Submitting jumps the debounce: somebody who pressed the key
+                // has finished typing and should not wait out a timer.
+                onSubmitted: (value) {
+                  _timer?.cancel();
+                  widget.onChanged(value);
+                },
+                style: isDark
+                    ? AppTextStyles.darkBody()
+                    : AppTextStyles.lightBody(),
+                decoration: InputDecoration(
+                  isDense: true,
+                  // Both of these come from the app's `InputDecorationTheme`,
+                  // and both are wrong inside a pill that already draws itself:
+                  // `filled` paints a second, smaller box within this one, and
+                  // the theme's 14-point vertical padding makes the field taller
+                  // than the pill — so the text is clipped by the very box that
+                  // should not be there. Turned off explicitly rather than left
+                  // to inheritance.
+                  filled: false,
+                  contentPadding: EdgeInsets.zero,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  hintText: widget.hint,
+                  hintStyle:
+                      (isDark
+                              ? AppTextStyles.darkBody()
+                              : AppTextStyles.lightBody())
+                          .copyWith(color: tertiaryLabelColor(context)),
+                ),
               ),
             ),
-          ),
-          if (_controller.text.isNotEmpty)
-            IconButton(
-              onPressed: _clear,
-              icon: const Icon(Icons.close_rounded, size: 18),
-              tooltip: 'Clear',
-              color: secondaryLabelColor(context),
-            )
-          else
-            const SizedBox(width: 12),
-        ],
+            if (_controller.text.isNotEmpty)
+              IconButton(
+                onPressed: _clear,
+                icon: const Icon(Icons.close_rounded, size: 18),
+                tooltip: 'Clear',
+                color: secondaryLabelColor(context),
+              )
+            else
+              const SizedBox(width: 12),
+          ],
+        ),
       ),
     );
   }
@@ -1209,8 +1220,9 @@ class _FilterSheetState extends State<FilterSheet> {
                       ),
                       child: Text(
                         group.label,
-                        style:
-                            AppTextStyles.overline(Theme.of(context).brightness),
+                        style: AppTextStyles.overline(
+                          Theme.of(context).brightness,
+                        ),
                       ),
                     ),
                     if (group.range)
@@ -1230,15 +1242,17 @@ class _FilterSheetState extends State<FilterSheet> {
                       for (final value in group.options)
                         SheetRow(
                           key: widget.optionKey?.call(group.field, value),
-                          icon: (_draft[group.field] ?? const []).contains(value)
+                          icon:
+                              (_draft[group.field] ?? const []).contains(value)
                               ? Icons.check_box_rounded
                               : Icons.check_box_outline_blank_rounded,
                           label: group.nameOf(value),
                           tint: group.colorOf == null
                               ? null
                               : semanticInk(context, group.colorOf!(value)),
-                          selected:
-                              (_draft[group.field] ?? const []).contains(value),
+                          selected: (_draft[group.field] ?? const []).contains(
+                            value,
+                          ),
                           onTap: () => _toggle(group.field, value),
                         ),
                   ],

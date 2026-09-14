@@ -41,6 +41,27 @@ class EditScreeningController extends GetxController {
 
   late final PreTriageModel screening;
 
+  /// What [screening] is when nothing was handed over. Never rendered as a
+  /// record — [isMissingRecord] is what the screen reads — but it keeps the
+  /// field non-null so every other line here stays plain.
+  static final PreTriageModel _noRecord = PreTriageModel(
+    id: '',
+    screeningId: '',
+    firstName: '',
+    chiefComplaint: '',
+    status: 'screening',
+    createdAt: DateTime.fromMillisecondsSinceEpoch(0),
+  );
+
+  /// True when this screen was opened without a record to edit.
+  ///
+  /// A deep link, a shortcut from a build that passed the record differently,
+  /// or a push that forgot the argument. The old code ended the expression in
+  /// `!`, so all three were `Null check operator used on a null value` — which
+  /// is Flutter's **red screen**, on a ward, with no way back but the system
+  /// button.
+  bool get isMissingRecord => screening.screeningId.isEmpty;
+
   static List<String> get routes => NewScreeningStep2Controller.routes;
   static const sexes = ['Male', 'Female', 'Other'];
 
@@ -67,9 +88,12 @@ class EditScreeningController extends GetxController {
     super.onInit();
 
     final argument = Get.arguments;
-    screening = argument is PreTriageModel
+    final passed = argument is PreTriageModel
         ? argument
-        : (argument is Map ? argument['screening'] as PreTriageModel : null)!;
+        : (argument is Map ? argument['screening'] : null);
+    screening = passed is PreTriageModel ? passed : _noRecord;
+
+    if (isMissingRecord) return;
 
     firstNameController.text = screening.firstName;
     lastNameController.text = screening.lastName ?? '';
