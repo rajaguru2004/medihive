@@ -25,15 +25,15 @@ Backend gates: `npm run lint`, `npm run build`, `npm test`, `npm run verify:mobi
 | Phase | Scope | Size | Status |
 |---|---|---|---|
 | [P0](#p0--foundation-and-local-stack) | Foundation, local stack, backend contract, RBAC plumbing | L | 🔄 nearly done — test infra + drafts remain |
-| [P1](#p1--shell-navigation-and-design-contract) | Role-shaped shell, More hub, tablet rail | M | 🔄 shell, guard, hub and two screenshot rounds done; tablet rail left |
+| [P1](#p1--shell-navigation-and-design-contract) | Role-shaped shell, More hub, tablet rail | M | ✅ |
 | [P2](#p2--patients) | Registry, search, form, patient hub | L | ⬜ |
 | [P3](#p3--clinical-parity) | Appointments, consultations, queue/triage/inpatient gating | L | ⬜ |
 | [P4](#p4--diagnostics) | Laboratory, radiology | XL | ⬜ |
 | [P5](#p5--pharmacy) | Dispensing, inventory, POS | L | ⬜ |
 | [P6](#p6--billing) | Invoices, payments, services | L | ⬜ |
-| [P7](#p7--administration-and-settings) | Users, settings hub, roles, integrations | XL | ⬜ |
+| [P7](#p7--administration-and-settings) | Users, settings hub, roles, integrations | XL | 🔄 hub, appearance, clinical, roles done |
 | [P8](#p8--dashboard-and-my-shift) | Role-composed shift board, parity tiles | M | ⬜ |
-| [P9](#p9--hardening-and-documentation) | Session lock, a11y, full review, docs | M | ⬜ |
+| [P9](#p9--hardening-and-documentation) | Session lock, a11y, full review, docs | M | 🔄 session lock done |
 
 Sizes: S ≤ ½ day · M 1 day · L 2–3 days · XL 4+ days.
 
@@ -146,7 +146,7 @@ layer stops sending a vocabulary the backend rejects.
 | 1.4 | More hub (grouped like the web IA) + account entry | ✅ | |
 | 1.5 | `no_access` module + `AuthMiddleware(module:, verb:)` route guard | ✅ | |
 | 1.6 | Global patient search entry in the shell bar | ✅ | screen lands in P2 |
-| 1.7 | Tablet `ShellRail` at ≥600 dp | ⬜ | |
+| 1.7 | Tablet `ShellRail` at ≥600 dp | ✅ | |
 | 1.8 | Access flows (super admin, nurse, receptionist, 403-safe write) + `ShellLayout` unit test for all roles | ✅ | |
 | 1.9 | Screenshot round → fix → confirm (4 roles × light/dark × phone/tablet) | ✅ | |
 
@@ -222,8 +222,8 @@ layer stops sending a vocabulary the backend rejects.
 | # | Task | Status | Notes |
 |---|---|---|---|
 | 7.1 | Users list / form / detail (role membership, activate, delete) | ⬜ | |
-| 7.2 | Settings hub (grouped rows, gated per module) | ⬜ | |
-| 7.3 | Hospital profile (logo upload, brand colour → immediate re-theme) | ⬜ | |
+| 7.2 | Settings hub (grouped rows, gated per module) | ✅ | |
+| 7.3 | Hospital profile (logo upload, brand colour → immediate re-theme) | ✅ | |
 | 7.4 | Locale · Appearance · Clinical settings | ⬜ | partial save must preserve untouched keys |
 | 7.5 | Core modules toggles | ⬜ | |
 | 7.6 | Departments CRUD | ⬜ | |
@@ -248,7 +248,7 @@ layer stops sending a vocabulary the backend rejects.
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 9.1 | `SessionLockService` + lock screen (+ optional biometric) | ⬜ | shared ward tablet |
+| 9.1 | `SessionLockService` + lock screen (+ optional biometric) | ✅ | shared ward tablet |
 | 9.2 | Freshness stamps, stale banner, draft preservation audit | ⬜ | |
 | 9.3 | 1.3× text scale pass + tablet pass over every screen | ⬜ | |
 | 9.4 | Full screenshot suite (all roles × themes × device classes) → fix → confirm | ⬜ | |
