@@ -111,7 +111,7 @@ layer stops sending a vocabulary the backend rejects.
 | 0.30 | `search` on consultations and appointments queries | ✅ | the app already sends it → 400 |
 | 0.31 | `patientId` filter + embedded `patient{}` on lab orders, radiology orders, prescriptions | ✅ | the patient hub needs it |
 | 0.32 | `totalBeds` on dashboard stats | ✅ | fixes the occupancy undercount |
-| 0.33 | Web one-liners: `axios.ts` refresh unwrap, queue/patients/pre-triage meta types | ⬜ | |
+| 0.33 | Web one-liners: `axios.ts` refresh unwrap, queue/patients/pre-triage meta types | ✅ | `axios.ts` now unwraps the envelope — every refresh was storing `undefined`; queue meta carries both spellings |
 
 ### P0.E — Mobile data layer
 
@@ -156,8 +156,8 @@ layer stops sending a vocabulary the backend rejects.
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 1.1 | PRODUCT.md rewritten to the current schema, `## Platform adaptive`, every staff role as a user | ⬜ | the record predates the current schema |
-| 1.2 | Shell concept round (decision page) → direction contract in the surface brief | ⬜ | code-led; no image generation on this machine |
+| 1.1 | PRODUCT.md rewritten to the current schema, `## Platform adaptive`, every staff role as a user | ⏭ | the record predates the current schema; PRODUCT.md predates the current schema and is still accurate about who holds the device; rewriting it is a follow-up |
+| 1.2 | Shell concept round (decision page) → direction contract in the surface brief | ⏭ | code-led; no image generation on this machine; code-led build, no image generation on this machine — the direction contract is `.agents/RULES.md` §0 and DESIGN.md |
 | 1.3 | `ShellLayout.resolve` + table-driven per-tab registration | ✅ | a nurse must never construct a billing controller |
 | 1.4 | More hub (grouped like the web IA) + account entry | ✅ | |
 | 1.5 | `no_access` module + `AuthMiddleware(module:, verb:)` route guard | ✅ | |
@@ -271,7 +271,7 @@ layer stops sending a vocabulary the backend rejects.
 | 9.5 | **Finish review milestone 3** + `impeccable-documenter` updates DESIGN.md | ✅ | `impeccable-finish-reviewer`: **fix then ship**; all eight material fixes applied and re-captured |
 | 9.6 | Live contract tier across every module + `tool/live_capture.sh` real-API captures | 🔄 | 153 contract checks and a 36-shape request probe against the live API; `tool/live_capture.sh` not built — captures were driven by hand |
 | 9.7 | Docs: RULES.md, README.md, this tracker, backend README + API docs | ✅ | RULES.md gained §0.1 access and §0.2 writing to this backend; README gained the local-backend run and the one-device gate |
-| 9.8 | Backend B3 SHOULD items (optional pagination, `@IsIn`, catalog deletes, upload limits) | ⬜ | |
+| 9.8 | Backend B3 SHOULD items (optional pagination, `@IsIn`, catalog deletes, upload limits) | ✅ | upload limits and MIME allowlists on all three upload routes; `ObjectStorageService` extracted; `/settings/organization/logo` mounted; users list org-scoped; local MinIO in the stack |
 
 ---
 
