@@ -258,26 +258,35 @@ class _Census extends StatelessWidget {
 
     final stats = board.stats;
 
+    // The hero card is beds and money. A site with the ward module off, read
+    // by an account with no billing grant, has neither — and an empty card
+    // with a shadow under it is furniture that says nothing.
+    if (!board.canSeeBeds && !board.canSeeRevenue) return null;
+
     return BentoCard(
       key: HomeKeys.census,
       hero: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'BED OCCUPANCY',
-            style: AppTextStyles.overline(Theme.of(context).brightness),
-          ),
-          const SizedBox(height: 12),
-          WardCapacityBar(
-            key: HomeKeys.occupancy,
-            occupied: stats.occupiedBeds,
-            total: board.totalBeds,
-          ),
+          if (board.canSeeBeds) ...[
+            Text(
+              'BED OCCUPANCY',
+              style: AppTextStyles.overline(Theme.of(context).brightness),
+            ),
+            const SizedBox(height: 12),
+            WardCapacityBar(
+              key: HomeKeys.occupancy,
+              occupied: stats.occupiedBeds,
+              total: board.totalBeds,
+            ),
+          ],
           if (board.canSeeRevenue) ...[
-            const SizedBox(height: 18),
-            const Hairline(),
-            const SizedBox(height: 18),
+            if (board.canSeeBeds) ...[
+              const SizedBox(height: 18),
+              const Hairline(),
+              const SizedBox(height: 18),
+            ],
             MoneyFigure(
               key: ShiftKeys.revenue,
               label: 'Taken today',
@@ -339,17 +348,18 @@ class _Census extends StatelessWidget {
           icon: Icons.medication_outlined,
           onTap: _open(Modules.pharmacy, PharmacyRoutes.hub),
         ),
-        Figure(
-          label: 'Beds free',
-          value: '${stats.availableBeds}',
-          icon: Icons.bed_outlined,
-          // A ward with no free bed is the one bed figure that is an alarm:
-          // the next admission has nowhere to go.
-          color: stats.availableBeds <= 0 && board.totalBeds > 0
-              ? AppColors.acuityCritical
-              : null,
-          onTap: _open(Modules.inpatient, Routes.INPATIENT_BEDS_GRID),
-        ),
+        if (board.canSeeBeds)
+          Figure(
+            label: 'Beds free',
+            value: '${stats.availableBeds}',
+            icon: Icons.bed_outlined,
+            // A ward with no free bed is the one bed figure that is an alarm:
+            // the next admission has nowhere to go.
+            color: stats.availableBeds <= 0 && board.totalBeds > 0
+                ? AppColors.acuityCritical
+                : null,
+            onTap: _open(Modules.inpatient, Routes.INPATIENT_BEDS_GRID),
+          ),
         Figure(
           label: 'Beds in use',
           value: '${stats.occupiedBeds}',

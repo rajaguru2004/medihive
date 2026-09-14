@@ -121,6 +121,25 @@ class DashboardController extends GetxController with LoadStateMixin {
       Get.isRegistered<AccessService>() &&
       AccessService.to.canRead(Modules.billing);
 
+  /// Whether the ward figures belong on this board.
+  ///
+  /// Two conditions, and the second is the one this misses without saying so:
+  /// the account must be granted the module **and** the site must still run
+  /// it. A site that switches the ward module off loses the ward tab straight
+  /// away — `ShellLayout.resolve` sees to that — and a board still counting
+  /// occupied beds underneath is a switch that only half worked.
+  ///
+  /// An absent key means on, exactly as the shell reads it: the backend's own
+  /// default is `inpatient: false`, and treating a missing key as off would
+  /// blank the census for every site that never opened the settings screen.
+  bool get canSeeBeds {
+    if (!Get.isRegistered<AccessService>()) return false;
+    if (!AccessService.to.canRead(Modules.inpatient)) return false;
+    if (!Get.isRegistered<SettingsService>()) return true;
+    final flag = SettingsService.to.modulesEnabled[Modules.inpatient];
+    return flag is! bool || flag;
+  }
+
   List<ShiftSeries> get appointmentSeries =>
       ShiftCharts.appointments(appointmentStatuses);
 
