@@ -258,10 +258,14 @@ class _Census extends StatelessWidget {
 
     final stats = board.stats;
 
-    // The hero card is beds and money. A site with the ward module off, read
-    // by an account with no billing grant, has neither — and an empty card
-    // with a shadow under it is furniture that says nothing.
-    if (!board.canSeeBeds && !board.canSeeRevenue) return null;
+    // The hero half is beds and money. A site with the ward module off, read
+    // by an account with no billing grant, has neither — so that half goes and
+    // the eight figures stand on their own rather than inside an empty card
+    // with a shadow under it.
+    final figures = FigureGrid(key: ShiftKeys.figures, figures: _figures(stats));
+    if (!board.canSeeBeds && !board.canSeeRevenue) {
+      return BentoCard(key: HomeKeys.census, hero: true, child: figures);
+    }
 
     return BentoCard(
       key: HomeKeys.census,
@@ -300,10 +304,7 @@ class _Census extends StatelessWidget {
           const SizedBox(height: 18),
           const Hairline(),
           const SizedBox(height: 18),
-          FigureGrid(
-            key: ShiftKeys.figures,
-            figures: _figures(stats),
-          ),
+          figures,
         ],
       ),
     );
@@ -606,9 +607,10 @@ class _AppointmentRow extends StatelessWidget {
       title: patient.displayName,
       subtitle: patient.mrn.isEmpty ? null : 'MRN ${patient.mrn}',
       showChevron: false,
-      // The time, not an icon. A clinic list is read down its time column.
+      // The time, not an icon. A clinic list is read down its time column —
+      // and 56 rather than 52, because at 52 this wrapped "14:30" mid-digit.
       leading: SizedBox(
-        width: 52,
+        width: 56,
         child: Text(
           Formatters.clockTime(appointment.appointmentTime),
           style: AppFonts.numeric(

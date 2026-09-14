@@ -268,9 +268,14 @@ class VitalTile extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+        // Two lines, not one. In a three-column grid at this size "Discharged"
+        // came out as DISCHARG…, "Over 7 days" as OVER 7 DA… and "Revenue
+        // today" as Revenue tod… — four screens losing the word that carries
+        // the meaning, while the number above it had room to spare. A label
+        // that wraps is longer; a label that is cut is wrong.
         Text(
           label.toUpperCase(),
-          maxLines: 1,
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: AppTextStyles.overline(brightness),
         ),

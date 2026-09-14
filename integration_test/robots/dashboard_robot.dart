@@ -33,7 +33,12 @@ final class DashboardRobot extends Robot with ShellTab {
   Future<void> assertOnBoard() async {
     await assertVisible();
     seeNoErrorBanner();
-    await tester.pumpUntilFound(find.byKey(HomeKeys.census));
+    // The figures, not the census card. The hero card is beds and money, and
+    // an account with neither — a lab technician holds no ward grant and no
+    // billing grant — correctly gets a board without one. Waiting for it made
+    // the absence of a card nobody should see look like a board that never
+    // loaded.
+    await tester.pumpUntilFound(find.byKey(ShiftKeys.figures));
   }
 
   /// The attention card, which is drawn only when there is something to say.

@@ -405,14 +405,19 @@ class PrescriptionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = prescription.itemSummary;
+    final mrn = prescription.patient.mrn;
     return PersonRow(
       name: prescription.patient.displayName,
-      subtitle: items.isEmpty ? 'No drugs on this prescription' : items,
-      // The MRN alone. Every script in this queue was written today, so the
-      // date earns none of the room it was taking from the patient's name.
-      detail: prescription.patient.mrn.isEmpty
-          ? null
-          : 'MRN ${prescription.patient.mrn}',
+      // The MRN leads the subtitle rather than sitting in the trailing detail
+      // column. That column is capped so the name can breathe, and at 1.3×
+      // text the cap cut the MRN to "MRN 104…" — ellipsising the identifier a
+      // pharmacist checks the patient against, which is the one thing a
+      // clinical row may never do. Here it is first in the line, so what runs
+      // out of room is the drug list, which the detail screen carries in full.
+      subtitle: [
+        if (mrn.isNotEmpty) 'MRN $mrn',
+        if (items.isNotEmpty) items else 'No drugs on this prescription',
+      ].join(' · '),
       onTap: onTap,
       trailing: StatusPill(
         status: prescription.status,

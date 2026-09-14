@@ -72,8 +72,15 @@ class InpatientView extends GetView<InpatientController> {
                       VitalTile(
                         label: 'Beds free',
                         value: '${stats.availableBeds}',
+                        // Amber, not red. A full estate is a capacity fact —
+                        // the same class as an overdue invoice or an empty
+                        // shelf — and red in this app means a deteriorating
+                        // patient or an error. A bed manager reading a red
+                        // zero here learns nothing they cannot read from the
+                        // number itself, and every red that is not a patient
+                        // costs the ward board's own reds their meaning.
                         tone: stats.availableBeds == 0
-                            ? AppColors.acuityCritical
+                            ? AppColors.warning
                             : null,
                       ),
                       VitalTile(
@@ -241,16 +248,20 @@ class WardRow extends StatelessWidget {
                   value: '${ward.occupiedBeds}',
                   unit: 'of ${ward.capacity}',
                   size: 15,
-                  // Red only when there is genuinely nowhere to put anybody.
-                  // A ward at 90% is busy, not an emergency.
-                  tone: full ? AppColors.acuityCritical : null,
+                  // Amber at capacity, never red. A full ward is somebody's
+                  // afternoon — the next admission goes to another ward or
+                  // waits — not a deteriorating patient. The bar below it is
+                  // the longest run of colour on this screen, and painting it
+                  // in the app's one alarm colour made a bed count the loudest
+                  // thing on a board whose reds are supposed to be people.
+                  tone: full ? AppColors.warning : null,
                 ),
                 const SizedBox(height: 6),
                 UsedBar(
                   fraction: ward.capacity == 0
                       ? 0
                       : ward.occupiedBeds / ward.capacity,
-                  color: full ? AppColors.acuityCritical : AppColors.bedOccupied,
+                  color: full ? AppColors.warning : AppColors.bedOccupied,
                   height: 4,
                 ),
               ],

@@ -530,8 +530,11 @@ class _AppointmentRow extends StatelessWidget {
         horizontal: BentoSpace.listPad,
         vertical: 10,
       ),
+      // 56, not 52. A time at this weight needs every point of it: at 52 the
+      // column wrapped "14:30" to "14:3" over "0", which reads as a rendering
+      // fault on the one column a clinic list is scanned down.
       leading: SizedBox(
-        width: 52,
+        width: 56,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
