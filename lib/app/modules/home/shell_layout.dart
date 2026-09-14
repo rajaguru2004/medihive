@@ -110,6 +110,13 @@ class ShellLayout {
 
   bool get hasMore => more.isNotEmpty;
 
+  /// Everything this account can reach, bar first then the rest.
+  ///
+  /// What a rail shows. A rail has no horizontal limit, so hiding destinations
+  /// behind a hub there would be inventing the phone's constraint on hardware
+  /// that does not share it.
+  List<ShellDestination> get everything => [...tabs, ...more];
+
   /// The destinations grouped in the console's own order, for the More hub and
   /// for the tablet rail.
   Map<ShellGroup, List<ShellDestination>> get moreByGroup {

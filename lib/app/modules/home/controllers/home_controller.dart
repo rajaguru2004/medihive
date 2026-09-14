@@ -127,6 +127,20 @@ class HomeController extends GetxController {
     return true;
   }
 
+  /// What the rail does with a tap.
+  ///
+  /// A rail carries every destination, including the ones a bar would have
+  /// pushed into More — so a tap is either a tab switch or, for a destination
+  /// with no slot in the stack, a push. One entry point so the rail does not
+  /// have to know which is which.
+  void selectOrOpen(String route) {
+    if (selectRoute(route)) return;
+    final destination = allDestinations.firstWhereOrNull(
+      (d) => d.route == route,
+    );
+    if (destination != null) openDestination(destination);
+  }
+
   /// Opens a destination from the More hub.
   ///
   /// Pushed, not swapped into the bar: the bar's membership is the resolved

@@ -6,6 +6,9 @@ abstract final class HomeKeys {
   static const appBar = Key('home_app_bar');
   static const title = Key('home_title');
   static const tabBar = Key('home_tab_bar');
+
+  /// The rail that replaces the tab bar above 600 dp.
+  static const rail = Key('home_rail');
   static const profileButton = Key('home_profile_button');
   static const themeToggle = Key('home_theme_toggle');
   static const signOut = Key('home_sign_out');

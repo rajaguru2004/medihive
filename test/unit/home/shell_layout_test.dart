@@ -290,4 +290,29 @@ void main() {
       }
     });
   });
+
+  group('what a rail shows', () {
+    test('every destination, with the bar ones first', () {
+      // A rail has no horizontal limit, so it carries what More would have
+      // held. Hiding destinations behind a hub on a tablet would be inventing
+      // the phone's constraint on hardware that does not share it.
+      for (final role in _seededPermissions.keys) {
+        final layout = _layoutFor(role);
+        expect(
+          layout.everything.length,
+          layout.tabs.length + layout.more.length,
+          reason: '$role loses a destination on a rail',
+        );
+        expect(layout.everything.take(layout.tabs.length), layout.tabs);
+      }
+    });
+
+    test('a super admin reaches all thirteen on a rail', () {
+      final layout = ShellLayout.resolve(
+        access: const AccessMap(isSuperAdmin: true),
+        destinations: _destinations,
+      );
+      expect(layout.everything.length, _destinations.length);
+    });
+  });
 }

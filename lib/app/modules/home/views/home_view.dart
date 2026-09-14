@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/keys/app_keys.dart';
+import '../../../core/window_class.dart';
 import '../../../routes/app_pages.dart';
 import '../../../theme/theme.dart';
 import '../../more/views/more_view.dart';
@@ -19,23 +20,37 @@ class HomeView extends GetView<HomeController> {
 
   @override
   Widget build(BuildContext context) {
+    // Structure, not scale. A bottom bar stretched across a tablet leaves its
+    // destinations under the far edge of a two-handed grip and wastes the width
+    // that made it a tablet; a rail puts them back under a thumb and gives the
+    // content the rest.
+    final rail = WindowClass.of(context).navMode.isRail;
+
+    final stack = Obx(
+      () => LazyIndexedStack(
+        index: controller.activeIndex,
+        children: [
+          for (final destination in controller.tabs) destination.body(),
+          // The last slot, when anything did not fit. Built here rather than
+          // pushed so switching to it keeps the other tabs' scroll positions
+          // and costs no refetch, exactly like the tabs beside it.
+          if (controller.hasMore) const MoreView(),
+        ],
+      ),
+    );
+
     return Scaffold(
       key: HomeKeys.screen,
       appBar: _ShellBar(controller: controller),
-      body: Obx(
-        () => LazyIndexedStack(
-          index: controller.activeIndex,
-          children: [
-            for (final destination in controller.tabs) destination.body(),
-            // The last slot, when anything did not fit on the bar. Built here
-            // rather than pushed so switching to it keeps the other tabs'
-            // scroll positions and costs no refetch, exactly like the four
-            // beside it.
-            if (controller.hasMore) const MoreView(),
-          ],
-        ),
-      ),
-      bottomNavigationBar: _ShellTabBar(controller: controller),
+      body: rail
+          ? Row(
+              children: [
+                _ShellSideRail(controller: controller),
+                Expanded(child: stack),
+              ],
+            )
+          : stack,
+      bottomNavigationBar: rail ? null : _ShellTabBar(controller: controller),
     );
   }
 }
@@ -136,6 +151,46 @@ class _ProfileButton extends StatelessWidget {
             ),
           ),
         ),
+      );
+    });
+  }
+}
+
+/// The rail, on anything wider than a phone.
+///
+/// It carries **every** destination this account has, not the four that fit a
+/// bar: the constraint a bar imposes is horizontal space, and a rail does not
+/// have it. So there is no More here — hiding destinations behind a hub on a
+/// screen with room for all of them would be inventing the phone's limitation
+/// on hardware that does not share it.
+class _ShellSideRail extends StatelessWidget {
+  const _ShellSideRail({required this.controller});
+
+  final HomeController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final extended =
+        WindowClass.of(context).navMode == ShellNavMode.extendedRail;
+
+    return Obx(() {
+      final all = controller.layout.everything;
+
+      return ShellRail(
+        key: HomeKeys.rail,
+        extended: extended,
+        selectedId: controller.activeRoute,
+        itemKey: HomeKeys.tab,
+        items: [
+          for (final destination in all)
+            ShellNavItem(
+              id: destination.route,
+              label: destination.label,
+              icon: destination.icon,
+              activeIcon: destination.activeIcon,
+            ),
+        ],
+        onSelected: controller.selectOrOpen,
       );
     });
   }
