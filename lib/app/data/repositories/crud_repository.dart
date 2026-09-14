@@ -87,6 +87,21 @@ class CrudRepository<T> {
     return all;
   }
 
+  /// The whole collection from a route that has **no pagination DTO at all**.
+  ///
+  /// `page`, `limit`, `orderBy` and `orderDir` are not ignored by those routes
+  /// — `forbidNonWhitelisted` makes each one a 400 that takes the whole
+  /// request with it. Billing services, pharmacy drugs, radiology exams and
+  /// the settings collections are all in this group; [listAll] is for the ones
+  /// that do page.
+  Future<List<T>> listUnpaged({Map<String, dynamic>? params}) async {
+    final response = await client.get(
+      routes.list,
+      queryParameters: params == null || params.isEmpty ? null : params,
+    );
+    return ApiEnvelope.of(response).orThrow().listOf(fromJson);
+  }
+
   /// The first page matching a search term.
   Future<List<T>> search(
     String query, {

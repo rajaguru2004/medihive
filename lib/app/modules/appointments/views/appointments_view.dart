@@ -4,10 +4,12 @@ import 'package:intl/intl.dart';
 
 import '../../../core/app_clock.dart';
 import '../../../core/keys/app_keys.dart';
+import '../../../data/models/access_map.dart';
 import '../../../data/models/appointment_model.dart';
+import '../../../data/services/access_service.dart';
 import '../../../data/utils/formatters.dart';
-import '../../../routes/app_pages.dart';
 import '../../../theme/theme.dart';
+import '../appointment_routes.dart';
 import '../controllers/appointments_controller.dart';
 
 /// The clinic board.
@@ -107,16 +109,27 @@ class AppointmentsView extends GetView<AppointmentsController> {
     return Scaffold(
       appBar: DetailHeader(
         title: 'Appointments',
-        action: CircleIconButton(
-          key: AppointmentsKeys.createButton,
-          icon: Icons.add_rounded,
-          tooltip: 'Book appointment',
-          onTap: () => Get.toNamed<void>(Routes.APPOINTMENT_CREATE),
-        ),
+        action: _canBook
+            ? CircleIconButton(
+                key: AppointmentsKeys.createButton,
+                icon: Icons.add_rounded,
+                tooltip: 'Book appointment',
+                onTap: () => Get.toNamed<void>(AppointmentRoutes.form),
+              )
+            : null,
       ),
       body: body,
     );
   }
+
+  /// Whether this account is offered a way to book.
+  ///
+  /// A hint, not a permission — the server authorises the write on its own and
+  /// the form still handles the 403 that can arrive anyway. What this decides
+  /// is whether somebody is shown a door that would refuse them.
+  bool get _canBook =>
+      !Get.isRegistered<AccessService>() ||
+      AccessService.to.can(Modules.appointments, AccessVerb.create);
 
   /// The list, in whichever shape this view calls for.
   ///
@@ -129,7 +142,7 @@ class AppointmentsView extends GetView<AppointmentsController> {
 
       if (open.isEmpty && closed.isEmpty) {
         return [
-          const BentoSection(
+          BentoSection(
             top: BentoSpace.section,
             child: EmptyState(
               key: AppointmentsKeys.empty,
@@ -137,6 +150,13 @@ class AppointmentsView extends GetView<AppointmentsController> {
               title: 'Nothing booked today',
               message: 'Appointments booked for today appear here in time '
                   'order.',
+              // An empty screen that offers the thing which would fill it.
+              // Absent for an account that cannot book, rather than offered
+              // and then refused.
+              actionLabel: _canBook ? 'Book an appointment' : null,
+              onAction: _canBook
+                  ? () => Get.toNamed<void>(AppointmentRoutes.form)
+                  : null,
             ),
           ),
         ];
@@ -179,8 +199,16 @@ class AppointmentsView extends GetView<AppointmentsController> {
                     ? 'Nothing booked on '
                         '${Formatters.dateMedium(controller.selectedDay.value)}'
                     : 'No appointments yet',
-            actionLabel: controller.isFiltered ? 'Clear filters' : null,
-            onAction: controller.isFiltered ? controller.clearFilters : null,
+            actionLabel: controller.isFiltered
+                ? 'Clear filters'
+                : _canBook
+                    ? 'Book an appointment'
+                    : null,
+            onAction: controller.isFiltered
+                ? controller.clearFilters
+                : _canBook
+                    ? () => Get.toNamed<void>(AppointmentRoutes.form)
+                    : null,
           ),
         ),
       ];
@@ -529,126 +557,20 @@ class _AppointmentRow extends StatelessWidget {
         ),
       ),
       trailing: StatusPill(status: appointment.status, compact: true),
-      onTap: () => _openActions(context, appointment, controller),
+      // Into the record, not into a sheet of actions. The detail carries the
+      // same steps and three more the sheet could not — a reschedule, a
+      // cancellation with its reason, a delete — each gated on what this
+      // account may actually do. Two places offering the same actions is two
+      // places that eventually disagree about which ones are allowed.
+      //
+      // The row's own model travels with the id so the header paints on the
+      // first frame rather than after a round trip.
+      onTap: () => Get.toNamed<void>(
+        AppointmentRoutes.detailFor(appointment.id),
+        arguments: {'id': appointment.id, 'appointment': appointment},
+      ),
     );
   }
-}
-
-Future<void> _openActions(
-  BuildContext context,
-  AppointmentModel appointment,
-  AppointmentsController controller,
-) {
-  final patient = appointment.patient;
-  final name = patient.fullName.trim().isEmpty
-      ? 'Patient ${patient.mrn}'
-      : patient.fullName;
-  final status = appointment.status.trim().toLowerCase();
-  final closed = const {'completed', 'cancelled', 'no_show'}.contains(status);
-
-  return Get.bottomSheet<void>(
-    SheetShell(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SheetSection(
-            bottom: BentoSpace.section,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                PatientIdentityBand(
-                  name: name,
-                  mrn: patient.mrn,
-                  sex: patient.gender,
-                  extra: '${appointment.appointmentTime} · '
-                      '${appointment.doctor.fullName}',
-                ),
-                if (appointment.chiefComplaint.trim().isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  FactRow(
-                    label: 'Complaint',
-                    value: appointment.chiefComplaint,
-                    inset: false,
-                  ),
-                ],
-              ],
-            ),
-          ),
-          if (closed)
-            const SheetSection(
-              child: NoticeBanner(
-                message: 'This appointment is closed. Reopening it is done in '
-                    'the admin console.',
-                icon: Icons.lock_outline_rounded,
-              ),
-            )
-          else ...[
-            if (status == 'scheduled' || status == 'confirmed')
-              SheetRow(
-                icon: Icons.how_to_reg_outlined,
-                label: 'Check in',
-                sublabel: 'The patient has arrived',
-                onTap: () {
-                  Get.back<void>();
-                  controller.setStatus(appointment, 'checked_in');
-                },
-              ),
-            if (status == 'checked_in')
-              SheetRow(
-                icon: Icons.play_arrow_rounded,
-                label: 'Start',
-                sublabel: 'With the clinician now',
-                onTap: () {
-                  Get.back<void>();
-                  controller.setStatus(appointment, 'in_progress');
-                },
-              ),
-            if (status == 'in_progress' || status == 'checked_in')
-              SheetRow(
-                icon: Icons.check_circle_outline_rounded,
-                label: 'Complete',
-                onTap: () {
-                  Get.back<void>();
-                  controller.setStatus(appointment, 'completed');
-                },
-              ),
-            SheetRow(
-              icon: Icons.person_off_outlined,
-              label: 'Did not attend',
-              onTap: () {
-                Get.back<void>();
-                controller.setStatus(appointment, 'no_show');
-              },
-            ),
-            const Hairline(),
-            SheetRow(
-              icon: Icons.event_busy_outlined,
-              label: 'Cancel appointment',
-              destructive: true,
-              onTap: () async {
-                Get.back<void>();
-                final confirmed = await ConfirmDialog.show(
-                  context,
-                  title: 'Cancel $name’s appointment?',
-                  message: 'The slot is released. Rebooking is done from the '
-                      'admin console.',
-                  confirmLabel: 'Cancel appointment',
-                  cancelLabel: 'Keep it',
-                  destructive: true,
-                );
-                if (confirmed) {
-                  await controller.setStatus(appointment, 'cancelled');
-                }
-              },
-            ),
-          ],
-        ],
-      ),
-    ),
-    isScrollControlled: true,
-  );
 }
 
 // ── Loading ─────────────────────────────────────────────────────────────────

@@ -25,7 +25,13 @@ abstract final class BillingKeys {
 
   static const Key search = Key('billing_search');
 
-  static const Key invoiceList = Key('billing_invoice_list');
+  /// The list itself.
+  ///
+  /// Spelled `invoices` rather than `invoice` because [invoice] keys a row as
+  /// `billing_invoice_<id>` — and a robot that reads ids back by stripping
+  /// that prefix would otherwise find an invoice whose id is the word "list",
+  /// first in every ordering assertion and one extra in every count.
+  static const Key invoiceList = Key('billing_invoices_list');
 
   /// One invoice row, by id.
   ///
@@ -39,6 +45,13 @@ abstract final class BillingKeys {
   static const Key invoicesEmpty = Key('billing_invoices_empty');
 
   static const Key newInvoice = Key('billing_new_invoice');
+
+  /// One catalogue row on the **ledger's** Services tab.
+  ///
+  /// Deliberately not `BillingServicesKeys.service` — the catalogue screen is
+  /// pushed *over* this tab, so both rows for one service are mounted at once
+  /// and a shared key would make every finder for either of them ambiguous.
+  static Key ledgerService(String id) => Key('billing_ledger_service_$id');
 
   /// The link through to the service catalogue.
   static const Key openServices = Key('billing_open_services');

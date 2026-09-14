@@ -10,20 +10,15 @@ abstract final class SettingsKeys {
 
   static Key row(String id) => Key('settings_row_$id');
 
-  // ── Hospital profile ──────────────────────────────────────────────────────
+  // ── The rows the hub itself draws ─────────────────────────────────────────
+  //
+  // One anchor per destination, and nothing from inside it. Profile, locale
+  // and core modules each own a key file of their own — `settings_profile_
+  // keys.dart` and its two siblings — and this file used to carry a second
+  // spelling of each screen's name and save button, which meant two constants
+  // producing one key string and a `findsOneWidget` that could match either.
   static const Key profile = Key('settings_profile');
-  static const Key profileName = Key('settings_profile_name');
-  static const Key profileLogo = Key('settings_profile_logo');
-  static const Key profileColor = Key('settings_profile_color');
-  static const Key profileSave = Key('settings_profile_save');
-
-  // ── Locale ────────────────────────────────────────────────────────────────
   static const Key locale = Key('settings_locale');
-  static const Key currency = Key('settings_currency');
-  static const Key timezone = Key('settings_timezone');
-  static const Key dateFormat = Key('settings_date_format');
-  static const Key clock24 = Key('settings_clock_24');
-  static const Key localeSave = Key('settings_locale_save');
 
   // ── Appearance ────────────────────────────────────────────────────────────
   static const Key appearance = Key('settings_appearance');
@@ -42,7 +37,4 @@ abstract final class SettingsKeys {
 
   // ── Core modules ──────────────────────────────────────────────────────────
   static const Key modules = Key('settings_modules');
-  static const Key modulesSave = Key('settings_modules_save');
-
-  static Key module(String key) => Key('settings_module_$key');
 }

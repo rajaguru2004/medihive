@@ -29,6 +29,18 @@ abstract class SettingsFormController extends GetxController
   /// What this screen changes, and nothing else.
   OrganizationSettingsDraft buildDraft();
 
+  /// Where this screen's save goes.
+  ///
+  /// Every settings screen but one writes the organisation. The module
+  /// switches have their own route — `PUT /settings/modules`, whose DTO wants
+  /// `organizationId` beside the map — and it answers with the same
+  /// organisation object, so the adopt below is identical either way.
+  String get saveEndpoint => Endpoints.organization;
+
+  /// The body [save] sends. Overridden only where the route is not the
+  /// organisation's and therefore does not take an organisation draft.
+  Map<String, dynamic> buildBody() => buildDraft().toUpdateJson();
+
   /// Whether anything on this screen has actually been edited.
   bool get isDirty;
 
@@ -41,8 +53,8 @@ abstract class SettingsFormController extends GetxController
     await runGuarded(
       () async {
         final response = await client.put(
-          Endpoints.organization,
-          data: buildDraft().toUpdateJson(),
+          saveEndpoint,
+          data: buildBody(),
         );
         final envelope = ApiEnvelope.of(response).orThrow();
 

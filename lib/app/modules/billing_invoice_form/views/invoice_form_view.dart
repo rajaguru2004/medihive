@@ -306,7 +306,25 @@ class _LineCard extends StatelessWidget {
   final InvoiceFormController controller;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Obx(() => _card(context));
+
+  /// Its own `Obx`.
+  ///
+  /// A child constructed inside an `Obx` closure is **not** inside its
+  /// reactive scope — the closure builds the widget object and Flutter calls
+  /// `build` on it later, outside the proxy that records reads. Without this,
+  /// the per-line errors raised by a failed save would not appear until
+  /// something else touched the line list.
+  Widget _card(BuildContext context) {
+    // The list shortened under this card.
+    //
+    // Removing a line notifies both this `Obx` and the one that builds the
+    // list, and although Flutter rebuilds the parent first — which takes this
+    // element out of the tree — the guard costs nothing and a `RangeError`
+    // raised from inside a build is reported as a crash rather than as a stale
+    // row.
+    if (index >= controller.lines.length) return const SizedBox.shrink();
+
     final fields = controller.fieldsFor(index);
     final line = controller.lines[index];
     final totals = controller.lineTotals(index);
@@ -442,9 +460,10 @@ class _TotalsPane extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      // Touch the lines so this rebuilds when one changes. The totals are
-      // derived from them, and `Obx` tracks what is *read*.
-      controller.lines.length;
+      // The line count is read before the totals and shown in the heading:
+      // `Obx` tracks what is *read*, and a pane that only read the derived
+      // figures would be one dependency away from going stale.
+      final lines = controller.lines.length;
       final totals = controller.totals;
       final money = controller.money;
 
@@ -454,7 +473,10 @@ class _TotalsPane extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SectionHeader(title: 'Totals', inset: true),
+            SectionHeader(
+              title: lines == 1 ? 'Totals · 1 line' : 'Totals · $lines lines',
+              inset: true,
+            ),
             FactRow(
               key: InvoiceFormKeys.subtotal,
               label: 'Subtotal',

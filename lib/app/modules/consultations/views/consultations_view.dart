@@ -3,9 +3,12 @@ import 'package:get/get.dart';
 
 import '../../../core/app_clock.dart';
 import '../../../core/keys/app_keys.dart';
+import '../../../data/models/access_map.dart';
 import '../../../data/models/consultation_model.dart';
+import '../../../data/services/access_service.dart';
 import '../../../data/utils/formatters.dart';
 import '../../../theme/theme.dart';
+import '../consultation_routes.dart';
 import '../controllers/consultations_controller.dart';
 
 /// Consultations.
@@ -19,8 +22,24 @@ class ConsultationsView extends GetView<ConsultationsController> {
 
   @override
   Widget build(BuildContext context) {
+    // The hint, not the permission: the server authorises the write itself,
+    // and the form still handles the 403 that can arrive anyway. What this
+    // decides is whether somebody is *offered* a door that would refuse them.
+    final canWrite = !Get.isRegistered<AccessService>() ||
+        AccessService.to.can(Modules.consultations, AccessVerb.create);
+
     return Scaffold(
-      appBar: const DetailHeader(title: 'Consultations'),
+      appBar: DetailHeader(
+        title: 'Consultations',
+        action: canWrite
+            ? CircleIconButton(
+                key: ConsultationsKeys.createButton,
+                icon: Icons.add_rounded,
+                tooltip: 'New consultation',
+                onTap: () => Get.toNamed<void>(ConsultationRoutes.form),
+              )
+            : null,
+      ),
       body: Obx(() {
         if (controller.isLoading && controller.rxFirstLoad.value) {
           return const BentoScreen(
@@ -105,9 +124,18 @@ class ConsultationsView extends GetView<ConsultationsController> {
                       ? null
                       : 'A consultation records what happened in the room — '
                           'the examination, the diagnosis and the plan.',
-                  actionLabel: controller.isFiltered ? 'Clear filters' : null,
-                  onAction:
-                      controller.isFiltered ? controller.clearFilters : null,
+                  // A filtered empty offers the way back; a genuinely empty
+                  // one offers the thing that would put something here.
+                  actionLabel: controller.isFiltered
+                      ? 'Clear filters'
+                      : canWrite
+                          ? 'Write one'
+                          : null,
+                  onAction: controller.isFiltered
+                      ? controller.clearFilters
+                      : canWrite
+                          ? () => Get.toNamed<void>(ConsultationRoutes.form)
+                          : null,
                 ),
               )
             else ...[
@@ -273,160 +301,12 @@ class _ConsultationRow extends StatelessWidget {
           ),
         ],
       ),
-      onTap: () => _openConsultationSheet(context, consultation),
-    );
-  }
-}
-
-/// One consultation, in full.
-///
-/// A sheet rather than a pushed screen: it is a record to read, not a place to
-/// work, and a reader on a ward round wants to glance at it and dismiss it
-/// without losing their place in the list.
-Future<void> _openConsultationSheet(
-  BuildContext context,
-  ConsultationModel consultation,
-) {
-  final vitals = <VitalTile>[
-    if (consultation.temperature != null)
-      VitalTile(
-        label: 'Temp',
-        value: consultation.temperature!.toStringAsFixed(1),
-        unit: '°C',
-        tone: VitalRange.temperature(consultation.temperature),
-      ),
-    if (consultation.pulseRate != null)
-      VitalTile(
-        label: 'Pulse',
-        value: '${consultation.pulseRate}',
-        unit: 'bpm',
-        tone: VitalRange.pulse(consultation.pulseRate),
-      ),
-    if (consultation.bloodPressureSystolic != null)
-      VitalTile(
-        label: 'BP',
-        value: consultation.bloodPressureDiastolic == null
-            ? '${consultation.bloodPressureSystolic}'
-            : '${consultation.bloodPressureSystolic}/'
-                '${consultation.bloodPressureDiastolic}',
-        unit: 'mmHg',
-        tone: VitalRange.bloodPressure(
-          consultation.bloodPressureSystolic,
-          consultation.bloodPressureDiastolic,
-        ),
-      ),
-    if (consultation.oxygenSaturation != null)
-      VitalTile(
-        label: 'SpO₂',
-        value: '${consultation.oxygenSaturation}',
-        unit: '%',
-        tone: VitalRange.oxygenSaturation(consultation.oxygenSaturation),
-      ),
-    if (consultation.respiratoryRate != null)
-      VitalTile(
-        label: 'Resp',
-        value: '${consultation.respiratoryRate}',
-        unit: '/min',
-        tone: VitalRange.respiratoryRate(consultation.respiratoryRate),
-      ),
-    if (consultation.weight != null)
-      VitalTile(
-        label: 'Weight',
-        value: consultation.weight!.toStringAsFixed(1),
-        unit: 'kg',
-      ),
-  ];
-
-  return Get.bottomSheet<void>(
-    SheetShell(
-      title: 'Consultation',
-      scrollable: true,
-      child: SheetSection(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            PatientIdentityBand(
-              name: consultation.patient.fullName,
-              mrn: consultation.patient.mrn,
-              age: Formatters.age(consultation.patient.dateOfBirth),
-              sex: consultation.patient.gender,
-              extra: '${Formatters.dateMedium(consultation.visitDate)} · '
-                  '${consultation.doctor.fullName}',
-            ),
-            if (vitals.isNotEmpty) ...[
-              const SizedBox(height: BentoSpace.section),
-              InsetSurface(
-                padding: const EdgeInsets.all(16),
-                child: VitalsGrid(tiles: vitals, columns: 3),
-              ),
-            ],
-            const SizedBox(height: BentoSpace.section),
-            _Note(label: 'Complaint', value: consultation.chiefComplaint),
-            _Note(
-              label: 'History',
-              value: consultation.historyOfPresentIllness,
-            ),
-            _Note(
-              label: 'Examination',
-              value: consultation.physicalExamination,
-            ),
-            _Note(label: 'Diagnosis', value: consultation.diagnosis),
-            _Note(label: 'Plan', value: consultation.treatmentPlan),
-            _Note(
-              label: 'Follow-up',
-              value: [
-                if (consultation.followUpDate != null)
-                  Formatters.dateMedium(consultation.followUpDate),
-                if (consultation.followUpInstructions?.trim().isNotEmpty ??
-                    false)
-                  consultation.followUpInstructions!,
-              ].join(' · '),
-            ),
-            _Note(label: 'Referred to', value: consultation.referredTo),
-            _Note(label: 'Notes', value: consultation.notes),
-          ],
-        ),
-      ),
-    ),
-    isScrollControlled: true,
-  );
-}
-
-/// One labelled block of clinical prose, or nothing when there is none.
-///
-/// Omitted rather than shown empty: a record where half the headings say "—"
-/// is a record whose real content is harder to find.
-class _Note extends StatelessWidget {
-  const _Note({required this.label, required this.value});
-
-  final String label;
-  final String? value;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = value?.trim() ?? '';
-    if (text.isEmpty) return const SizedBox.shrink();
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: AppTextStyles.overline(Theme.of(context).brightness),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            text,
-            style: isDark
-                ? AppTextStyles.darkCallout()
-                : AppTextStyles.lightCallout(),
-          ),
-        ],
+      // Into the record rather than into a read-only sheet: the detail carries
+      // the same facts and the actions a clinician needs on them — an edit, a
+      // test, a study, an invoice — each gated on what this account may do.
+      onTap: () => Get.toNamed<void>(
+        ConsultationRoutes.detailFor(consultation.id),
+        arguments: {'id': consultation.id},
       ),
     );
   }

@@ -1,6 +1,10 @@
 import 'package:flutter/widgets.dart';
 
-/// Widget keys for the roles list and the permission editor.
+/// Widget keys for the roles list.
+///
+/// The editor a card opens is keyed from [StaffKeys]: it shares its people with
+/// the staff directory and the record, and one namespace across the four
+/// screens is what stops two views of one role drifting apart.
 abstract final class RolesKeys {
   static const Key screen = Key('roles_screen');
   static const Key list = Key('roles_list');
@@ -10,17 +14,8 @@ abstract final class RolesKeys {
 
   static Key card(String id) => Key('roles_card_$id');
 
-  // ── Editor ────────────────────────────────────────────────────────────────
-  static const Key editor = Key('role_editor');
-  static const Key name = Key('role_editor_name');
-  static const Key description = Key('role_editor_description');
-  static const Key systemNotice = Key('role_editor_system_notice');
-  static const Key save = Key('role_editor_save');
-
-  /// One switch per module and verb. Keyed by both, because a test asserting
-  /// "a nurse may create a screening" has to name the exact control.
-  static Key verb(String module, String verb) =>
-      Key('role_editor_${module}_$verb');
-
-  static Key moduleCard(String module) => Key('role_editor_module_$module');
+  // The permission editor's own keys live in `staff_keys.dart`, beside the
+  // staff directory and the record that share its people. They were declared
+  // here first, as placeholders, and two namespaces for one screen is how a
+  // test ends up passing against a control nobody renders.
 }

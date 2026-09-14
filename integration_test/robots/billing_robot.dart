@@ -341,6 +341,30 @@ final class BillingRobot extends Robot {
   /// What is still owed, as the detail's totals block shows it.
   String outstandingOnScreen() => _factValue(InvoiceDetailKeys.outstanding);
 
+  /// Waits for the balance to become [expected].
+  ///
+  /// A wait rather than a bare `expect`, because the reload that moves it is
+  /// announced on the `DataBus` and runs `silent: true` — no spinner, nothing
+  /// for `pumpUntilRouteSettled` to converge on. Asserting immediately after
+  /// the pop would be a race that passes on a fast machine and fails on a
+  /// loaded one, which is the worst kind of test to own.
+  Future<void> seeOutstanding(String expected) async {
+    await tester.pumpUntil(
+      () =>
+          find.byKey(InvoiceDetailKeys.outstanding).evaluate().isNotEmpty &&
+          outstandingOnScreen() == expected,
+      reason: 'the outstanding balance never reached $expected — it reads '
+          '${find.byKey(InvoiceDetailKeys.outstanding).evaluate().isEmpty ? '(nothing)' : outstandingOnScreen()}',
+    );
+  }
+
+  /// Waits for the payment history to hold [expected] receipts.
+  Future<void> seePaymentCount(int expected) => tester.pumpUntil(
+        () => paymentCount == expected,
+        reason: 'expected $expected payments on this invoice, found '
+            '$paymentCount',
+      );
+
   int get paymentCount => find
       .byWidgetPredicate(
         (widget) =>

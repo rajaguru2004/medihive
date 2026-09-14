@@ -109,12 +109,16 @@ class _Header extends StatelessWidget {
             ),
           ),
         if (controller.canDelete)
-          RecordAction(
-            key: AppointmentDetailKeys.delete,
-            icon: Icons.delete_outline_rounded,
-            label: 'Delete',
-            destructive: true,
-            onPressed: () => _confirmDelete(context, controller),
+          Obx(
+            () => RecordAction(
+              key: AppointmentDetailKeys.delete,
+              icon: Icons.delete_outline_rounded,
+              label: 'Delete',
+              destructive: true,
+              onPressed: controller.isActing.value
+                  ? null
+                  : () => _confirmDelete(context, controller),
+            ),
           ),
       ],
     );
@@ -362,43 +366,52 @@ class _Actions extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SectionHeader(title: 'What next'),
-        BentoCard(
-          padding: const EdgeInsets.symmetric(
-            vertical: BentoSpace.listCardPad,
-            horizontal: 6,
-          ),
-          child: Column(
-            children: [
-              for (final step in steps)
-                SheetRow(
-                  key: AppointmentDetailKeys.action(step),
-                  icon: _iconOf(step),
-                  label: AppointmentDetailController.labelOfStep(step),
-                  sublabel: AppointmentDetailController.captionOfStep(step),
-                  onTap: () => controller.moveTo(step),
-                ),
-              if (controller.canReschedule)
-                SheetRow(
-                  key: AppointmentDetailKeys.reschedule,
-                  icon: Icons.event_repeat_rounded,
-                  label: 'Move to another slot',
-                  sublabel: 'A new day or time, and the booking says so',
-                  onTap: () => _openReschedule(context, controller),
-                ),
-              if (controller.canCancel) ...[
-                const Hairline(indent: BentoSpace.listPad),
-                SheetRow(
-                  key: AppointmentDetailKeys.cancel,
-                  icon: Icons.event_busy_outlined,
-                  label: 'Cancel appointment',
-                  sublabel: 'The slot is released',
-                  destructive: true,
-                  onTap: () => _openCancel(context, controller),
-                ),
+        // A write in flight takes every row with it. One arrival recorded as
+        // two is a clinic's figures made up, and on ward wifi the gap between
+        // a tap and its answer is long enough for a second tap.
+        Obx(() {
+          final busy = controller.isActing.value;
+          return BentoCard(
+            padding: const EdgeInsets.symmetric(
+              vertical: BentoSpace.listCardPad,
+              horizontal: 6,
+            ),
+            child: Column(
+              children: [
+                for (final step in steps)
+                  SheetRow(
+                    key: AppointmentDetailKeys.action(step),
+                    icon: _iconOf(step),
+                    label: AppointmentDetailController.labelOfStep(step),
+                    sublabel: AppointmentDetailController.captionOfStep(step),
+                    onTap: busy ? null : () => controller.moveTo(step),
+                  ),
+                if (controller.canReschedule)
+                  SheetRow(
+                    key: AppointmentDetailKeys.reschedule,
+                    icon: Icons.event_repeat_rounded,
+                    label: 'Move to another slot',
+                    sublabel: 'A new day or time, and the booking says so',
+                    onTap: busy
+                        ? null
+                        : () => _openReschedule(context, controller),
+                  ),
+                if (controller.canCancel) ...[
+                  const Hairline(indent: BentoSpace.listPad),
+                  SheetRow(
+                    key: AppointmentDetailKeys.cancel,
+                    icon: Icons.event_busy_outlined,
+                    label: 'Cancel appointment',
+                    sublabel: 'The slot is released',
+                    destructive: true,
+                    onTap:
+                        busy ? null : () => _openCancel(context, controller),
+                  ),
+                ],
               ],
-            ],
-          ),
-        ),
+            ),
+          );
+        }),
       ],
     );
   }

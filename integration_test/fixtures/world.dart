@@ -3,10 +3,14 @@ import 'package:medihive/app/core/app_clock.dart';
 import '../fakes/fake_api.dart';
 import 'fake_jwt.dart';
 import 'modules/billing_fixtures.dart';
+import 'modules/clinical_fixtures.dart';
+import 'modules/integrations_fixtures.dart';
 import 'modules/laboratory_fixtures.dart';
 import 'modules/patients_fixtures.dart';
 import 'modules/pharmacy_fixtures.dart';
 import 'modules/radiology_fixtures.dart';
+import 'modules/settings_fixtures.dart';
+import 'modules/staff_fixtures.dart';
 import 'world_roles.dart';
 
 part 'world_bootstrap.dart';
@@ -55,10 +59,19 @@ abstract final class World {
     // the order and a lab technician's worklist shows the twelve rows the
     // patient fixture happens to carry.
     installPatientsFixtures(api);
+    installClinicalFixtures(api);
     installLaboratoryFixtures(api);
     installRadiologyFixtures(api);
     installPharmacyFixtures(api);
     installBillingFixtures(api);
+
+    // After the clinic, which registers a three-doctor `/api/users/staff` for
+    // its own pickers. This one is the same three people plus the rest of the
+    // department, and it honours `?role=` — which the role editor's member
+    // list is nothing but.
+    installStaffFixtures(api);
+    installSettingsFixtures(api);
+    installIntegrationsFixtures(api);
   }
 
   /// The refresh token every session in this world holds.

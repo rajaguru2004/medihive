@@ -4,9 +4,7 @@ import '../../../core/app_clock.dart';
 import '../../../data/models/appointment_model.dart';
 import '../../../data/services/appointment_service.dart';
 import '../../../data/services/data_bus.dart';
-import '../../../data/utils/error_handler.dart';
 import '../../../data/utils/load_state.dart';
-import '../../../theme/theme.dart';
 
 /// Which cut of the clinic is showing.
 enum ClinicView {
@@ -193,25 +191,6 @@ class AppointmentsController extends GetxController with LoadStateMixin {
     query.value = '';
     statusFilter.value = allStatuses;
     doctorFilter.value = allDoctors;
-  }
-
-  // ── Actions ───────────────────────────────────────────────────────────────
-
-  Future<void> setStatus(AppointmentModel appointment, String status) async {
-    final name = appointment.patient.fullName;
-    try {
-      await _service.updateAppointmentStatus(appointment.id, status);
-      showBentoToast('$name is now ${status.replaceAll('_', ' ')}.');
-      if (Get.isRegistered<DataBus>()) {
-        DataBus.to.changedRecord('appointments');
-      }
-      await load(silent: true);
-    } catch (e) {
-      showBentoToast(
-        parseErrorMessage(e, "Couldn't update $name's appointment."),
-        tone: ToastTone.failure,
-      );
-    }
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

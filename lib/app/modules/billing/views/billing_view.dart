@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/keys/billing_keys.dart';
-import '../../../core/keys/billing_services_keys.dart';
 import '../../../core/window_class.dart';
 import '../../../data/models/billing_service.dart';
 import '../../../data/models/invoice.dart';
@@ -162,6 +161,25 @@ class BillingView extends GetView<BillingController> {
         ),
       ),
 
+      // Above the ledger, not under it. It used to sit below the rows on the
+      // argument that a collector opens this screen to read — but eight bills
+      // is already a screen and a half on a phone, and an action nobody can
+      // reach without scrolling past the whole ledger is an action that is not
+      // there. It is also where imaging and the laboratory put theirs.
+      //
+      // Absent, not disabled, for an account that may not raise one. A greyed
+      // control is an invitation to ask why.
+      if (billing.canCreate && rows.isNotEmpty)
+        BentoSection(
+          bottom: BentoSpace.header,
+          child: PrimaryBar(
+            key: BillingKeys.newInvoice,
+            label: 'New invoice',
+            icon: Icons.add_rounded,
+            onPressed: _newInvoice,
+          ),
+        ),
+
       if (rows.isEmpty)
         BentoSection(
           child: EmptyState(
@@ -198,22 +216,6 @@ class BillingView extends GetView<BillingController> {
                 ],
               ],
             ),
-          ),
-        ),
-
-      // The primary action sits under the list rather than over it: a
-      // collector opens this screen to read, and the button that adds to it is
-      // the second thing they want, not the first.
-      //
-      // Absent, not disabled, for an account that may not raise one. A greyed
-      // control is an invitation to ask why.
-      if (billing.canCreate && rows.isNotEmpty)
-        BentoSection(
-          child: PrimaryBar(
-            key: BillingKeys.newInvoice,
-            label: 'New invoice',
-            icon: Icons.add_rounded,
-            onPressed: _newInvoice,
           ),
         ),
     ];
@@ -311,7 +313,16 @@ class _Stats extends StatelessWidget {
   final BillingController controller;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Obx(() => _card(context));
+
+  /// Its own `Obx`, and every widget in this file that reads an observable is
+  /// the same.
+  ///
+  /// A child constructed inside an `Obx` closure is **not** inside its
+  /// reactive scope: the closure only builds the widget object, and Flutter
+  /// calls `build` on it later, outside the proxy that records reads. So a
+  /// figure that changed while the enclosing list did not would never repaint.
+  Widget _card(BuildContext context) {
     final stats = controller.stats.value;
     final money = controller.money;
 
@@ -385,7 +396,9 @@ class _InvoiceRow extends StatelessWidget {
   final BillingController controller;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Obx(() => _row(context));
+
+  Widget _row(BuildContext context) {
     final status = controller.statusOf(invoice);
     final window = WindowClass.of(context);
 
@@ -435,7 +448,7 @@ class _ServiceRow extends StatelessWidget {
     ];
 
     return BentoRow(
-      key: BillingServicesKeys.service(service.id),
+      key: BillingKeys.ledgerService(service.id),
       title: service.serviceName,
       subtitle: parts.isEmpty ? null : parts.join(' · '),
       showChevron: false,

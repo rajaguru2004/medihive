@@ -172,6 +172,17 @@ class _InvoiceDetailViewState extends State<InvoiceDetailView> {
               ),
             ),
 
+          // What somebody opened this bill to *do*, above what it is made of.
+          // The actions used to close the screen, under the lines, the totals
+          // and the payment history — which on a phone is two screens of
+          // scrolling before the one button a collector came for. The header
+          // above already says what is owed; this says what can be done about
+          // it.
+          BentoSection(
+            bottom: BentoSpace.header,
+            child: _Actions(controller: _controller),
+          ),
+
           BentoSection(
             bottom: BentoSpace.header,
             child: _Items(controller: _controller),
@@ -182,12 +193,7 @@ class _InvoiceDetailViewState extends State<InvoiceDetailView> {
             child: _Totals(controller: _controller),
           ),
 
-          BentoSection(
-            bottom: BentoSpace.header,
-            child: _Payments(controller: _controller),
-          ),
-
-          BentoSection(child: _Actions(controller: _controller)),
+          BentoSection(child: _Payments(controller: _controller)),
         ],
       );
     });
@@ -397,7 +403,12 @@ class _Payments extends StatelessWidget {
   final InvoiceDetailController controller;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Obx(() => _section(context));
+
+  /// Its own `Obx`: the history is reloaded by a `DataBus` tick, and a child
+  /// built inside another `Obx` closure is not inside that closure's reactive
+  /// scope.
+  Widget _section(BuildContext context) {
     final payments = controller.payments;
     final money = controller.money;
 
@@ -495,7 +506,9 @@ class _Actions extends StatelessWidget {
   final InvoiceDetailController controller;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Obx(() => _bar(context));
+
+  Widget _bar(BuildContext context) {
     final invoice = controller.invoice.value;
 
     final actions = <Widget>[

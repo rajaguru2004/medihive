@@ -52,6 +52,7 @@ void main(List<String> args) {
 
   _scanModules();
   _checkKeyFiles();
+  _checkKeyCollisions();
   _checkNoPumpAndSettle();
   _checkNoFindTextInFlows();
 
@@ -188,6 +189,41 @@ void _checkKeyFiles() {
       _violations.add(
           'module "$module" has no $_keysDir/${module}_keys.dart (it needs at '
           'least a `screen` anchor)');
+    }
+  }
+}
+
+/// No key string may be declared twice.
+///
+/// Two modules that pick the same string are two screens a single `find.byKey`
+/// cannot tell apart, and the failure reads as "the widget did not render"
+/// rather than as a name clash. It happened the moment two streams built a
+/// role editor and a settings screen at the same time.
+///
+/// A stricter rule was tried and dropped: flagging a literal that a templated
+/// key such as `inpatient_ward_$id` could also produce. It fires 164 times on
+/// this tree — `inpatient_ward_name` collides with it only if a ward's id is
+/// literally the word "name" — and a check that cries wolf 164 times is a
+/// check somebody turns off. The two real collisions it would have caught
+/// (`billing_invoice_list` under `billing_invoice_$id`, and
+/// `invoice_form_discount_amount` under `invoice_form_discount_$mode`) were
+/// both found by a flow within a minute of the screen being wired.
+void _checkKeyCollisions() {
+  final literals = <String, String>{}; // key string -> where it was declared
+  final declaration = RegExp(r"Key\('([^'$]*)'\)");
+
+  for (final file in _dartFilesIn(_keysDir)) {
+    final name = file.uri.pathSegments.last;
+    final source = _withoutComments(file.readAsStringSync());
+
+    for (final match in declaration.allMatches(source)) {
+      final raw = match.group(1)!;
+      final seen = literals[raw];
+      if (seen != null && seen != name) {
+        _violations.add("key '$raw' is declared twice — $seen and $name");
+      } else {
+        literals[raw] = name;
+      }
     }
   }
 }

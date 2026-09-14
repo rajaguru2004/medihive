@@ -12,6 +12,7 @@ class Department {
     this.code,
     this.description,
     this.headId,
+    this.headName,
     this.isActive = true,
     this.staffCount,
     this.createdAt,
@@ -37,6 +38,14 @@ class Department {
   /// did not count rather than that the department is empty.
   final int? staffCount;
 
+  /// Who heads it, where the route resolved the name as well as the id.
+  ///
+  /// `GET /settings/departments` looks it up; the collection routes send only
+  /// [headId]. Null therefore means "not told", never "nobody" — a screen that
+  /// printed "No head" from a route that simply did not join would be stating
+  /// something about the department that nobody said.
+  final String? headName;
+
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -49,6 +58,11 @@ class Department {
 
   factory Department.fromJson(Map<String, dynamic> json) {
     final counts = asMap(json['_count']);
+    // `_count.users` on the collection routes, `userCount` on
+    // `GET /settings/departments`, which shapes its own row rather than sending
+    // Prisma's. Reading only the first left the settings screen with no idea
+    // how many people a department it was about to delete holds.
+    final staff = counts['users'] ?? json['userCount'];
     return Department(
       id: asString(json['id'] ?? json['_id']),
       organizationId: asString(json['organizationId']),
@@ -56,8 +70,9 @@ class Department {
       code: asStringOrNull(json['code']),
       description: asStringOrNull(json['description']),
       headId: asStringOrNull(json['headId']),
+      headName: asStringOrNull(json['headName']),
       isActive: asBool(json['isActive'], fallback: true),
-      staffCount: counts['users'] == null ? null : asInt(counts['users']),
+      staffCount: staff == null ? null : asInt(staff),
       createdAt: asDate(json['createdAt']),
       updatedAt: asDate(json['updatedAt']),
     );

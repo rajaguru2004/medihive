@@ -43,16 +43,36 @@ extension HarnessPump on WidgetTester {
         'Current route: ${Get.currentRoute}');
   }
 
+  /// Whether [finder] matches anything **right now**, without throwing.
+  ///
+  /// A `.first` or `.last` finder does not answer "nothing yet" — it throws
+  /// `Bad state: No element` out of `evaluate()`. Polling one directly turns
+  /// every frame before the widget arrives into a test error with a stack
+  /// trace from inside `Iterable.last`, which is the opposite of what the
+  /// caller asked for. The throw *is* the empty answer.
+  static bool _present(Finder finder) {
+    try {
+      return finder.evaluate().isNotEmpty;
+    } on StateError {
+      return false;
+    }
+  }
+
+  // `describeMatch` rather than the finder itself in both reasons below.
+  // Interpolating a `Finder` calls `toString`, which renders the *matches* —
+  // and on a `.first`/`.last` finder with none, that throws too. Which is
+  // exactly the case these two report on, so the timeout message was replaced
+  // by a stack trace from inside the failure message.
   Future<void> pumpUntilFound(Finder finder, {Duration? timeout}) => pumpUntil(
-        () => finder.evaluate().isNotEmpty,
+        () => _present(finder),
         timeout: timeout ?? _defaultTimeout,
-        reason: 'expected $finder to appear',
+        reason: 'expected ${finder.describeMatch(Plurality.one)} to appear',
       );
 
   Future<void> pumpUntilGone(Finder finder, {Duration? timeout}) => pumpUntil(
-        () => finder.evaluate().isEmpty,
+        () => !_present(finder),
         timeout: timeout ?? _defaultTimeout,
-        reason: 'expected $finder to disappear',
+        reason: 'expected ${finder.describeMatch(Plurality.one)} to disappear',
       );
 
   /// Waits for navigation to land and the destination to finish its first
@@ -251,6 +271,39 @@ extension HarnessPump on WidgetTester {
     if (finder.evaluate().isEmpty) return;
     try {
       await ensureVisible(finder);
+      await pump(const Duration(milliseconds: 16));
+    } on StateError {
+      // Not inside a Scrollable — already as visible as it will get.
+    }
+  }
+
+  /// Brings a keyed widget into view inside a **horizontal** strip.
+  ///
+  /// [scrollToKey] drags the page, which does nothing for a row of chips that
+  /// scrolls sideways — and a chip past the right edge is not built at all, so
+  /// the failure reads as "that tab does not exist". The patient hub's seventh
+  /// tab is off screen on every phone.
+  Future<void> scrollToKeyInStrip(
+    Finder strip,
+    Key key, {
+    int maxDrags = 20,
+  }) async {
+    final target = find.byKey(key);
+    if (strip.evaluate().isEmpty) return;
+
+    // Left first, then right. A strip already dragged to its end has the early
+    // chips unbuilt behind it, so a forward-only search reports the first tab
+    // as missing the moment a test has visited the last one.
+    for (final step in const [Offset(-180, 0), Offset(180, 0)]) {
+      for (var i = 0; i < maxDrags && target.evaluate().isEmpty; i++) {
+        await drag(strip.first, step);
+        await pump(const Duration(milliseconds: 16));
+      }
+      if (target.evaluate().isNotEmpty) break;
+    }
+    if (target.evaluate().isEmpty) return;
+    try {
+      await ensureVisible(target);
       await pump(const Duration(milliseconds: 16));
     } on StateError {
       // Not inside a Scrollable — already as visible as it will get.

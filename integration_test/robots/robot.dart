@@ -133,11 +133,25 @@ abstract base class Robot {
     await tester.pumpUntilViewportStable();
     await tester.pumpUntilRouteSettled();
 
-    final row = find
-        .ancestor(of: find.text(label), matching: find.byType(SheetRow))
-        .last;
-    await tester.pumpUntilFound(row);
-    await tester.tap(row);
+    final rows =
+        find.ancestor(of: find.text(label), matching: find.byType(SheetRow));
+
+    // Narrow the sheet to what is being picked, the way a person does. The
+    // sheet is capped at 62% of the screen, so anything past the fifth or
+    // sixth option is never built — and an unbuilt row is indistinguishable
+    // from an option the picker does not carry.
+    if (rows.evaluate().isEmpty &&
+        find.byKey(kPickerSearchKey).evaluate().isNotEmpty) {
+      await tester.enterText(find.byKey(kPickerSearchKey), label);
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpUntilViewportStable();
+    }
+
+    // Waited on unfiltered, tapped filtered. `.last` does not evaluate to
+    // nothing while the sheet is still filling — it throws — so the wait has
+    // to be on the finder that can answer "not yet".
+    await tester.pumpUntilFound(rows);
+    await tester.tap(rows.last);
     await settle();
   }
 

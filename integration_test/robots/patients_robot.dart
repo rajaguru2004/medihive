@@ -164,6 +164,13 @@ final class PatientHubRobot extends Robot {
   }
 
   Future<void> openTab(PatientHubTab tab) async {
+    // The strip scrolls sideways and the last tabs are past the right edge on
+    // a phone, where they are not built at all — so this has to drag the strip
+    // before it can tap anything on it.
+    await tester.scrollToKeyInStrip(
+      find.byKey(PatientHubKeys.tabs),
+      PatientHubKeys.tab(tab.name),
+    );
     await tester.tapKey(PatientHubKeys.tab(tab.name));
     await settle();
   }

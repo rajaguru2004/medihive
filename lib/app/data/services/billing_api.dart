@@ -124,7 +124,7 @@ class BillingCatalogRepository extends CrudRepository<BillingService> {
         );
 
   /// The whole active catalogue, optionally narrowed to one category.
-  Future<List<BillingService>> entries({String? category}) => listAll(
+  Future<List<BillingService>> entries({String? category}) => listUnpaged(
         params: {
           if (category != null && category.trim().isNotEmpty)
             'category': category.trim(),

@@ -32,8 +32,13 @@ abstract final class InvoiceFormKeys {
   static const Key discountMode = Key('invoice_form_discount_mode');
 
   /// One segment of the amount-or-percentage control, by the mode's own name.
+  ///
+  /// Spelled off [discountMode] rather than off the bare prefix: the mode is
+  /// literally called `amount`, so `invoice_form_discount_$mode` collided with
+  /// [discountAmount] and every finder for the money field matched the segment
+  /// that chooses it as well.
   static Key discountModeOption(String mode) =>
-      Key('invoice_form_discount_$mode');
+      Key('invoice_form_discount_mode_$mode');
 
   static const Key discountAmount = Key('invoice_form_discount_amount');
   static const Key discountPercentage = Key('invoice_form_discount_percent');

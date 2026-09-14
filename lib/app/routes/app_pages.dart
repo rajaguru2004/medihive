@@ -6,10 +6,20 @@ import '../modules/add_to_queue/bindings/add_to_queue_binding.dart';
 import '../modules/add_to_queue/views/add_to_queue_view.dart';
 import '../modules/admit_patient/bindings/admit_patient_binding.dart';
 import '../modules/admit_patient/views/admit_patient_view.dart';
+import '../modules/appointment_detail/bindings/appointment_detail_binding.dart';
+import '../modules/appointment_detail/views/appointment_detail_view.dart';
+import '../modules/appointment_form/bindings/appointment_form_binding.dart';
+import '../modules/appointment_form/views/appointment_form_view.dart';
+import '../modules/appointments/appointment_routes.dart';
 import '../modules/appointments/bindings/appointments_binding.dart';
 import '../modules/appointments/views/appointments_view.dart';
 import '../modules/billing/billing_routes.dart';
+import '../modules/consultation_detail/bindings/consultation_detail_binding.dart';
+import '../modules/consultation_detail/views/consultation_detail_view.dart';
+import '../modules/consultation_form/bindings/consultation_form_binding.dart';
+import '../modules/consultation_form/views/consultation_form_view.dart';
 import '../modules/consultations/bindings/consultations_binding.dart';
+import '../modules/consultations/consultation_routes.dart';
 import '../modules/consultations/views/consultations_view.dart';
 import '../modules/dashboard/bindings/dashboard_binding.dart';
 import '../modules/dashboard/views/dashboard_view.dart';
@@ -33,6 +43,7 @@ import '../modules/inpatient_overview/bindings/inpatient_overview_binding.dart';
 import '../modules/inpatient_overview/views/inpatient_overview_view.dart';
 import '../modules/inpatient_wards/bindings/inpatient_wards_binding.dart';
 import '../modules/inpatient_wards/views/inpatient_wards_view.dart';
+import '../modules/integrations/integrations_routes.dart';
 import '../modules/laboratory/laboratory_routes.dart';
 import '../modules/login/bindings/login_binding.dart';
 import '../modules/login/views/login_view.dart';
@@ -63,11 +74,13 @@ import '../modules/radiology/radiology_routes.dart';
 import '../modules/roles/bindings/roles_binding.dart';
 import '../modules/roles/views/roles_view.dart';
 import '../modules/settings/bindings/settings_binding.dart';
+import '../modules/settings/settings_routes.dart';
 import '../modules/settings/views/appearance_settings_view.dart';
 import '../modules/settings/views/clinical_settings_view.dart';
 import '../modules/settings/views/settings_hub_view.dart';
 import '../modules/splash/bindings/splash_binding.dart';
 import '../modules/splash/views/splash_view.dart';
+import '../modules/users/user_routes.dart';
 import 'middlewares/auth_middleware.dart';
 
 part 'app_routes.dart';
@@ -223,23 +236,49 @@ class AppPages {
       middlewares: _gate(Modules.appointments, 'The clinic list'),
       transition: _push,
     ),
+    // `/appointments/create` and `/appointments/edit` are both registered
+    // before `/appointments/:id`, which matches either of them. GetX answers
+    // with the first pattern that matches, so the other order books an
+    // appointment by opening the detail screen for one called "edit".
     GetPage(
       name: _Paths.APPOINTMENT_CREATE,
-      page: () => const PlaceholderView(
-        module: 'appointment-create',
-        title: 'Book appointment',
-        icon: Icons.event_available_outlined,
-        message: 'Booking from the app is not switched on for this site yet. '
-            'Appointments booked in the admin console appear on the clinic '
-            'board straight away.',
-      ),
-      middlewares: _auth,
+      page: () => const AppointmentFormView(),
+      binding: AppointmentFormBinding(),
+      middlewares: _gate(Modules.appointments, 'Booking'),
+      transition: _push,
+    ),
+    GetPage(
+      name: AppointmentRoutes.form,
+      page: () => const AppointmentFormView(),
+      binding: AppointmentFormBinding(),
+      middlewares: _gate(Modules.appointments, 'Booking'),
+      transition: _push,
+    ),
+    GetPage(
+      name: AppointmentRoutes.detail,
+      page: () => const AppointmentDetailView(),
+      binding: AppointmentDetailBinding(),
+      middlewares: _gate(Modules.appointments, 'The clinic list'),
       transition: _push,
     ),
     GetPage(
       name: _Paths.CONSULTATIONS,
       page: () => const ConsultationsView(),
       binding: ConsultationsBinding(),
+      middlewares: _gate(Modules.consultations, 'Consultations'),
+      transition: _push,
+    ),
+    GetPage(
+      name: ConsultationRoutes.form,
+      page: () => const ConsultationFormView(),
+      binding: ConsultationFormBinding(),
+      middlewares: _gate(Modules.consultations, 'Consultations'),
+      transition: _push,
+    ),
+    GetPage(
+      name: ConsultationRoutes.detail,
+      page: () => const ConsultationDetailView(),
+      binding: ConsultationDetailBinding(),
       middlewares: _gate(Modules.consultations, 'Consultations'),
       transition: _push,
     ),
@@ -393,37 +432,10 @@ class AppPages {
     ...RadiologyPages.pages,
     ...PharmacyPages.pages,
     ...BillingPages.pages,
+    ...StaffPages.pages,
+    ...SettingsPages.pages,
+    ...IntegrationsPages.pages,
 
-    // ── Routed, not yet built ─────────────────────────────────────────────
-    //
-    // Reachable rather than absent: a nav entry or a deep link that lands on
-    // one of these gets a screen that says what the module is for and where
-    // the work happens today. The alternative is an unknown-route page, which
-    // reads as a broken app rather than as an unfinished one.
-    GetPage(
-      name: _Paths.USERS_STAFF,
-      page: () => const PlaceholderView(
-        module: 'staff',
-        title: 'Staff',
-        icon: Icons.badge_outlined,
-        message: 'Staff accounts, roles and permissions are managed in the '
-            'admin console.',
-      ),
-      middlewares: _gate(Modules.users, 'Users and staff'),
-      transition: _push,
-    ),
-    GetPage(
-      name: _Paths.INTEGRATIONS,
-      page: () => const PlaceholderView(
-        module: 'integrations',
-        title: 'Integrations',
-        icon: Icons.hub_outlined,
-        message: 'Device and third-party integrations are configured in the '
-            'admin console.',
-      ),
-      middlewares: _gate(Modules.integrations, 'Integrations'),
-      transition: _push,
-    ),
   ];
 
   /// Where an unrecognised route lands.

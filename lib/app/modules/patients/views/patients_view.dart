@@ -113,20 +113,34 @@ class _Register extends StatelessWidget {
             onRetry: controller.reload,
             separator: const Hairline(indent: 68),
             empty: _Empty(controller: controller),
-            // Each row gets its own `Obx`, because a sliver's children are
-            // built during layout rather than inside the closure above — so a
-            // row reading `selectedId` from there would subscribe to nothing
-            // and the tablet's list would never mark the open patient.
+            // On a two-pane window each row gets its own `Obx`, because a
+            // sliver's children are built during layout rather than inside the
+            // closure above — so a row reading `selectedId` from there would
+            // subscribe to nothing and the list would never mark the open
+            // patient.
+            //
+            // On a phone there is no selection to read, and an `Obx` whose
+            // builder touches no observable **throws** rather than degrading:
+            // `[Get] the improper use of a GetX has been detected`. That is
+            // one error per row, and a register with no rows on it.
             itemBuilder: (context, index) {
               final patient = rows[index];
+              if (!isTwoPane) {
+                return _PatientRow(
+                  key: PatientsKeys.row(patient.id),
+                  patient: patient,
+                  controller: controller,
+                  isTwoPane: false,
+                  selected: false,
+                );
+              }
               return Obx(
                 () => _PatientRow(
                   key: PatientsKeys.row(patient.id),
                   patient: patient,
                   controller: controller,
-                  isTwoPane: isTwoPane,
-                  selected:
-                      isTwoPane && controller.selectedId.value == patient.id,
+                  isTwoPane: true,
+                  selected: controller.selectedId.value == patient.id,
                 ),
               );
             },

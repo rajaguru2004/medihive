@@ -16,13 +16,14 @@ import '../../dashboard/controllers/dashboard_controller.dart';
 import '../../dashboard/views/dashboard_view.dart';
 import '../../inpatient/controllers/inpatient_controller.dart';
 import '../../inpatient/views/inpatient_view.dart';
+import '../../integrations/controllers/integrations_controller.dart';
+import '../../integrations/views/integrations_view.dart';
 import '../../laboratory/controllers/laboratory_controller.dart';
 import '../../laboratory/views/laboratory_view.dart';
 import '../../patients/controllers/patients_controller.dart';
 import '../../patients/views/patients_view.dart';
 import '../../pharmacy/controllers/pharmacy_controller.dart';
 import '../../pharmacy/views/pharmacy_view.dart';
-import '../../placeholders/views/placeholder_view.dart';
 import '../../pre_triage/controllers/pre_triage_controller.dart';
 import '../../pre_triage/views/pre_triage_view.dart';
 import '../../queue/controllers/queue_controller.dart';
@@ -31,6 +32,8 @@ import '../../radiology/controllers/radiology_controller.dart';
 import '../../radiology/views/radiology_view.dart';
 import '../../settings/controllers/settings_hub_controller.dart';
 import '../../settings/views/settings_hub_view.dart';
+import '../../users/controllers/users_controller.dart';
+import '../../users/views/users_view.dart';
 import '../controllers/home_controller.dart';
 
 /// Registers the shell and the tabs this account actually gets.
@@ -291,13 +294,11 @@ class HomeBinding extends Bindings {
           group: ShellGroup.administration,
           module: Modules.users,
           rank: 11,
-          body: () => const PlaceholderView(
-            module: 'staff',
-            title: 'Users & staff',
-            icon: Icons.people_outline_rounded,
-            message: 'Accounts and roles are managed in the web console for '
-                'now.',
-          ),
+          body: UsersView.new,
+          register: () {
+            Get.put<UsersController>(UsersController(), permanent: true);
+            SessionManager.to.registerScoped<UsersController>();
+          },
         ),
         ShellDestination(
           route: Routes.SETTINGS,
@@ -326,13 +327,12 @@ class HomeBinding extends Bindings {
           group: ShellGroup.administration,
           module: Modules.integrations,
           rank: 13,
-          body: () => const PlaceholderView(
-            module: 'integrations',
-            title: 'Integrations',
-            icon: Icons.cable_outlined,
-            message: 'Analyser and device connections are configured in the '
-                'web console for now.',
-          ),
+          body: IntegrationsView.new,
+          register: () {
+            Get.put<IntegrationsController>(IntegrationsController(),
+                permanent: true);
+            SessionManager.to.registerScoped<IntegrationsController>();
+          },
         ),
       ];
 }

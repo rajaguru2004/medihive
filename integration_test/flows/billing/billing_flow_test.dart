@@ -330,15 +330,11 @@ void registerBillingFlows() {
 
       // The bill behind the form has caught up: the payment announced itself
       // on the DataBus and the detail reloaded. Nothing here reached into a
-      // sibling controller to make that happen.
+      // sibling controller to make that happen — which is why this waits for
+      // the balance rather than asserting it on the frame after the pop.
       await billing.assertOnInvoiceDetail();
-      expect(
-        billing.outstandingOnScreen(),
-        money(1012),
-        reason: 'the balance is what a collector is watching; a receipt that '
-            'does not move it is a receipt nobody can reconcile',
-      );
-      expect(billing.paymentCount, 2);
+      await billing.seeOutstanding(money(1012));
+      await billing.seePaymentCount(2);
     });
 
     testWidgets('a settled bill offers nothing to pay, and a part-paid one '

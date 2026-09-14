@@ -4,8 +4,8 @@ import 'package:get/get.dart';
 import '../../../core/keys/app_keys.dart';
 import '../../../data/models/role.dart';
 import '../../../data/utils/formatters.dart';
-import '../../../routes/app_pages.dart';
 import '../../../theme/theme.dart';
+import '../../users/user_routes.dart';
 import '../controllers/roles_controller.dart';
 
 /// Who can do what, as roles rather than as a matrix.
@@ -67,7 +67,7 @@ class RolesView extends GetView<RolesController> {
                     for (final role in c.customRoles)
                       BentoSection(
                         bottom: BentoSpace.action,
-                        child: _RoleCard(role: role, editable: c.canEdit),
+                        child: _RoleCard(role: role),
                       ),
                   ],
 
@@ -79,11 +79,12 @@ class RolesView extends GetView<RolesController> {
                   for (final role in c.systemRoles)
                     BentoSection(
                       bottom: BentoSpace.action,
-                      // Built-in roles are shown but never editable: the server
-                      // refuses with ROLE_SYSTEM_PROTECTED. Listing them still
-                      // matters — somebody shaping a custom role needs to see
-                      // what NURSE already has.
-                      child: _RoleCard(role: role, editable: false),
+                      // Built-in roles open, and open read-only: the server
+                      // refuses every edit with ROLE_SYSTEM_PROTECTED, and the
+                      // editor says so rather than letting a save 403. Being
+                      // able to *read* one is the point — somebody shaping a
+                      // custom role needs to see what NURSE already has.
+                      child: _RoleCard(role: role),
                     ),
                 ],
               ],
@@ -96,10 +97,9 @@ class RolesView extends GetView<RolesController> {
 }
 
 class _RoleCard extends StatelessWidget {
-  const _RoleCard({required this.role, required this.editable});
+  const _RoleCard({required this.role});
 
   final Role role;
-  final bool editable;
 
   /// What this role can do, in the language of the job.
   ///
@@ -121,6 +121,11 @@ class _RoleCard extends StatelessWidget {
       }
     });
 
+    // `GET /api/roles` answers the role rows and **no** `rolePermissions`, so
+    // a card built from the list has nothing to summarise. Saying "no access"
+    // there would be a claim about the role rather than about what this route
+    // sent — and it is wrong for every built-in role on the screen.
+    if (role.permissions.isEmpty) return 'Open it to see what it can do.';
     if (writes.isEmpty && reads.isEmpty) return 'No access to anything yet.';
 
     final parts = <String>[];
@@ -145,9 +150,13 @@ class _RoleCard extends StatelessWidget {
 
     return BentoCard(
       key: RolesKeys.card(role.id),
-      onTap: editable && role.isEditable
-          ? () => Get.toNamed<void>(Routes.SETTINGS_ROLES, arguments: role)
-          : null,
+      // Every card opens, including a built-in one. It used to point at
+      // `Routes.SETTINGS_ROLES` — this screen — so a tap reopened the list it
+      // came from.
+      onTap: () => Get.toNamed<void>(
+        StaffRoutes.roleEditor,
+        arguments: {'id': role.id, 'role': role},
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

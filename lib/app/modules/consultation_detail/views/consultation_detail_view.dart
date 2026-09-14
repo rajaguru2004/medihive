@@ -169,12 +169,18 @@ class _Header extends StatelessWidget {
                 ),
               ),
             if (controller.canDelete)
-              RecordAction(
-                key: ConsultationDetailKeys.delete,
-                icon: Icons.delete_outline_rounded,
-                label: 'Delete',
-                destructive: true,
-                onPressed: () => _confirmDelete(context, controller),
+              // Taken away while the delete is in flight: a record removed
+              // twice is a 404 reported to somebody who did nothing wrong.
+              Obx(
+                () => RecordAction(
+                  key: ConsultationDetailKeys.delete,
+                  icon: Icons.delete_outline_rounded,
+                  label: 'Delete',
+                  destructive: true,
+                  onPressed: controller.isActing.value
+                      ? null
+                      : () => _confirmDelete(context, controller),
+                ),
               ),
           ],
         ),
