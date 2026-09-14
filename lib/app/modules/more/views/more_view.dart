@@ -47,8 +47,13 @@ class MoreView extends StatelessWidget {
                 ),
               ),
 
-            for (final entry in layout.moreByGroup.entries) ...[
+            for (final (index, entry)
+                in layout.moreByGroup.entries.indexed) ...[
               BentoSection(
+                // The first group needs air under the app bar. Without it the
+                // heading sits flush against the bar and reads as part of it
+                // rather than as the start of the list.
+                top: index == 0 ? BentoSpace.section : 0,
                 bottom: BentoSpace.header,
                 child: SectionHeader(
                   key: MoreKeys.group(entry.key.name),
@@ -86,7 +91,7 @@ class MoreView extends StatelessWidget {
                           : 'Signed in',
                       subtitle: [
                         if (controller.user?.role.isNotEmpty ?? false)
-                          controller.user!.role,
+                          controller.user!.roleLabel,
                         if (controller.user?.department.isNotEmpty ?? false)
                           controller.user!.department,
                       ].join(' · '),

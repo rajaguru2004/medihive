@@ -192,4 +192,27 @@ void main() {
       expect(Formatters.date(null), '—');
     });
   });
+
+  group('label', () {
+    test('turns a stored enum into something a person reads', () {
+      // The defect this exists for: `Checked_in`, `Registered_as_patient` and
+      // `icu` all shipped to a ward board once.
+      expect(Formatters.label('LAB_TECHNICIAN'), 'Lab technician');
+      expect(Formatters.label('registered_as_patient'), 'Registered as patient');
+      expect(Formatters.label('NURSE'), 'Nurse');
+      expect(Formatters.label('no-show'), 'No show');
+    });
+
+    test('is empty for nothing, rather than printing a dash', () {
+      expect(Formatters.label(null), '');
+      expect(Formatters.label(''), '');
+      expect(Formatters.label('   '), '');
+      // A value that is only separators has no word in it to capitalise.
+      expect(Formatters.label('___'), '');
+    });
+
+    test('does not mangle a value that is already a sentence', () {
+      expect(Formatters.label('Acute Medical'), 'Acute medical');
+    });
+  });
 }

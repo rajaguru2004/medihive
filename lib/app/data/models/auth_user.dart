@@ -1,3 +1,4 @@
+import '../utils/formatters.dart';
 import '../utils/jwt_claims.dart';
 import 'json.dart';
 
@@ -25,8 +26,8 @@ class AuthUser {
   final String name;
   final String email;
 
-  /// The role's display name — "Consultant", "Charge nurse". Shown; never
-  /// used to decide what somebody may do.
+  /// The role as the server stores it — `NURSE`, `LAB_TECHNICIAN`. Shown
+  /// through [roleLabel]; never used to decide what somebody may do.
   final String role;
 
   final String roleId;
@@ -70,6 +71,12 @@ class AuthUser {
     return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
         .toUpperCase();
   }
+
+  /// The role as a person would read it: `LAB_TECHNICIAN` → `Lab technician`.
+  ///
+  /// The raw value is a database word. Printing it in an account row is the
+  /// same defect as printing `Registered_as_patient` on a board.
+  String get roleLabel => Formatters.label(role);
 
   bool can(String permission) => permissions.contains(permission);
 

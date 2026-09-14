@@ -1645,21 +1645,26 @@ class SecondaryBar extends StatelessWidget {
 }
 
 /// A tinted card that offers one next step, with a reason above it.
+///
+/// The step is optional. Some of these cards say something everybody needs to
+/// know — a patient is deteriorating — while the way to act on it belongs to
+/// one role. Showing the card without the button is honest; showing a button
+/// that refuses the tap is not.
 class ActionCard extends StatelessWidget {
   const ActionCard({
     super.key,
     required this.title,
     required this.message,
-    required this.actionLabel,
-    required this.onAction,
+    this.actionLabel,
+    this.onAction,
     this.icon,
     this.tint,
   });
 
   final String title;
   final String message;
-  final String actionLabel;
-  final VoidCallback onAction;
+  final String? actionLabel;
+  final VoidCallback? onAction;
   final IconData? icon;
   final Color? tint;
 
@@ -1700,6 +1705,7 @@ class ActionCard extends StatelessWidget {
                       ? AppTextStyles.darkFootnote()
                       : AppTextStyles.lightFootnote(),
                 ),
+                if (actionLabel != null && onAction != null) ...[
                 const SizedBox(height: 10),
                 SizedBox(
                   height: 40,
@@ -1723,9 +1729,10 @@ class ActionCard extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    child: Text(actionLabel),
+                    child: Text(actionLabel!),
                   ),
                 ),
+                ],
               ],
             ),
           ),

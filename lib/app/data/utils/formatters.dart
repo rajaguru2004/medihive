@@ -281,6 +281,28 @@ abstract final class Formatters {
     ].join('-');
   }
 
+  /// A stored value as a person would read it.
+  ///
+  /// `LAB_TECHNICIAN` → `Lab technician`, `registered_as_patient` →
+  /// `Registered as patient`, `icu` → `Icu`.
+  ///
+  /// Exists because a stored value reaching a screen unchanged is this
+  /// codebase's most repeated defect — `Checked_in`, `Registered_as_patient`
+  /// and `icu` all shipped once. Anything that arrives as an enum and is shown
+  /// to somebody goes through here.
+  ///
+  /// Deliberately not clever: it does not know that `icu` wants to be `ICU`.
+  /// A screen that needs a real name for a code uses a vocabulary that has one
+  /// (`CaseStatus.labelOf`, `BedState.label`); this is the honest fallback for
+  /// everything else.
+  static String label(String? raw) {
+    final value = raw?.trim() ?? '';
+    if (value.isEmpty) return '';
+    final spaced = value.replaceAll(RegExp(r'[_-]+'), ' ').trim();
+    if (spaced.isEmpty) return '';
+    return spaced[0].toUpperCase() + spaced.substring(1).toLowerCase();
+  }
+
   /// Shortens a long name to fit a dense row without cutting mid-word where a
   /// word boundary is close by.
   static String truncate(String value, int max) {

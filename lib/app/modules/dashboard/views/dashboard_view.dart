@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/keys/app_keys.dart';
+import '../../../data/models/access_map.dart';
 import '../../../data/models/dashboard_model.dart';
+import '../../../data/services/access_service.dart';
 import '../../../data/utils/formatters.dart';
 import '../../../routes/app_pages.dart';
 import '../../../theme/theme.dart';
@@ -121,10 +123,16 @@ class _AttentionCard extends StatelessWidget {
       message: count == 1
           ? 'One patient has been flagged as critical or is deteriorating.'
           : 'These patients have been flagged as critical or are deteriorating.',
-      actionLabel: 'Open queue',
+      // The count is worth showing to anybody — a deteriorating patient is
+      // everybody's business — but the way in is only offered to somebody who
+      // can open it. A red card whose one action is refused is an alarm with
+      // no answer.
+      actionLabel: AccessService.to.canRead(Modules.queue) ? 'Open queue' : null,
       icon: Icons.priority_high_rounded,
       tint: AppColors.acuityCritical,
-      onAction: () => Get.toNamed<void>(Routes.QUEUE),
+      onAction: AccessService.to.canRead(Modules.queue)
+          ? () => Get.toNamed<void>(Routes.QUEUE)
+          : null,
     );
   }
 }
@@ -222,29 +230,81 @@ class _QuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Four, on one row, all of them things somebody standing at a desk does
-    // several times an hour. Anything done once a shift belongs on its own
-    // screen, not here.
-    const actions = [
+    // Things somebody standing at a desk does several times an hour. Anything
+    // done once a shift belongs on its own screen, not here.
+    //
+    // Each names the module and verb it needs, and the row shows only what this
+    // account can actually perform. A tile that routes straight to the
+    // no-access screen is worse than a missing tile: it teaches a clinician
+    // that the app's own shortcuts cannot be trusted.
+    const candidates = [
       (
         id: 'screening',
         icon: Icons.assignment_outlined,
         label: 'New screening',
         route: Routes.NEW_SCREENING_STEP1,
+        module: Modules.preTriage,
       ),
       (
         id: 'queue',
         icon: Icons.person_add_alt_1_outlined,
         label: 'Add to queue',
         route: Routes.ADD_TO_QUEUE,
+        module: Modules.queue,
       ),
       (
         id: 'admit',
         icon: Icons.local_hotel_outlined,
         label: 'Admit patient',
         route: Routes.INPATIENT_ADMIT,
+        module: Modules.inpatient,
+      ),
+      (
+        id: 'consultation',
+        icon: Icons.note_add_outlined,
+        label: 'New consult',
+        route: Routes.CONSULTATIONS,
+        module: Modules.consultations,
+      ),
+      (
+        id: 'lab',
+        icon: Icons.science_outlined,
+        label: 'Lab orders',
+        route: Routes.LABORATORY,
+        module: Modules.laboratory,
+      ),
+      (
+        id: 'imaging',
+        icon: Icons.monitor_heart_outlined,
+        label: 'Imaging',
+        route: Routes.RADIOLOGY,
+        module: Modules.radiology,
+      ),
+      (
+        id: 'dispense',
+        icon: Icons.medication_outlined,
+        label: 'Dispense',
+        route: Routes.PHARMACY,
+        module: Modules.pharmacy,
+      ),
+      (
+        id: 'invoice',
+        icon: Icons.receipt_long_outlined,
+        label: 'New invoice',
+        route: Routes.BILLING,
+        module: Modules.billing,
       ),
     ];
+
+    final access = AccessService.to.map;
+    // Three at 411 dp. A fourth tile at the 1.3 text scale wraps its label to
+    // three lines and the row stops being scannable.
+    final actions = candidates
+        .where((a) => access.can(a.module, AccessVerb.create))
+        .take(3)
+        .toList();
+
+    if (actions.isEmpty) return const SizedBox.shrink();
 
     return Column(
       key: HomeKeys.quickActions,
@@ -265,6 +325,15 @@ class _QuickActions extends StatelessWidget {
                     onTap: () => Get.toNamed<void>(actions[i].route),
                   ),
                 ),
+              ],
+              // Keeps a short row the same shape as a full one. An account
+              // with one permitted action would otherwise get a single tile
+              // stretched across the whole width, with its icon adrift in the
+              // middle of it — which reads as a layout that broke rather than
+              // a row with less in it.
+              for (var i = actions.length; i < 3; i++) ...[
+                if (i > 0) const SizedBox(width: 10),
+                const Expanded(child: SizedBox.shrink()),
               ],
             ],
           ),
@@ -297,8 +366,14 @@ class _QueueLoadCard extends StatelessWidget {
       children: [
         SectionHeader(
           title: 'Waiting by service',
-          actionLabel: 'Queue',
-          onAction: () => Get.toNamed<void>(Routes.QUEUE),
+          // The breakdown is worth seeing even without the board — a lab
+          // technician cares how many people are waiting on them. The way
+          // through is only offered to somebody who can open it.
+          actionLabel:
+              AccessService.to.canRead(Modules.queue) ? 'Queue' : null,
+          onAction: AccessService.to.canRead(Modules.queue)
+              ? () => Get.toNamed<void>(Routes.QUEUE)
+              : null,
         ),
         BentoCard(
           key: HomeKeys.queueLoad,

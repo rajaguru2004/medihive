@@ -30,7 +30,7 @@ Future<void> openAccountSheet(
               child: PatientIdentityBand(
                 name: user.name.isEmpty ? user.email : user.name,
                 extra: [
-                  if (user.role.isNotEmpty) user.role,
+                  if (user.role.isNotEmpty) user.roleLabel,
                   if (user.department.isNotEmpty) user.department,
                 ].join(' · '),
               ),
