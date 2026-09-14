@@ -79,6 +79,26 @@ Nothing downstream can be verified until the models actually answer.
 | 0.10 | Emulator `Pixel_6_Pro_API_36` booted | ⬜ | deferred while agents run — 2.8 GB free on a 15 GB box |
 | 0.11 | Tamil/Hindi Piper voices | ⏭ | P10 |
 
+### Measured on this box, 2026-09-14
+
+The numbers the UX has to be designed around, not guessed at.
+
+| Path | Warm | Note |
+|---|---|---|
+| STT, 3.3 s of speech | **1.1 s** | faster-whisper `small`, CPU |
+| STT, 10.3 s of speech | **1.45 s** | ~7× realtime; not the bottleneck |
+| TTS, one question | ~1 s | Piper, 22050 Hz mono |
+| LLM extraction, short answer | **~8 s** | gemma3:4b, 38% GPU offload |
+| LLM extraction, long answer | **~20 s** | ~10–20 tok/s |
+| LLM cold load | 74 s | first call after idle eviction |
+
+**Voice in is cheap; the model is the whole cost.** A full round trip through
+Piper and back through Whisper returned the sentence verbatim at 0.84
+confidence, so the pipeline is sound. What this means for P7: the microphone can
+be conversational, and the next question — which comes from the deterministic
+selector, not the model — renders immediately. Only extraction is slow, and it
+is the one thing the patient never waits on.
+
 ---
 
 ## P1 · Patient identity and self-login
