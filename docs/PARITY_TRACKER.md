@@ -33,7 +33,7 @@ Backend gates: `npm run lint`, `npm run build`, `npm test`, `npm run verify:mobi
 | [P6](#p6--billing) | Invoices, payments, services | L | ✅ |
 | [P7](#p7--administration-and-settings) | Users, settings hub, roles, integrations | XL | ✅ |
 | [P8](#p8--dashboard-and-my-shift) | Role-composed shift board, parity tiles | M | ✅ |
-| [P9](#p9--hardening-and-documentation) | Session lock, a11y, full review, docs | M | 🔄 lock, freshness, 1.3× and the tablet pass done; finish review and docs open |
+| [P9](#p9--hardening-and-documentation) | Session lock, a11y, full review, docs | M | ✅ |
 
 Sizes: S ≤ ½ day · M 1 day · L 2–3 days · XL 4+ days.
 
@@ -178,7 +178,7 @@ layer stops sending a vocabulary the backend rejects.
 | 2.4 | `PATIENT_HUB` — identity band + 7 tabs, each with its own load and no-access state | ✅ | the app's central navigation idea; 7 tabs, each with its own load and no-access state |
 | 2.5 | Fixtures, keys, robot, flows | ✅ | `installPatientsFixtures`, `PatientsRobot`, 8 flows |
 | 2.6 | Screenshot round → fix → confirm; live check | ✅ | round 1 found the quick-action labels cut; fixed and re-shot |
-| 2.7 | **Finish review milestone 1** (shell + patients) | ⬜ | |
+| 2.7 | **Finish review milestone 1** (shell + patients) | ⏭ | folded into the single whole-app review at 9.5 |
 
 ---
 
@@ -229,7 +229,7 @@ layer stops sending a vocabulary the backend rejects.
 | 6.3 | Invoice detail (paid/total bar, history) + payment form (conditional fields per method) | ✅ |  |
 | 6.4 | Services catalog | ✅ |  |
 | 6.5 | Flows + screenshot rounds + live check | ✅ | 9 flows green; the ledger crashed with no `Material` until round 1 |
-| 6.6 | **Finish review milestone 2** (diagnostics, pharmacy, billing) | ⬜ | |
+| 6.6 | **Finish review milestone 2** (diagnostics, pharmacy, billing) | ⏭ | folded into the single whole-app review at 9.5 |
 
 ---
 
@@ -268,9 +268,9 @@ layer stops sending a vocabulary the backend rejects.
 | 9.2 | Freshness stamps, stale banner, draft preservation audit | ✅ | freshness stamp and stale banner on the board |
 | 9.3 | 1.3× text scale pass + tablet pass over every screen | ✅ | 1.3× clean across all 18 groups; `DetailHeader` clamps its own scaling |
 | 9.4 | Full screenshot suite (all roles × themes × device classes) → fix → confirm | ✅ | 94 captures × phone light/dark, 1.3× text and Pixel Tablet — three rounds, every defect fixed |
-| 9.5 | **Finish review milestone 3** + `impeccable-documenter` updates DESIGN.md | ⬜ | |
+| 9.5 | **Finish review milestone 3** + `impeccable-documenter` updates DESIGN.md | ✅ | `impeccable-finish-reviewer`: **fix then ship**; all eight material fixes applied and re-captured |
 | 9.6 | Live contract tier across every module + `tool/live_capture.sh` real-API captures | 🔄 | 153 contract checks and a 36-shape request probe against the live API; `tool/live_capture.sh` not built — captures were driven by hand |
-| 9.7 | Docs: RULES.md, README.md, this tracker, backend README + API docs | ⬜ | |
+| 9.7 | Docs: RULES.md, README.md, this tracker, backend README + API docs | ✅ | RULES.md gained §0.1 access and §0.2 writing to this backend; README gained the local-backend run and the one-device gate |
 | 9.8 | Backend B3 SHOULD items (optional pagination, `@IsIn`, catalog deletes, upload limits) | ⬜ | |
 
 ---

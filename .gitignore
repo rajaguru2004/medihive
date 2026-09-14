@@ -46,7 +46,12 @@ app.*.map.json
 
 # Screenshots from a design pass. Evidence of one build, not an artefact of
 # the repo — regenerate with the drive command in README.md.
+# Screenshots are evidence of one build, not an artefact of the repo. The
+# suffixed ones are the passes a review round compares: `-100` standard size,
+# `-130` at the text scale a ward tablet is usually left at, `-tablet` the rail.
 /.review/
+/.review-*/
+/.impeccable/
 
 # Analyzer scratch output from before the port. Kept out rather than deleted
 # in case somebody is mid-diff against it.
