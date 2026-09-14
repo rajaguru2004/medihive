@@ -1731,4 +1731,65 @@ void main() {
       expectBody(bed.toUpdateJson(), allowed: bedUpdate, expected: bedUpdate);
     });
   });
+
+  // ── The patient portal ────────────────────────────────────────────────────
+  //
+  // The only two writes in this app that go out without a bearer token. They
+  // are still validated by the same `whitelist + forbidNonWhitelisted`, so an
+  // extra key here is a patient standing at a desk unable to get into their
+  // own record.
+
+  group('PatientClaimDraft', () {
+    // hms_v2/src/modules/patient-auth/dto/claim-patient-record.dto.ts
+    const create = {'mrn', 'dateOfBirth'};
+
+    final draft = PatientClaimDraft(
+      mrn: 'MRN-PORTAL-0001',
+      dateOfBirth: DateTime(1990, 5, 17),
+    );
+
+    test('sends the two things printed on a card, and nothing else', () {
+      expectBody(draft.toCreateJson(), allowed: create, expected: create);
+    });
+
+    test('the date of birth is a calendar day, not an instant', () {
+      // `@IsDateString()` accepts both, and the difference is a whole day.
+      // `isoDay` deliberately does not convert to UTC first: 1990-05-17 in a
+      // UTC+ zone becomes the 16th if it does, and the pair then matches
+      // nothing — which the server answers with a perfectly valid-looking
+      // token that is refused ten minutes later at activation.
+      expect(draft.toCreateJson()['dateOfBirth'], '1990-05-17');
+    });
+  });
+
+  group('PatientActivationDraft', () {
+    // hms_v2/src/modules/patient-auth/dto/activate-patient-account.dto.ts
+    const create = {'claimToken', 'password', 'email'};
+
+    test('sends the token, the password and the address', () {
+      const draft = PatientActivationDraft(
+        claimToken: 'a-claim-token-long-enough',
+        password: 'Portal@12345',
+        email: 'patient@example.com',
+      );
+      expectBody(draft.toCreateJson(), allowed: create, expected: create);
+    });
+
+    test('omits the email rather than sending a blank one', () {
+      // `@IsOptional() @IsEmail()` — an empty string is not an email, so
+      // sending one is a 400 for the whole request. The record may already
+      // carry an address, and the app cannot know: the claim response tells it
+      // nothing about the record on purpose.
+      const draft = PatientActivationDraft(
+        claimToken: 'a-claim-token-long-enough',
+        password: 'Portal@12345',
+        email: '   ',
+      );
+      expectBody(
+        draft.toCreateJson(),
+        allowed: create,
+        expected: create.difference({'email'}),
+      );
+    });
+  });
 }

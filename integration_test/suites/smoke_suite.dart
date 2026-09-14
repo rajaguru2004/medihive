@@ -9,6 +9,7 @@ import '../flows/home/shell_flow_test.dart';
 import '../flows/inpatient/beds_flow_test.dart';
 import '../flows/integrations/integrations_flow_test.dart';
 import '../flows/laboratory/laboratory_flow_test.dart';
+import '../flows/patient_portal/patient_portal_flow_test.dart';
 import '../flows/patients/patients_flow_test.dart';
 import '../flows/pharmacy/pharmacy_flow_test.dart';
 import '../flows/pre_triage/screening_flow_test.dart';
@@ -52,4 +53,9 @@ void main() {
   registerSettingsFlows();
   registerIntegrationsFlows();
   registerShiftFlows();
+
+  // Last, and the only one whose account is not a member of staff: a patient
+  // reading their own record. It boots a role the flows above never use, so it
+  // is also the run that proves the landing decision has two answers.
+  registerPatientPortalFlows();
 }

@@ -53,6 +53,7 @@ export 'new_screening_step2_keys.dart';
 export 'no_access_keys.dart';
 export 'patient_form_keys.dart';
 export 'patient_hub_keys.dart';
+export 'patient_portal_keys.dart';
 export 'patient_search_keys.dart';
 export 'patients_keys.dart';
 export 'pharmacy_keys.dart';

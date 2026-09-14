@@ -57,6 +57,8 @@ import '../modules/patient_form/bindings/patient_form_binding.dart';
 import '../modules/patient_form/views/patient_form_view.dart';
 import '../modules/patient_hub/bindings/patient_hub_binding.dart';
 import '../modules/patient_hub/views/patient_hub_view.dart';
+import '../modules/patient_portal/patient_portal_routes.dart';
+import '../modules/patient_portal/patient_shell.dart';
 import '../modules/patient_search/bindings/patient_search_binding.dart';
 import '../modules/patient_search/views/patient_search_view.dart';
 import '../modules/patients/bindings/patients_binding.dart';
@@ -202,7 +204,15 @@ class AppPages {
       name: _Paths.HOME,
       page: () => const HomeView(),
       binding: HomeBinding(),
-      middlewares: _auth,
+      // The staff shell, and the one route that has to know the other shell
+      // exists. Sign-in and the splash screen both resolve their own landing,
+      // so a patient never reaches this page in normal use — but every
+      // `const RouteSettings(name: Routes.HOME)` in the app was written before
+      // there were two shells, and `PatientShellMiddleware` is what catches
+      // the ones that still point here: a deep link, a saved shortcut,
+      // `GuestMiddleware` bouncing a signed-in user off `/login`, and the
+      // unknown-route screen's way out.
+      middlewares: [..._auth, PatientShellMiddleware()],
     ),
     GetPage(
       name: _Paths.DASHBOARD,
@@ -436,6 +446,10 @@ class AppPages {
     ...SettingsPages.pages,
     ...IntegrationsPages.pages,
 
+    // The patient portal. A different audience on the same device, so its
+    // screens are gated on the one verb only a patient holds rather than on a
+    // role name — see `PatientShell`.
+    ...PatientPortalPages.routes,
   ];
 
   /// Where an unrecognised route lands.

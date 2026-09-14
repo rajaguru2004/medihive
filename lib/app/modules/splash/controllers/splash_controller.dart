@@ -6,6 +6,7 @@ import '../../../core/app_log.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../data/services/settings_service.dart';
 import '../../../routes/app_pages.dart';
+import '../../patient_portal/patient_shell.dart';
 
 /// Decides where the app opens.
 ///
@@ -51,7 +52,13 @@ class SplashController extends GetxController {
       // session down through SessionManager and routed to sign-in, so this
       // check is what stops us routing on top of that.
       if (!AuthService.to.isAuthenticated) return;
-      destination = Routes.HOME;
+
+      // A warm start lands where sign-in would have. `refreshCurrentUser`
+      // has just re-read the access map through `AccessService`, so this is
+      // resolved from what the server says now rather than from what was
+      // cached — a record claimed since the last launch opens the portal on
+      // this launch.
+      destination = PatientShell.currentLanding;
     }
 
     final elapsed = DateTime.now().difference(started);

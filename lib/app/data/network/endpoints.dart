@@ -89,6 +89,34 @@ abstract class Endpoints {
   static const String meAccess = '/api/auth/me/access';
   static const String changePassword = '/api/auth/change-password';
 
+  // ── The patient portal ────────────────────────────────────────────────────
+  //
+  // The first two are **public**, which no other write in this file is. They
+  // are how somebody who has a hospital card but no login gets one, so they
+  // are sent with `AuthInterceptor.unauthenticated`: a 401 from either reads
+  // as "that did not work" rather than tearing down a session the caller does
+  // not have yet.
+
+  /// `{mrn, dateOfBirth}` → a short-lived, single-use claim token.
+  ///
+  /// Answers **identically whether or not the MRN exists**, so nothing the app
+  /// reads back distinguishes the two. Copy written against this route has to
+  /// be true in both cases.
+  static const String patientClaim = '/api/patient-auth/claim';
+
+  /// `{claimToken, password, email?}` → the ordinary token pair.
+  ///
+  /// Afterwards the patient signs in through [login] like every other account.
+  static const String patientActivate = '/api/patient-auth/activate';
+
+  /// The caller's own patient record and portal state.
+  ///
+  /// Reads the `patientId` on the bearer token and discards any id in the
+  /// query, so there is no version of this request that asks about somebody
+  /// else. It is the portal's only route to its own identity: a portal account
+  /// holds no `patients` module, so `/api/patients/:id` is a 403.
+  static const String patientPortalMe = '/api/patient-auth/me';
+
   // ── Collections ───────────────────────────────────────────────────────────
   //
   // One [Crud] per resource. Anything that is not list/read/create/update/

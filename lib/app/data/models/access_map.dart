@@ -48,6 +48,26 @@ abstract final class Modules {
   static const String dashboard = 'dashboard';
   static const String audit = 'audit';
 
+  // ── The patient portal's own two ──────────────────────────────────────────
+  //
+  // A patient signs in to this app as themselves, and these are the modules
+  // their role is granted. Both are real keys in `access.modules` — verified
+  // against the live API — so they belong here beside the staff ones rather
+  // than in the portal module: this class is the vocabulary, not the audience.
+  //
+  // The **create** verb on each is the one that matters, and only `PATIENT`
+  // holds it. A doctor and a nurse are granted `CASE_TAKING_READ` and
+  // `PATIENT_DOCUMENT_READ` — they read the intake and the documents a patient
+  // brought — and nothing more, because an intake a clinician can rewrite
+  // stops being evidence of what the patient said. See
+  // `PatientShell.isPortalAccount`, which is what routes on that distinction.
+
+  /// The intake a patient tells about themselves.
+  static const String caseTaking = 'case-taking';
+
+  /// The prescriptions, reports and letters a patient brought with them.
+  static const String patientDocuments = 'patient-documents';
+
   /// Named because the permission vocabulary maps onto it
   /// (`DEATH_CERTIFICATE_READ`), but deliberately **not** in [all]: the server
   /// seeds no permission rows in this category, so it never appears in an
@@ -73,6 +93,8 @@ abstract final class Modules {
     settings,
     dashboard,
     audit,
+    caseTaking,
+    patientDocuments,
   ];
 }
 
@@ -262,6 +284,13 @@ class AccessMap {
     'DASHBOARD': Modules.dashboard,
     'AUDIT': Modules.audit,
     'DEATH_CERTIFICATE': Modules.deathCertificates,
+    // Without these two a portal account rebuilt from its token — the
+    // offline fallback in `AccessService` — would come back holding only
+    // `appointments` and `dashboard`, which are staff modules. It would then
+    // look exactly like a clinician with very few permissions, and the
+    // landing decision would put a patient in the staff shell.
+    'CASE_TAKING': Modules.caseTaking,
+    'PATIENT_DOCUMENT': Modules.patientDocuments,
   };
 
   static const Map<String, AccessVerb> _verbs = {

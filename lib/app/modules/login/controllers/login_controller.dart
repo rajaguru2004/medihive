@@ -6,7 +6,7 @@ import '../../../data/services/auth_service.dart';
 import '../../../data/services/session_manager.dart';
 import '../../../data/services/settings_service.dart';
 import '../../../data/utils/error_handler.dart';
-import '../../../routes/app_pages.dart';
+import '../../patient_portal/patient_shell.dart';
 
 class LoginController extends GetxController {
   final emailController = TextEditingController();
@@ -80,7 +80,14 @@ class LoginController extends GetxController {
       // default would otherwise show one frame of teal on sign-in.
       await SettingsService.to.load();
 
-      await Get.offAllNamed<void>(Routes.HOME);
+      // Which shell this account belongs in, decided from the access map
+      // `signIn` has just loaded — never from the role name. Roles are
+      // customisable in this product, so a hospital can rename PATIENT or
+      // grant its permissions to a role of its own, and a sign-in that
+      // switched on the name would put that hospital's patients into the ward
+      // board. `PatientShell` states the two facts in the map it reads
+      // instead, and why those two.
+      await Get.offAllNamed<void>(PatientShell.currentLanding);
     } catch (e, stack) {
       errorMessage.value = parseErrorMessage(
         e,

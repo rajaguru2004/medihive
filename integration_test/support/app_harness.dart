@@ -20,6 +20,7 @@ import 'package:medihive/app/data/services/queue_service.dart';
 import 'package:medihive/app/data/services/session_manager.dart';
 import 'package:medihive/app/data/services/settings_service.dart';
 import 'package:medihive/app/modules/home/controllers/home_controller.dart';
+import 'package:medihive/app/modules/patient_portal/patient_shell.dart';
 import 'package:medihive/app/routes/app_pages.dart';
 import 'package:medihive/app/theme/theme.dart';
 import 'package:medihive/main.dart';
@@ -175,8 +176,13 @@ class AppHarness {
     if (fonts) await _loadRealFonts();
 
     await tester.pumpWidget(const MediHiveApp());
+    // Where this account's session actually opens, resolved the way the app
+    // resolves it rather than from a second table here. A portal account does
+    // not land on the staff shell — that is the whole point of `PatientShell`
+    // — so a harness that waited for `/home` would hang for fifteen seconds
+    // and then report the wrong thing.
     await tester.pumpUntilRouteSettled(
-      expectRoute: signedIn ? Routes.HOME : Routes.LOGIN,
+      expectRoute: signedIn ? PatientShell.currentLanding : Routes.LOGIN,
     );
 
     final harness = AppHarness._(tester, api, role);

@@ -100,6 +100,26 @@ enum WorldRole {
     roleName: 'BILLING_STAFF',
     department: 'Finance',
     employeeId: 'EMP-0091',
+  ),
+
+  /// The one account in this list who does not work here.
+  ///
+  /// Ifeoma Balogun is already `p-1` in the world — she is on the clinic
+  /// board, she has appointments, she was recently discharged — and this is
+  /// her signing in to read her own record. Deliberately the same person
+  /// rather than a tenth invented one: the whole point of the portal is that a
+  /// patient and a clinician are looking at the same record from two sides,
+  /// and a fixture with a portal patient nobody in the department has ever
+  /// seen cannot show that.
+  ///
+  /// No department and no employee id, because she has neither. The live API
+  /// sends null for all three and the shell has to survive it.
+  patient(
+    id: 'u-10',
+    displayName: 'Ifeoma Balogun',
+    email: 'i.balogun@example.org',
+    roleName: 'PATIENT',
+    department: '',
   );
 
   const WorldRole({
@@ -202,6 +222,21 @@ enum WorldRole {
             'PATIENT_READ',
             'DASHBOARD_READ',
           ],
+        // Create and update on both of the portal's own modules — filling in
+        // an intake and correcting it before the consultation is the patient
+        // doing their own work — but no DELETE, and **no `PATIENT_READ`**.
+        // That last omission is the one the landing decision turns on: every
+        // staff role above holds it, because a clinician who cannot look a
+        // patient up cannot do their job, and an account that can file its own
+        // history and cannot read anybody else's record is the person rather
+        // than the hospital. See `PatientShell.isPortalAccount`.
+        WorldRole.patient => [
+            'APPOINTMENT_CREATE',
+            'APPOINTMENT_READ',
+            ..._only('CASE_TAKING', _cru),
+            ..._only('PATIENT_DOCUMENT', _cru),
+            'DASHBOARD_READ',
+          ],
       };
 
   /// The `access.modules` block of `GET /api/auth/me`, derived from
@@ -280,6 +315,12 @@ const Map<String, String> _modulesByPrefix = {
   'SETTINGS': 'settings',
   'DASHBOARD': 'dashboard',
   'AUDIT': 'audit',
+  // The portal's own two. `resource` on the server's permission rows is what
+  // `/auth/me` keys its module map by, and these are the strings it sends —
+  // checked against the live API, which answers a patient's map with
+  // `case-taking` and `patient-documents` beside the seventeen staff ones.
+  'CASE_TAKING': 'case-taking',
+  'PATIENT_DOCUMENT': 'patient-documents',
 };
 
 const Map<String, String> _accessFields = {

@@ -20,6 +20,7 @@ export 'draft_json.dart';
 export 'inpatient_drafts.dart';
 export 'lab_drafts.dart';
 export 'patient_draft.dart';
+export 'patient_portal_drafts.dart';
 export 'pharmacy_drafts.dart';
 export 'queue_draft.dart';
 export 'radiology_drafts.dart';

@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../../../core/keys/app_keys.dart';
 import '../../../theme/theme.dart';
+import '../../patient_portal/patient_portal_navigation.dart';
 import '../controllers/login_controller.dart';
 
 /// Sign in.
@@ -141,6 +142,43 @@ class LoginView extends GetView<LoginController> {
                           style: isDark
                               ? AppTextStyles.darkFootnote()
                               : AppTextStyles.lightFootnote(),
+                        ),
+
+                        // ── The other person who opens this app ──────────
+                        //
+                        // A patient with a hospital card and no password has
+                        // nowhere else to start: the claim screen is public
+                        // and reachable from nothing but here. Below the rule
+                        // and below the staff form, because the heaviest user
+                        // of this screen is still a clinician at the start of
+                        // a shift — but a real control rather than a link, so
+                        // somebody holding a card can actually hit it.
+                        const SizedBox(height: 24),
+                        const Hairline(),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Are you a patient?',
+                          textAlign: TextAlign.center,
+                          style: isDark
+                              ? AppTextStyles.darkHeadline()
+                              : AppTextStyles.lightHeadline(),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'If you have a hospital card and no password yet, '
+                          'you can set one up.',
+                          textAlign: TextAlign.center,
+                          style: (isDark
+                                  ? AppTextStyles.darkSubheadline()
+                                  : AppTextStyles.lightSubheadline())
+                              .copyWith(color: secondaryLabelColor(context)),
+                        ),
+                        const SizedBox(height: 14),
+                        const SecondaryBar(
+                          key: PatientPortalKeys.claimFromSignIn,
+                          label: 'Use my hospital card',
+                          icon: Icons.badge_outlined,
+                          onPressed: PatientPortalNavigation.toClaim,
                         ),
                       ],
                     ),

@@ -6,6 +6,7 @@ import 'modules/billing_fixtures.dart';
 import 'modules/clinical_fixtures.dart';
 import 'modules/integrations_fixtures.dart';
 import 'modules/laboratory_fixtures.dart';
+import 'modules/patient_portal_fixtures.dart';
 import 'modules/patients_fixtures.dart';
 import 'modules/pharmacy_fixtures.dart';
 import 'modules/radiology_fixtures.dart';
@@ -72,6 +73,13 @@ abstract final class World {
     installStaffFixtures(api);
     installSettingsFixtures(api);
     installIntegrationsFixtures(api);
+
+    // Last, and it takes nothing off anybody: the portal's three routes are
+    // its own. It deliberately does **not** re-register `/api/appointments` —
+    // `installPatientsFixtures` already serves the `patientId`-aware version,
+    // and the portal asking for one patient's rows is the same request the
+    // hub's Visits tab makes.
+    installPatientPortalFixtures(api);
   }
 
   /// The refresh token every session in this world holds.

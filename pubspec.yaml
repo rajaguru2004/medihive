@@ -65,7 +65,15 @@ dependencies:
   # The runtime grant the three above need, and the only permission_handler
   # call site in the app is `data/services/media_permissions.dart` — so the
   # sentence a patient reads when they say no is written once.
-  permission_handler: ^13.0.2
+  #
+  # Held below 13. `permission_handler_android` 14.1.0 ships a
+  # `build.gradle.kts` whose `plugins {}` block declares only
+  # `com.android.library`, and then calls a `kotlin { compilerOptions { … } }`
+  # extension that exists only where the Kotlin plugin has been applied. The
+  # Android build fails to configure with "Unresolved reference: jvmTarget"
+  # before a line of this app is compiled. Nothing here can fix a build script
+  # inside somebody else's package, so the constraint is the fix.
+  permission_handler: ^12.0.0
 
 dev_dependencies:
   flutter_test:
