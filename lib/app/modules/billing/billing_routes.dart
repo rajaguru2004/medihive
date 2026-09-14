@@ -58,7 +58,12 @@ abstract final class BillingPages {
   static List<GetPage<dynamic>> get pages => [
         GetPage(
           name: BillingRoutes.list,
-          page: () => const BillingView(),
+          // Pushed rather than embedded: this copy draws its own header.
+          // Without the flag the screen renders with no `Scaffold` above
+          // it — and a `Text` with no `Material` ancestor is drawn by
+          // Flutter with a yellow underline through it, on every label on
+          // the screen.
+          page: () => const BillingView(embedded: false),
           binding: BillingBinding(),
           middlewares: _gate,
           transition: _push,

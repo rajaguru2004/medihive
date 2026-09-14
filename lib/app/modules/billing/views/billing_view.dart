@@ -368,9 +368,12 @@ class _Stats extends StatelessWidget {
                 color: AppColors.accent,
               ),
               Figure(
-                label: 'In the catalogue',
+                label: 'Catalogue',
                 value: '${stats.totalServices}',
-                caption: 'Chargeable services',
+                // Two words: the tile is half the card wide and a caption
+                // that runs out of room is cut mid-word, which reads as a
+                // rendering fault rather than as a long sentence.
+                caption: 'Priced services',
                 icon: Icons.sell_outlined,
               ),
             ],

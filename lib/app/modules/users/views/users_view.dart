@@ -161,7 +161,10 @@ class _Controls extends StatelessWidget {
         Expanded(
           child: ListControls(
             searchKey: StaffKeys.search,
-            searchHint: 'Name, email, employee id or role',
+            // Short enough to read. The field shares its row with three
+            // controls, so a hint listing four things is cut after the
+            // second — and a truncated hint is a hint that teaches nothing.
+            searchHint: 'Name or email',
             onSearch: controller.search,
             // Absent rather than empty when there is nothing to filter by:
             // `GET /api/roles` is gated on `ROLE_READ`, which a user

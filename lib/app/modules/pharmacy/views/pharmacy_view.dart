@@ -408,10 +408,11 @@ class PrescriptionRow extends StatelessWidget {
     return PersonRow(
       name: prescription.patient.displayName,
       subtitle: items.isEmpty ? 'No drugs on this prescription' : items,
-      detail: [
-        if (prescription.patient.mrn.isNotEmpty) 'MRN ${prescription.patient.mrn}',
-        SettingsService.to.date(prescription.prescriptionDate),
-      ].join(' · '),
+      // The MRN alone. Every script in this queue was written today, so the
+      // date earns none of the room it was taking from the patient's name.
+      detail: prescription.patient.mrn.isEmpty
+          ? null
+          : 'MRN ${prescription.patient.mrn}',
       onTap: onTap,
       trailing: StatusPill(
         status: prescription.status,

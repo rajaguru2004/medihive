@@ -469,6 +469,7 @@ class BentoRow extends StatelessWidget {
     this.onTap,
     this.onLongPress,
     this.showChevron = true,
+    this.titleMaxLines = 1,
     this.subtitleMaxLines = 1,
     this.padding = const EdgeInsets.symmetric(
       horizontal: BentoSpace.listPad,
@@ -485,6 +486,13 @@ class BentoRow extends StatelessWidget {
   /// is harder to scan. Raised where the subtitle is genuinely the content —
   /// a library row, whose columns are the whole point and which otherwise
   /// clips in the middle of a word.
+  /// How many lines the title may take before it is cut.
+  ///
+  /// One by default, which is right for a person's name. Two for a row whose
+  /// title is equipment: "Sysmex XN-1000 (Haematology)" cut to "Sysmex XN-10…"
+  /// is a row that cannot be told from the analyser beside it.
+  final int titleMaxLines;
+
   final int subtitleMaxLines;
   final IconData? icon;
   final Color? iconColor;
@@ -530,7 +538,7 @@ class BentoRow extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  maxLines: 1,
+                  maxLines: titleMaxLines,
                   overflow: TextOverflow.ellipsis,
                   style: isDark
                       ? AppTextStyles.darkCallout(weight: FontWeight.w600)

@@ -43,8 +43,14 @@ class DeviceRow extends StatelessWidget {
       iconColor: AppColors.acuityRoutine,
       onTap: onTap,
       showChevron: onTap != null,
+      // Two lines for the name and two for the facts. An analyser's name is
+      // its model number — "Sysmex XN-1000 (Haematology)" cut to "Sysmex
+      // XN-10…" is a row that cannot be told from the one below it, and this
+      // is a screen whose whole job is telling one machine from another.
+      titleMaxLines: 2,
+      subtitleMaxLines: 2,
       trailing: SizedBox(
-        width: 128,
+        width: 108,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           mainAxisSize: MainAxisSize.min,

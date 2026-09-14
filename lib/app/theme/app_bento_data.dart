@@ -626,8 +626,16 @@ class PersonRow extends StatelessWidget {
                   ),
                   if (detail != null && detail!.trim().isNotEmpty) ...[
                     const SizedBox(width: 10),
+                    // Less room when there is also a status pill to the right
+                    // of it. Forty per cent for the detail plus whatever the
+                    // pill needs left a dispensing queue reading "Ifeo… /
+                    // Amox…" beside "MRN 10421 · 12/03/20…" — the two things
+                    // that identify the script cut, and the two that do not
+                    // whole. The name is what this row is for.
                     ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: row.maxWidth * 0.4),
+                      constraints: BoxConstraints(
+                        maxWidth: row.maxWidth * (trailing == null ? 0.4 : 0.24),
+                      ),
                       child: Text(
                         detail!,
                         maxLines: 1,

@@ -6,6 +6,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:medihive/app/routes/app_pages.dart';
 
 import '../../fixtures/world_roles.dart';
+import '../../robots/route_robot.dart';
 import '../../support/app_harness.dart';
 import '../../support/pump.dart';
 
@@ -79,6 +80,8 @@ void registerRouteFlows() {
           isNull,
           reason: '$name threw while building',
         );
+
+        RouteRobot(harness).assertOnMaterial(name);
 
         await harness.tester.pumpUntilViewportStable();
       });

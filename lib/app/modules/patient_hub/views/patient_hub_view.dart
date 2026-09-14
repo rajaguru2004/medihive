@@ -12,7 +12,12 @@ import '../../../data/services/settings_service.dart';
 import '../../../data/utils/formatters.dart';
 import '../../../routes/app_pages.dart';
 import '../../../theme/theme.dart';
+import '../../appointments/appointment_routes.dart';
+import '../../billing/billing_routes.dart';
+import '../../consultations/consultation_routes.dart';
+import '../../laboratory/laboratory_routes.dart';
 import '../../patients/patient_routes.dart';
+import '../../radiology/radiology_routes.dart';
 import '../controllers/patient_hub_controller.dart';
 
 part 'patient_hub_tabs.dart';
@@ -255,10 +260,10 @@ class _QuickActions extends StatelessWidget {
     // one of them starts pre-filling is a change in that module alone.
     final arguments = {'patientId': patient.id, 'patient': patient};
 
-    // The four below `admit` have no create route in this build. Rather than
-    // push a name the table does not carry, each opens the module that owns
-    // the job — a real screen that says where the work happens today. When the
-    // create screens land, each of these is one constant.
+    // Every one of these opens the screen that does the job, with the patient
+    // already chosen. Labels are short enough to sit on a tile without being
+    // cut: "Book appointme…" is a tile that reads as broken, and a truncated
+    // word is the one thing a label may never be.
     final actions = <_HubAction>[
       if (access.can(Modules.queue, AccessVerb.create))
         const _HubAction(
@@ -270,44 +275,44 @@ class _QuickActions extends StatelessWidget {
       if (access.can(Modules.appointments, AccessVerb.create))
         const _HubAction(
           name: 'book',
-          label: 'Book appointment',
+          label: 'Book visit',
           icon: Icons.event_outlined,
-          route: Routes.APPOINTMENT_CREATE,
+          route: AppointmentRoutes.form,
         ),
       if (access.can(Modules.inpatient, AccessVerb.create))
         const _HubAction(
           name: 'admit',
-          label: 'Admit patient',
+          label: 'Admit',
           icon: Icons.local_hotel_outlined,
           route: Routes.INPATIENT_ADMIT,
         ),
       if (access.can(Modules.consultations, AccessVerb.create))
         const _HubAction(
           name: 'consult',
-          label: 'New consultation',
+          label: 'Consultation',
           icon: Icons.description_outlined,
-          route: Routes.CONSULTATIONS,
+          route: ConsultationRoutes.form,
         ),
       if (access.can(Modules.laboratory, AccessVerb.create))
         const _HubAction(
           name: 'lab',
           label: 'Order lab',
           icon: Icons.science_outlined,
-          route: Routes.LABORATORY,
+          route: LabRoutes.orderNew,
         ),
       if (access.can(Modules.radiology, AccessVerb.create))
         const _HubAction(
           name: 'imaging',
           label: 'Order imaging',
           icon: Icons.monitor_heart_outlined,
-          route: Routes.RADIOLOGY,
+          route: RadiologyRoutes.orderNew,
         ),
       if (access.can(Modules.billing, AccessVerb.create))
         const _HubAction(
           name: 'invoice',
           label: 'New invoice',
           icon: Icons.receipt_long_outlined,
-          route: Routes.BILLING,
+          route: BillingRoutes.invoiceNew,
         ),
     ];
 

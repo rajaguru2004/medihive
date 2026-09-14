@@ -98,7 +98,8 @@ abstract final class ClinicalWorld {
 
 void _appointments(FakeApi api) {
   final bookings = <String, Map<String, Object?>>{
-    for (final row in _appointmentRows) row['id']! as String: {...row},
+    for (final row in [..._appointmentRows, ..._sharedWorldRows])
+      row['id']! as String: {...row},
   };
 
   api.on('GET', '/api/appointments/:id', (request) {
@@ -173,6 +174,51 @@ void _appointments(FakeApi api) {
 }
 
 /// One booking per status, through one clinic morning.
+/// The three bookings the shared world puts on the clinic board.
+///
+/// They are not this file's own — `world.dart` registers the list and the
+/// dashboard's "upcoming" block from them — but every one of them is a row
+/// somebody taps, and `GET /api/appointments/:id` lives here. Without them a
+/// tap on the board answered 404 and the clinic's own detail screen said the
+/// booking was not there, which is a bug nobody would have found from a flow
+/// that opens the bookings this file invented.
+final List<Map<String, Object?>> _sharedWorldRows = [
+  _appointment(
+    id: 'a-1',
+    time: '09:15',
+    status: 'completed',
+    patientId: 'p-1',
+    mrn: '10421',
+    first: 'Ifeoma',
+    last: 'Balogun',
+    complaint: 'Routine review',
+    completedAt: _minutesAgo(90),
+  ),
+  _appointment(
+    id: 'a-2',
+    time: '10:00',
+    status: 'completed',
+    patientId: 'p-6',
+    mrn: '10426',
+    first: 'Yusuf',
+    last: 'Adeyemi',
+    complaint: 'Post-op check',
+    type: 'follow_up',
+    completedAt: _minutesAgo(40),
+  ),
+  _appointment(
+    id: 'a-3',
+    time: '11:30',
+    status: 'checked_in',
+    patientId: 'p-4',
+    mrn: '10424',
+    first: 'Grace',
+    last: 'Mwangi',
+    complaint: 'Persistent cough',
+    checkedInAt: _minutesAgo(15),
+  ),
+];
+
 final List<Map<String, Object?>> _appointmentRows = [
   _appointment(
     id: ClinicalWorld.scheduledAppointment,

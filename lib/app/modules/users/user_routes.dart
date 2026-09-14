@@ -65,7 +65,11 @@ abstract final class StaffPages {
   static List<GetPage<dynamic>> get pages => [
         GetPage(
           name: StaffRoutes.list,
-          page: () => const UsersView(),
+          // Pushed rather than embedded: this copy draws its own header.
+          // Without the flag there is no `Scaffold` above it, and a `Text`
+          // with no `Material` ancestor is drawn with a yellow underline
+          // through it.
+          page: () => const UsersView(embedded: false),
           binding: UsersBinding(),
           middlewares: _staffGate,
           transition: _push,

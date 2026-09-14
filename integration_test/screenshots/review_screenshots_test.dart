@@ -4,7 +4,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:medihive/app/core/keys/app_keys.dart';
+import 'package:medihive/app/modules/appointments/appointment_routes.dart';
+import 'package:medihive/app/modules/billing/billing_routes.dart';
+import 'package:medihive/app/modules/consultations/consultation_routes.dart';
 import 'package:medihive/app/modules/home/controllers/home_controller.dart';
+import 'package:medihive/app/modules/laboratory/laboratory_routes.dart';
+import 'package:medihive/app/modules/patients/patient_routes.dart';
+import 'package:medihive/app/modules/pharmacy/pharmacy_routes.dart';
+import 'package:medihive/app/modules/radiology/radiology_routes.dart';
+import 'package:medihive/app/modules/users/user_routes.dart';
 import 'package:medihive/app/routes/app_pages.dart';
 import 'package:medihive/app/theme/theme.dart';
 
@@ -100,6 +108,15 @@ void main() {
 
       await tester.pumpUntilFound(find.byKey(HomeKeys.dashboard));
       await shootBoth(tester, harness, '02-today');
+
+      // The shift bands and the charts are below the figures, so the top of
+      // the board is the only part a contact sheet ever sees. A screen that is
+      // never captured is a screen nobody looks at — which is how the More hub
+      // shipped with no top padding.
+      await tester.scrollToKey(ShiftKeys.band('waiting'));
+      await shootBoth(tester, harness, '02b-today-bands');
+      await tester.scrollToKey(ShiftKeys.appointmentChart);
+      await shootBoth(tester, harness, '02c-today-charts');
 
       await harness.showTab(Routes.QUEUE);
       await shootBoth(tester, harness, '03-queue');
@@ -281,11 +298,155 @@ void main() {
       Get.back<void>();
       await tester.pumpUntilRouteSettled();
 
-      open(Routes.PHARMACY);
-      await tester.pumpUntilFound(
-        find.byKey(PlaceholderKeys.screen('pharmacy')),
-      );
-      await shootBoth(tester, harness, '20-placeholder');
+      open(Routes.PATIENTS);
+      await tester.pumpUntilFound(find.byKey(PatientsKeys.screen));
+      await shootBoth(tester, harness, '20-patients');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+    });
+  });
+
+
+  // ── The modules this release added ──────────────────────────────────────
+  //
+  // One test per family rather than one per screen: each boots the app, and a
+  // boot is four seconds. Within a family the screens are pushed and popped in
+  // the order somebody actually walks them, so a contact sheet reads as a
+  // journey rather than as an alphabetical list of surfaces.
+
+  group('records', () {
+    testWidgets('the register and one record', (tester) async {
+      final harness = await AppHarness.bootSignedIn(tester, fonts: true);
+
+      open(PatientRoutes.hub, arguments: {'id': 'p-2'});
+      await tester.pumpUntilFound(find.byKey(PatientHubKeys.screen));
+      await shootBoth(tester, harness, '24-patient-hub');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+
+      open(PatientRoutes.form);
+      await tester.pumpUntilFound(find.byKey(PatientFormKeys.screen));
+      await shootBoth(tester, harness, '25-patient-form');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+    });
+  });
+
+  group('the clinic', () {
+    testWidgets('booking and writing one up', (tester) async {
+      final harness = await AppHarness.bootSignedIn(tester, fonts: true);
+
+      open(AppointmentRoutes.detailFor('a-1'));
+      await tester.pumpUntilFound(find.byKey(AppointmentDetailKeys.screen));
+      await shootBoth(tester, harness, '26-appointment');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+
+      open(AppointmentRoutes.form);
+      await tester.pumpUntilFound(find.byKey(AppointmentFormKeys.screen));
+      await shootBoth(tester, harness, '27-booking');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+
+      open(ConsultationRoutes.form);
+      await tester.pumpUntilFound(find.byKey(ConsultationFormKeys.screen));
+      await shootBoth(tester, harness, '28-consultation-form');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+    });
+  });
+
+  group('diagnostics', () {
+    testWidgets('the bench and the reading room', (tester) async {
+      final harness = await AppHarness.bootSignedIn(tester, fonts: true);
+
+      open(LabRoutes.worklist);
+      await tester.pumpUntilFound(find.byKey(LaboratoryKeys.screen));
+      await shootBoth(tester, harness, '29-laboratory');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+
+      open(LabRoutes.catalog);
+      await tester.pumpUntilFound(find.byKey(LabCatalogKeys.screen));
+      await shootBoth(tester, harness, '30-lab-catalogue');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+
+      open(RadiologyRoutes.worklist);
+      await tester.pumpUntilFound(find.byKey(RadiologyKeys.screen));
+      await shootBoth(tester, harness, '31-radiology');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+    });
+  });
+
+  group('operations', () {
+    testWidgets('the counter and the ledger', (tester) async {
+      final harness = await AppHarness.bootSignedIn(tester, fonts: true);
+
+      open(PharmacyRoutes.hub);
+      await tester.pumpUntilFound(find.byKey(PharmacyKeys.screen));
+      await shootBoth(tester, harness, '32-pharmacy');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+
+      open(BillingRoutes.list);
+      await tester.pumpUntilFound(find.byKey(BillingKeys.screen));
+      await shootBoth(tester, harness, '33-billing');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+
+      open(BillingRoutes.invoice('inv-4'));
+      await tester.pumpUntilFound(find.byKey(InvoiceDetailKeys.screen));
+      await shootBoth(tester, harness, '34-invoice');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+
+      open(BillingRoutes.invoiceNew);
+      await tester.pumpUntilFound(find.byKey(InvoiceFormKeys.screen));
+      await shootBoth(tester, harness, '35-invoice-form');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+    });
+  });
+
+  group('administration', () {
+    testWidgets('staff, roles and the settings hub', (tester) async {
+      final harness = await AppHarness.bootSignedIn(tester, fonts: true);
+
+      open(StaffRoutes.list);
+      await tester.pumpUntilFound(find.byKey(StaffKeys.screen));
+      await shootBoth(tester, harness, '36-staff');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+
+      open(StaffRoutes.form);
+      await tester.pumpUntilFound(find.byKey(UserFormKeys.screen));
+      await shootBoth(tester, harness, '37-user-form');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+
+      open(Routes.SETTINGS);
+      await tester.pumpUntilFound(find.byKey(SettingsKeys.screen));
+      await shootBoth(tester, harness, '38-settings');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+
+      open(Routes.SETTINGS_LOCALE);
+      await tester.pumpUntilFound(find.byKey(SettingsLocaleKeys.screen));
+      await shootBoth(tester, harness, '39-locale');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+
+      open(Routes.SETTINGS_MODULES);
+      await tester.pumpUntilFound(find.byKey(SettingsModulesKeys.screen));
+      await shootBoth(tester, harness, '40-modules');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+
+      open(Routes.INTEGRATIONS);
+      await tester.pumpUntilFound(find.byKey(IntegrationsKeys.screen));
+      await shootBoth(tester, harness, '41-integrations');
       Get.back<void>();
       await tester.pumpUntilRouteSettled();
     });
