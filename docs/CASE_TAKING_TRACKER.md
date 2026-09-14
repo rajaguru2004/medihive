@@ -36,12 +36,12 @@ Legend: ✅ done · 🔄 in progress · ⬜ not started · ⛔ blocked · ⏭ de
 |---|---|---|---|
 | [P0](#p0--environment) | Ollama, gemma3:4b, Python sidecar, API, device | M | ✅ |
 | [P1](#p1--patient-identity-and-self-login) | `Patient`↔`User`, MRN+DOB claim, self-scoping guard | L | ✅ |
-| [P2](#p2--case-taking-domain-and-engine) | Schema, tri-state, question selector, safety rules | XL | 🔄 |
-| [P3](#p3--ai-module-and-sidecar-wiring) | `LlmProvider`, prompts, sidecar client, degradation | L | 🔄 |
-| [P4](#p4--medical-document-intelligence) | Upload, OCR, classify, extract, presigned reads | XL | ⬜ |
+| [P2](#p2--case-taking-domain-and-engine) | Schema, tri-state, question selector, safety rules | XL | 🔄 live tier |
+| [P3](#p3--ai-module-and-sidecar-wiring) | `LlmProvider`, prompts, sidecar client, degradation | L | 🔄 live tier |
+| [P4](#p4--medical-document-intelligence) | Upload, OCR, classify, extract, presigned reads | XL | 🔄 live tier |
 | [P5](#p5--flutter-foundations) | Media seams, conversation kit, permissions, language seam | L | ✅ |
-| [P6](#p6--patient-shell-and-entry) | Patient shell, claim/activate, language, consent | M | ⬜ |
-| [P7](#p7--the-interview) | Adaptive interview by voice, text and touch | XL | ⬜ |
+| [P6](#p6--patient-shell-and-entry) | Patient shell, claim/activate, language, consent | M | ✅ |
+| [P7](#p7--the-interview) | Adaptive interview by voice, text and touch | XL | 🔄 |
 | [P8](#p8--documents-on-the-phone) | Capture, upload, review extraction, correct | L | ⬜ |
 | [P9](#p9--review-submit-handoff) | Verification, submission, doctor handoff | L | ⬜ |
 | [P10](#p10--languages) | Tamil and Hindi — **deliberately last** | M | ⬜ |
@@ -52,12 +52,14 @@ Sizes: S ≤ ½ day · M 1 day · L 2–3 days · XL 4+ days.
 
 | | |
 |---|---|
-| Backend | **523** unit tests green, 30 suites · lint and build clean |
-| Live contract | **39 checks** on `verify-patient-auth.ts` against the real API and DB |
-| Mobile | 395 unit tests · analyze zero · 4 unkeyed (baseline 4) |
+| Backend | **760** unit tests green, 46 suites · lint and build clean |
+| Live contract | **39 checks** on `verify-patient-auth.ts`; case-taking and documents still to come |
+| Mobile | **399** unit tests · analyze zero · 4 unkeyed (baseline 4) |
+| Device | **9 portal flows green on a real vivo I2219, Android 16** — no emulator, no host RAM |
 | Database | 7 new tables applied and verified in `hms_v2_dev` |
 | Models | `gemma3:4b` serving · faster-whisper, Piper and PP-OCRv5 all answering |
-| Commits | 3 on `hms_v2/main`, 1 on `medihive/main` |
+| Routes | case-taking, patient-documents and patient-auth all mounted and guarded |
+| Commits | 6 on `hms_v2/main`, 5 on `medihive/main` |
 
 ---
 
@@ -76,7 +78,7 @@ Nothing downstream can be verified until the models actually answer.
 | 0.7 | TTS — Piper + `en_US-lessac-medium` | ✅ | real WAV round-trip, 16-bit mono 22050 Hz |
 | 0.8 | Backend running against local Postgres | ✅ | startup log confirmed `localhost:5432/hms_v2_dev` before anything destructive ran |
 | 0.9 | Containers — postgres, redis, minio | ✅ | already up |
-| 0.10 | Emulator `Pixel_6_Pro_API_36` booted | ⬜ | deferred while agents run — 2.8 GB free on a 15 GB box |
+| 0.10 | A device for the device tier | ✅ | **a physical vivo I2219 on Android 16 (`10BF3E014J007KU`)**, not an emulator. The user's own phone, and it costs the host no RAM — which matters on a box whose IDE alone holds 3.4 GB. `Pixel_6_Pro_API_36` remains available but is no longer the gate |
 | 0.11 | Tamil/Hindi Piper voices | ⏭ | P10 |
 
 ### Measured on this box, 2026-09-14
@@ -202,13 +204,13 @@ patient-scoped was enforceable.
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 6.1 | `patient_portal/` module tree + route table | ⬜ | per-module style, one `...PatientPages.routes,` line |
-| 6.2 | Role-shaped landing: a PATIENT never sees the staff shell | ⬜ | from `access.modules`, never the role name — RULES §0.1 |
-| 6.3 | Patient dashboard | ⬜ | appointments, records, documents, Start case taking |
-| 6.4 | Claim / activate screens | ⬜ | MRN + DOB → password |
-| 6.5 | Language screen | ⬜ | English only until P10 |
-| 6.6 | Consent screen | ⬜ | what is collected, who reads it, that it is not a diagnosis, that they can stop |
-| 6.7 | Robot + fixtures + flow test | ⬜ | |
+| 6.1 | `patient_portal/` module tree + route table | ✅ | per-module style, one `...PatientPages.routes,` line |
+| 6.2 | Role-shaped landing: a PATIENT never sees the staff shell | ✅ | from `access.modules`, never the role name — RULES §0.1. A deep link to the staff shell lands on the portal instead, and that is a test |
+| 6.3 | Patient dashboard | ✅ | shows this patient's appointments and no others |
+| 6.4 | Claim / activate screens | ✅ | the copy cannot say "that card was not recognised" — claim answers identically either way, so the app genuinely does not know. It says what to do next instead |
+| 6.5 | Language screen | ✅ | English only until P10; the choice is carried on the session from day one |
+| 6.6 | Consent screen | ✅ | what is collected, who reads it, that it is not a diagnosis, that they can stop. Declining leaves the patient on their own screen rather than stranding them |
+| 6.7 | Robot + fixtures + flow test | ✅ | **9 flows green on the physical device** |
 
 ---
 
@@ -303,6 +305,11 @@ patient-scoped was enforceable.
 | 16 | `readFactAt` indexed the fact map directly | Field paths come from model output, so `facts['toString']` returns a truthy Function and reaches a caller as a "fact" with no presence | ✅ `hasOwnProperty` |
 | 17 | Two vocabularies for one concept: the schema said a tapped answer was `touch`, the engine says `choice` | Two spellings is two spellings somebody has to map, and one of them will be missed | ✅ `ANSWER_MODALITIES` is the single source; the schema comment now points at it |
 | 18 | Uncertainty must be tested **before** negation in `derivePresence` | Nearly every English way of saying "I don't know" contains a negation, so the obvious order silently turns every "I'm not sure" into an asserted "no" | ✅ rule order documented as load-bearing and pinned by specs |
+| 19 | **The Android build was broken and nothing caught it.** P5 added four native plugins and no APK was built afterwards; `permission_handler_android` 14.1.0 ships a `build.gradle.kts` declaring only `com.android.library` in `plugins {}` and then calling a `kotlin { compilerOptions { … } }` extension that exists only where the Kotlin plugin was applied | **Every Android build failed to configure** with "Unresolved reference: jvmTarget" before a line of this app compiled. Invisible to `flutter analyze` and to the whole unit tier, which is why it survived a green gate | ✅ `permission_handler` held below 13, where the Android artifact is still Groovy. The defect is inside someone else's package, so the constraint is the fix |
+| 20 | **The machine was OOM-killed** running three agents, an emulator and a Gradle build at once | Lost the session; the work survived only because it was on disk. The IDE alone holds 3.4 GB of the 15 | ✅ device tier moved to a **physical** phone, which costs no host RAM; parallelism capped at two |
+| 21 | The emulator segfaults under `-no-window` on this host | Not worth chasing — a real device was attached the whole time | ⏭ use `10BF3E014J007KU` |
+| 22 | Two `fetch` mocks were typed narrowly for typed reads, then assigned to `global.fetch` | The suites did not fail — they failed to *compile*, which reads as "3 suites failed, 0 tests failed" and is easy to misread as flaky | ✅ typed at the factory, cast only at the assignment |
+| 23 | A spec used `Array.prototype.at(-1)` | The project targets ES2021; `.at` is ES2022, so the suite would not build | ✅ indexed |
 
 ---
 
