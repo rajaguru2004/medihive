@@ -25,7 +25,7 @@ Backend gates: `npm run lint`, `npm run build`, `npm test`, `npm run verify:mobi
 | Phase | Scope | Size | Status |
 |---|---|---|---|
 | [P0](#p0--foundation-and-local-stack) | Foundation, local stack, backend contract, RBAC plumbing | L | 🔄 nearly done — test infra + drafts remain |
-| [P1](#p1--shell-navigation-and-design-contract) | Role-shaped shell, More hub, tablet rail | M | ⬜ |
+| [P1](#p1--shell-navigation-and-design-contract) | Role-shaped shell, More hub, tablet rail | M | 🔄 shell + guard done; rail and screenshots next |
 | [P2](#p2--patients) | Registry, search, form, patient hub | L | ⬜ |
 | [P3](#p3--clinical-parity) | Appointments, consultations, queue/triage/inpatient gating | L | ⬜ |
 | [P4](#p4--diagnostics) | Laboratory, radiology | XL | ⬜ |
@@ -142,9 +142,9 @@ layer stops sending a vocabulary the backend rejects.
 |---|---|---|---|
 | 1.1 | PRODUCT.md rewritten to the current schema, `## Platform adaptive`, every staff role as a user | ⬜ | the record predates the current schema |
 | 1.2 | Shell concept round (decision page) → direction contract in the surface brief | ⬜ | code-led; no image generation on this machine |
-| 1.3 | `ShellLayout.resolve` + table-driven per-tab registration | ⬜ | a nurse must never construct a billing controller |
-| 1.4 | More hub (grouped like the web IA) + account entry | ⬜ | |
-| 1.5 | `no_access` module + `AuthMiddleware(module:, verb:)` route guard | ⬜ | |
+| 1.3 | `ShellLayout.resolve` + table-driven per-tab registration | ✅ | a nurse must never construct a billing controller |
+| 1.4 | More hub (grouped like the web IA) + account entry | ✅ | |
+| 1.5 | `no_access` module + `AuthMiddleware(module:, verb:)` route guard | ✅ | |
 | 1.6 | Global patient search entry in the shell bar | ⬜ | screen lands in P2 |
 | 1.7 | Tablet `ShellRail` at ≥600 dp | ⬜ | |
 | 1.8 | Access flows (super admin, nurse, receptionist, 403-safe write) + `ShellLayout` unit test for all roles | ⬜ | |
