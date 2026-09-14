@@ -25,7 +25,15 @@ abstract final class PatientHubKeys {
 
   static Key tab(String name) => Key('patient_hub_tab_$name');
   static Key body(String name) => Key('patient_hub_body_$name');
+
+  /// Every collection behind this tab was refused: a locked panel, no content.
   static Key noAccess(String name) => Key('patient_hub_no_access_$name');
+
+  /// **Some** of them were — the tab still has content, and says in words
+  /// which part of it is missing. A distinct key, because "this tab is locked"
+  /// and "this tab is short of one module" are different facts and a test that
+  /// could not tell them apart would pass on either.
+  static Key partialAccess(String name) => Key('patient_hub_partial_$name');
   static Key tabError(String name) => Key('patient_hub_error_$name');
   static Key tabEmpty(String name) => Key('patient_hub_empty_$name');
   static Key row(String name, String id) => Key('patient_hub_${name}_$id');

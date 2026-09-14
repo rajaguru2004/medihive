@@ -28,15 +28,13 @@ abstract final class BillingKeys {
   static const Key invoiceList = Key('billing_invoice_list');
 
   /// One invoice row, by id.
-  static Key invoice(String id) => Key('billing_invoice_$id');
-
-  /// The status pill on one invoice row.
   ///
-  /// Keyed separately from the row because the assertion that matters about it
-  /// is its **colour**, not its label: an overdue bill is amber, and a test
-  /// that reads the word "Overdue" would pass just as happily if somebody
-  /// painted it `acuityCritical`.
-  static Key invoiceStatusPill(String id) => Key('billing_invoice_pill_$id');
+  /// A row carries exactly one `StatusPill`, so a flow reaches the pill as the
+  /// row's only descendant of that type. Keyed as the row rather than as the
+  /// pill on purpose: the assertion that matters is the pill's **colour**, and
+  /// a test that read the word "Overdue" off a key would pass just as happily
+  /// if somebody painted it `acuityCritical`.
+  static Key invoice(String id) => Key('billing_invoice_$id');
 
   static const Key invoicesEmpty = Key('billing_invoices_empty');
 

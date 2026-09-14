@@ -38,6 +38,7 @@ export 'placeholders_keys.dart';
 export 'pre_triage_details_keys.dart';
 export 'pre_triage_keys.dart';
 export 'queue_keys.dart';
+export 'roles_keys.dart';
 export 'screening_keys.dart';
 export 'session_lock_keys.dart';
 export 'settings_keys.dart';

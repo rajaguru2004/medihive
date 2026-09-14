@@ -16,6 +16,13 @@ abstract final class PatientsKeys {
   /// Absent, not disabled, for an account without `patients.create`.
   static const registerButton = Key('patients_register_button');
 
+  /// The same action offered from the empty state.
+  ///
+  /// Its own key rather than the control's: an empty register shows both, and
+  /// a test asserting "Register is here" against a key that matches twice
+  /// fails on the one screen where the assertion matters most.
+  static const registerFromEmpty = Key('patients_register_from_empty');
+
   /// Opens the global lookup.
   static const searchButton = Key('patients_search_button');
 

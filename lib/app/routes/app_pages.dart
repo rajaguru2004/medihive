@@ -47,6 +47,8 @@ import '../modules/pre_triage_details/bindings/pre_triage_details_binding.dart';
 import '../modules/pre_triage_details/views/pre_triage_details_view.dart';
 import '../modules/queue/bindings/queue_binding.dart';
 import '../modules/queue/views/queue_view.dart';
+import '../modules/roles/bindings/roles_binding.dart';
+import '../modules/roles/views/roles_view.dart';
 import '../modules/settings/bindings/settings_binding.dart';
 import '../modules/settings/views/appearance_settings_view.dart';
 import '../modules/settings/views/clinical_settings_view.dart';
@@ -143,6 +145,14 @@ class AppPages {
           verb: AccessVerb.update,
         ),
       ],
+      transition: _push,
+    ),
+
+    GetPage(
+      name: _Paths.SETTINGS_ROLES,
+      page: () => const RolesView(),
+      binding: RolesBinding(),
+      middlewares: _gate(Modules.roles, 'Roles and access'),
       transition: _push,
     ),
 
