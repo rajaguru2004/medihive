@@ -7,6 +7,7 @@ import '../../core/live_obx.dart';
 import '../../routes/app_pages.dart';
 import 'access_service.dart';
 import 'auth_service.dart';
+import 'session_lock_service.dart';
 import 'settings_service.dart';
 
 /// Why a session ended. Surfaced on the sign-in screen so the user is told
@@ -114,6 +115,9 @@ class SessionManager extends GetxService {
     // access map deciding which tabs they see being the half that matters.
     if (Get.isRegistered<AccessService>()) await AccessService.to.clear();
     if (Get.isRegistered<SettingsService>()) SettingsService.to.clear();
+    // Dropped rather than unlocked: the next screen is the sign-in form, and a
+    // lock over that traps whoever picks the device up next.
+    if (Get.isRegistered<SessionLockService>()) SessionLockService.to.reset();
 
     // Not awaited: the future completes when the *next* route is popped,
     // which for a sign-in screen is never. Awaiting it hangs every caller of

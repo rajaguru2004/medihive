@@ -4,11 +4,13 @@ import 'package:get/get.dart';
 
 import 'app/bindings/initial_binding.dart';
 import 'app/core/app_log.dart';
+import 'app/core/session_lock_scope.dart';
 import 'app/data/network/dio_client.dart';
 import 'app/data/network/endpoints.dart';
 import 'app/data/services/access_service.dart';
 import 'app/data/services/auth_service.dart';
 import 'app/data/services/data_bus.dart';
+import 'app/data/services/session_lock_service.dart';
 import 'app/data/services/session_manager.dart';
 import 'app/data/services/settings_service.dart';
 import 'app/routes/app_pages.dart';
@@ -49,6 +51,10 @@ Future<void> main() async {
   Get.put(SessionManager());
   Get.put(SettingsService());
   final accessService = Get.put(AccessService());
+
+  // After SettingsService, which holds the idle threshold it reads, and after
+  // AuthService, which it asks whether anybody is signed in.
+  Get.put(SessionLockService());
 
   // The services every module reaches for with `Get.find`. Registered here
   // rather than through `initialBinding:`, which runs after the first route is
@@ -128,7 +134,12 @@ class MediHiveApp extends StatelessWidget {
               maxScaleFactor: 1.3,
             ),
           ),
-          child: child ?? const SizedBox.shrink(),
+          // The lock sits inside the clamped MediaQuery, so it obeys the same
+          // text-scale ceiling as everything else — and outside the navigator,
+          // so it survives a route change rather than being popped by one.
+          child: SessionLockScope(
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
     );
