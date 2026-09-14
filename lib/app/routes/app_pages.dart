@@ -47,6 +47,10 @@ import '../modules/pre_triage_details/bindings/pre_triage_details_binding.dart';
 import '../modules/pre_triage_details/views/pre_triage_details_view.dart';
 import '../modules/queue/bindings/queue_binding.dart';
 import '../modules/queue/views/queue_view.dart';
+import '../modules/settings/bindings/settings_binding.dart';
+import '../modules/settings/views/appearance_settings_view.dart';
+import '../modules/settings/views/clinical_settings_view.dart';
+import '../modules/settings/views/settings_hub_view.dart';
 import '../modules/splash/bindings/splash_binding.dart';
 import '../modules/splash/views/splash_view.dart';
 import 'middlewares/auth_middleware.dart';
@@ -102,6 +106,44 @@ class AppPages {
       page: () => const LoginView(),
       binding: LoginBinding(),
       middlewares: [GuestMiddleware()],
+    ),
+
+    // ── Settings ──────────────────────────────────────────────────────────
+    GetPage(
+      name: _Paths.SETTINGS,
+      page: () => const SettingsHubView(),
+      binding: SettingsHubBinding(),
+      middlewares: _gate(Modules.settings, 'Settings'),
+      transition: _push,
+    ),
+    GetPage(
+      name: _Paths.SETTINGS_APPEARANCE,
+      page: () => const AppearanceSettingsView(),
+      binding: AppearanceSettingsBinding(),
+      // Changing the site's theme is a write, so the guard asks for one. A
+      // read-only settings account can open the hub and see what is set; it
+      // cannot open the screens that change it.
+      middlewares: [
+        AuthMiddleware(
+          module: Modules.settings,
+          moduleName: 'Appearance settings',
+          verb: AccessVerb.update,
+        ),
+      ],
+      transition: _push,
+    ),
+    GetPage(
+      name: _Paths.SETTINGS_CLINICAL,
+      page: () => const ClinicalSettingsView(),
+      binding: ClinicalSettingsBinding(),
+      middlewares: [
+        AuthMiddleware(
+          module: Modules.settings,
+          moduleName: 'Clinical settings',
+          verb: AccessVerb.update,
+        ),
+      ],
+      transition: _push,
     ),
 
     // ── Shell ─────────────────────────────────────────────────────────────

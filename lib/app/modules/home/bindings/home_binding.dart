@@ -18,6 +18,8 @@ import '../../pre_triage/controllers/pre_triage_controller.dart';
 import '../../pre_triage/views/pre_triage_view.dart';
 import '../../queue/controllers/queue_controller.dart';
 import '../../queue/views/queue_view.dart';
+import '../../settings/controllers/settings_hub_controller.dart';
+import '../../settings/views/settings_hub_view.dart';
 import '../controllers/home_controller.dart';
 
 /// Registers the shell and the tabs this account actually gets.
@@ -54,6 +56,25 @@ class HomeBinding extends Bindings {
       permanent: true,
     );
   }
+
+  /// The settings hub's rows.
+  ///
+  /// Built here as well as in `SettingsHubBinding` because the hub is both a
+  /// pushed route and — for an administrator, who gets it on the bar — a tab
+  /// the shell builds directly, where no route binding runs.
+  static List<SettingsEntry> _settingsEntries() =>
+      SettingsHubController.allEntries(
+        Routes.SETTINGS,
+        profile: Routes.SETTINGS_PROFILE,
+        locale: Routes.SETTINGS_LOCALE,
+        appearance: Routes.SETTINGS_APPEARANCE,
+        clinical: Routes.SETTINGS_CLINICAL,
+        modules: Routes.SETTINGS_MODULES,
+        departments: Routes.SETTINGS_DEPARTMENTS,
+        staff: Routes.USERS_STAFF,
+        roles: Routes.SETTINGS_ROLES,
+        integrations: Routes.INTEGRATIONS,
+      );
 
   /// Every destination the app has, in the order the More hub reads them.
   ///
@@ -270,6 +291,24 @@ class HomeBinding extends Bindings {
             message: 'Accounts and roles are managed in the web console for '
                 'now.',
           ),
+        ),
+        ShellDestination(
+          route: Routes.SETTINGS,
+          label: 'Settings',
+          title: 'Settings',
+          icon: Icons.settings_outlined,
+          activeIcon: Icons.settings_rounded,
+          group: ShellGroup.administration,
+          module: Modules.settings,
+          rank: 12,
+          body: SettingsHubView.new,
+          register: () {
+            Get.put<SettingsHubController>(
+              SettingsHubController()..entries = _settingsEntries(),
+              permanent: true,
+            );
+            SessionManager.to.registerScoped<SettingsHubController>();
+          },
         ),
         ShellDestination(
           route: Routes.INTEGRATIONS,

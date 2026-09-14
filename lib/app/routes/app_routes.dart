@@ -50,6 +50,16 @@ abstract class Routes {
   static const MORE = _Paths.MORE;
   static const NO_ACCESS = _Paths.NO_ACCESS;
 
+  // ── Settings ──────────────────────────────────────────────────────────────
+  static const SETTINGS = _Paths.SETTINGS;
+  static const SETTINGS_PROFILE = _Paths.SETTINGS_PROFILE;
+  static const SETTINGS_LOCALE = _Paths.SETTINGS_LOCALE;
+  static const SETTINGS_APPEARANCE = _Paths.SETTINGS_APPEARANCE;
+  static const SETTINGS_CLINICAL = _Paths.SETTINGS_CLINICAL;
+  static const SETTINGS_MODULES = _Paths.SETTINGS_MODULES;
+  static const SETTINGS_DEPARTMENTS = _Paths.SETTINGS_DEPARTMENTS;
+  static const SETTINGS_ROLES = _Paths.SETTINGS_ROLES;
+
   // ── Routed, not yet built ─────────────────────────────────────────────────
   static const PATIENTS = _Paths.PATIENTS;
   static const PHARMACY = _Paths.PHARMACY;
@@ -93,6 +103,15 @@ abstract class _Paths {
 
   /// The hub holding every destination that did not fit on the bar.
   static const MORE = '/more';
+
+  static const SETTINGS = '/settings';
+  static const SETTINGS_PROFILE = '/settings/profile';
+  static const SETTINGS_LOCALE = '/settings/locale';
+  static const SETTINGS_APPEARANCE = '/settings/appearance';
+  static const SETTINGS_CLINICAL = '/settings/clinical';
+  static const SETTINGS_MODULES = '/settings/modules';
+  static const SETTINGS_DEPARTMENTS = '/settings/departments';
+  static const SETTINGS_ROLES = '/settings/roles';
 
   /// Where a route guard sends somebody who asked for a module they do
   /// not have. Reachable only by deep link or a stale shortcut.
