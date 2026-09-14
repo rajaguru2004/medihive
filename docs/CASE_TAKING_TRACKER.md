@@ -80,7 +80,7 @@ Nothing downstream can be verified until the models actually answer.
 | 0.8 | Backend running against local Postgres | ✅ | startup log confirmed `localhost:5432/hms_v2_dev` before anything destructive ran |
 | 0.9 | Containers — postgres, redis, minio | ✅ | already up |
 | 0.10 | A device for the device tier | ✅ | **a physical vivo I2219 on Android 16 (`10BF3E014J007KU`)**, not an emulator. The user's own phone, and it costs the host no RAM — which matters on a box whose IDE alone holds 3.4 GB. `Pixel_6_Pro_API_36` remains available but is no longer the gate |
-| 0.11 | Tamil/Hindi Piper voices | ⏭ | P10 |
+| 0.11 | Tamil/Hindi Piper voices | 🔄 | Hindi downloaded and round-tripped. **Tamil does not exist in Piper** — see ledger 31, it is a decision rather than a download |
 
 ### Measured on this box, 2026-09-14
 
@@ -265,8 +265,10 @@ patient-scoped was enforceable.
 | 10.1 | `patient_translations.dart`, `PatientText` becomes a lookup | ⬜ | no call-site changes |
 | 10.2 | `translations:` / `locale:` / `fallbackLocale:` on `GetMaterialApp` | ⬜ | staff screens untouched |
 | 10.3 | Tamil and Hindi unlocked | ⬜ | |
-| 10.4 | Tamil/Hindi STT + TTS benchmarked before voice is promised | ⬜ | text and touch must stay sufficient |
-| 10.5 | Store the original utterance **and** its English rendering | ⬜ | so doctor and auditor see the same evidence |
+| 10.4 | Hindi voice benchmarked | ✅ | `hi_IN-pratham-medium` downloaded and round-tripped. TTS clean; Whisper read it back at **0.76** against English's 0.84, and turned the medical word *तकलीफ* into *तत्लीप* — usable, measurably weaker, and a reason to show the transcript for confirmation rather than act on it |
+| 10.5 | **Tamil TTS — Piper cannot speak Tamil at all** | ⛔ | The voice repository has `hi`, `ml`, `te`, `mr`, `bn`, `ur` and **no `ta`**. Tamil is the spec's *first* priority language (§5). Whisper still understands Tamil, so a Tamil patient can be *heard*; they cannot be *spoken to* by Piper. See the decision below |
+| 10.6 | Choose the Tamil path | ⬜ | §8 of the spec already anticipated this — "IndicF5 / other Indic-capable TTS after benchmarking". Either add a second engine for Tamil, or ship Tamil as read-on-screen with voice input only. **Not a decision to make silently**: the difference is whether a Tamil-speaking patient who cannot read is served at all |
+| 10.7 | Store the original utterance **and** its English rendering | ⬜ | so doctor and auditor see the same evidence |
 
 ---
 
@@ -319,6 +321,8 @@ patient-scoped was enforceable.
 | 28 | A PDF of a page is not detected as a text-duplicate of its PNG — 0.52 against a measured 0.88 threshold | The sidecar renders PDFs at a different DPI and PP-OCR collapses word spacing (`Tab.METFORMIN500mg`), changing the content signature wholesale. Outside what §21's second signal claims, which is the re-*photographed* page | ⏭ left alone rather than loosening a threshold `duplicates.ts` argues at length was measured. Matters if PDF re-uploads are common in the field |
 | 29 | **A 65-point overflow that only appears on the red-flag screen.** Panel heights were budgeted from `MediaQuery.sizeOf(context).height` | That counts height the app bar and safe areas have already taken. It shows only when all three pinned bands are up at once — which is precisely the screen a deteriorating patient sees | ✅ budgeted from a `LayoutBuilder`'s own `maxHeight`, both capped bands holding their own scroll |
 | 30 | The phone auto-locked with a PIN mid-run, then was unplugged | `MainActivity` pauses, no frames are produced, and the harness sits at `+0` until it times out — it reads as a hang, not a lock. `wm dismiss-keyguard`, swipes and `cmd statusbar collapse` all fail against a secure credential | ⏭ finished on `emulator-5554`; screen timeout raised to 30 min for next time |
+| 31 | **Piper has no Tamil voice.** The repository ships `hi`, `ml`, `te`, `mr`, `bn` and `ur` — there is no `ta` at all | Tamil is the spec's **first** priority language (§5). Whisper understands Tamil, so a Tamil patient can be heard; Piper cannot speak to them. A patient who cannot read is the one this affects | ⛔ P10.6 — either a second TTS engine for Tamil (§8 already names IndicF5) or Tamil ships read-on-screen with voice input only. Not a decision to make quietly |
+| 32 | Hindi round-trips, but weaker than English | TTS is clean; Whisper returns 0.76 against English's 0.84, and turned *तकलीफ* (trouble) into *तत्लीप* — a medical word, in the question that opens every interview | ✅ measured, not assumed. Argues for showing the transcript back for confirmation rather than acting on it |
 
 ---
 
