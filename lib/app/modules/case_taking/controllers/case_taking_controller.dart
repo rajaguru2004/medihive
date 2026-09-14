@@ -115,6 +115,38 @@ class CaseTakingController extends GetxController with LoadStateMixin {
 
   final RxBool rxRedFlagRaised = false.obs;
 
+  /// Whether the notices band has anything to draw.
+  ///
+  /// The view needs this as well as the band itself: an empty band still holds
+  /// the height cap its parent gave it, and on the first question that cap is
+  /// space nobody can use while the question below it is squeezed into a
+  /// scroll. One getter rather than the same three-way condition written twice,
+  /// because the copy that drifts is the one that leaves a blank half-screen.
+  bool get hasNotices =>
+      rxRedFlagRaised.value || rxFromSnapshot.value || rxLoadError.value != null;
+
+  /// How much of the column the question and its answers may take.
+  ///
+  /// Three cases, and each of the numbers was paid for:
+  ///
+  /// * **A notice is up.** All three bands are on screen, so the panel takes
+  ///   the smaller share. `0.34 + 0.52` plus the rail is what fits; raising the
+  ///   panel to `0.72` here overflowed the red-flag screen by 91 points.
+  /// * **Nothing said yet.** The transcript is empty and the notices band is
+  ///   collapsed, so their caps are height nobody can use. Handing it to the
+  ///   panel is the difference between the question being readable and being
+  ///   scrolled off the top of its own scroll view — a contact sheet caught it
+  ///   showing the answer tiles sliced through their own glyphs.
+  /// * **A conversation exists.** The panel yields. The transcript is a
+  ///   `ListView.builder`, which builds only what it has room to show: starve
+  ///   it and it renders *nothing*, so the answer the patient just gave is not
+  ///   on screen and not in the tree. That is a silent failure, and it is why
+  ///   this is not simply "as much as the panel wants".
+  double get livePanelHeightFraction {
+    if (hasNotices) return 0.52;
+    return rxTurns.isEmpty ? 0.86 : 0.58;
+  }
+
   // ── Answering out loud ────────────────────────────────────────────────────
 
   final Rx<MicState> rxMic = MicState.idle.obs;

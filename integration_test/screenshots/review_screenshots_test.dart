@@ -6,9 +6,12 @@ import 'package:integration_test/integration_test.dart';
 import 'package:medihive/app/core/keys/app_keys.dart';
 import 'package:medihive/app/modules/appointments/appointment_routes.dart';
 import 'package:medihive/app/modules/billing/billing_routes.dart';
+import 'package:medihive/app/modules/case_review/case_review_routes.dart';
 import 'package:medihive/app/modules/consultations/consultation_routes.dart';
 import 'package:medihive/app/modules/home/controllers/home_controller.dart';
 import 'package:medihive/app/modules/laboratory/laboratory_routes.dart';
+import 'package:medihive/app/modules/patient_documents/patient_documents_routes.dart';
+import 'package:medihive/app/modules/patient_portal/patient_portal_routes.dart';
 import 'package:medihive/app/modules/patients/patient_routes.dart';
 import 'package:medihive/app/modules/pharmacy/pharmacy_routes.dart';
 import 'package:medihive/app/modules/radiology/radiology_routes.dart';
@@ -479,6 +482,78 @@ void main() {
         await tester.pumpUntilRouteSettled();
       }
       await harness.useLightTheme();
+    });
+  });
+
+  // The patient's side of the app.
+  //
+  // These screens are the only ones in MediHive not read by somebody who uses
+  // the app forty times a shift. They are read once, by a person who is
+  // unwell, possibly frightened, and has never seen this software before — so
+  // the contact sheet matters more here than anywhere else in the build. A
+  // ward board that is slightly too dense costs a nurse a second; a consent
+  // screen that is slightly too dense costs a patient their consent.
+  group('patient', () {
+    testWidgets('the way in', (tester) async {
+      final harness = await AppHarness.bootSignedIn(
+        tester,
+        fonts: true,
+        role: WorldRole.patient,
+      );
+
+      await tester.pumpUntilFound(find.byKey(PatientPortalKeys.dashboard));
+      await shootBoth(tester, harness, '30-patient-dashboard');
+
+      open(PatientPortalRoutes.language);
+      await tester.pumpUntilFound(find.byKey(PatientPortalKeys.language));
+      await shootBoth(tester, harness, '31-patient-language');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+
+      open(PatientPortalRoutes.consent);
+      await tester.pumpUntilFound(find.byKey(PatientPortalKeys.consent));
+      await shootBoth(tester, harness, '32-patient-consent');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+    });
+
+    testWidgets('claiming a record', (tester) async {
+      final harness = await AppHarness.bootSignedOut(tester, fonts: true);
+
+      open(PatientPortalRoutes.claim);
+      await tester.pumpUntilFound(find.byKey(PatientPortalKeys.claim));
+      await shootBoth(tester, harness, '33-patient-claim');
+    });
+
+    testWidgets('the interview', (tester) async {
+      final harness = await AppHarness.bootSignedIn(
+        tester,
+        fonts: true,
+        role: WorldRole.patient,
+      );
+
+      open(PatientPortalRoutes.caseTaking);
+      await tester.pumpUntilFound(find.byKey(CaseTakingKeys.screen));
+      await tester.pumpUntilFound(find.byKey(CaseTakingKeys.question));
+      await shootBoth(tester, harness, '34-patient-interview');
+    });
+
+    testWidgets('documents and the case read back', (tester) async {
+      final harness = await AppHarness.bootSignedIn(
+        tester,
+        fonts: true,
+        role: WorldRole.patient,
+      );
+
+      open(PatientDocumentsRoutes.list);
+      await tester.pumpUntilFound(find.byKey(PatientDocumentsKeys.screen));
+      await shootBoth(tester, harness, '35-patient-documents');
+      Get.back<void>();
+      await tester.pumpUntilRouteSettled();
+
+      open(CaseReviewRoutes.review);
+      await tester.pumpUntilFound(find.byKey(CaseReviewKeys.screen));
+      await shootBoth(tester, harness, '36-patient-case-review');
     });
   });
 }

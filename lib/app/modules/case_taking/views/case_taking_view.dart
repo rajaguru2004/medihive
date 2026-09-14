@@ -62,25 +62,42 @@ class CaseTakingView extends GetView<CaseTakingController> {
             child: LayoutBuilder(
               builder: (context, box) {
                 final available = box.maxHeight;
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _Rail(c),
-                    // Two capped bands and one that takes the slack. Both caps
-                    // hold their own scroll, so the content inside gives way
-                    // rather than the column overflowing — and together they
-                    // leave the rail room to grow at the largest text size.
-                    ConstrainedBox(
-                      constraints: BoxConstraints(maxHeight: available * 0.34),
-                      child: _Notices(c),
-                    ),
-                    Expanded(child: _Conversation(c)),
-                    ConstrainedBox(
-                      constraints: BoxConstraints(maxHeight: available * 0.52),
-                      child: _LivePanel(c),
-                    ),
-                  ],
-                );
+                return Obx(() {
+                  // The caps have to add up, and how they add up depends on
+                  // what is actually on screen — see `livePanelHeightFraction`,
+                  // where the three cases and the cost of each are written down.
+                  final panelCap = c.livePanelHeightFraction;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _Rail(c),
+                      // Two capped bands and one that takes the slack. Both
+                      // caps hold their own scroll, so the content inside gives
+                      // way rather than the column overflowing — and together
+                      // they leave the rail room to grow at the largest text
+                      // size.
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: available * 0.34,
+                        ),
+                        child: _Notices(c),
+                      ),
+                      // The live panel is measured first, at whatever height it
+                      // needs up to its cap, and the transcript takes what is
+                      // left. That order is the whole point: the question being
+                      // asked now outranks the history of the ones already
+                      // answered. `Flexible` rather than `Expanded` so an empty
+                      // transcript yields its space instead of holding it open.
+                      Flexible(child: _Conversation(c)),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: available * panelCap,
+                        ),
+                        child: _LivePanel(c),
+                      ),
+                    ],
+                  );
+                });
               },
             ),
           ),
@@ -209,6 +226,13 @@ class _Conversation extends StatelessWidget {
       );
     }
 
+    // Nothing said yet, so take no room. A `ListView` is greedy — it fills
+    // whatever height it is handed, including when it has no children — and on
+    // the first question that turned the top half of the screen into a blank
+    // field while the question and its answers were squeezed into a scroll
+    // below it.
+    if (turns.isEmpty) return const SizedBox.shrink();
+
     return ListView.builder(
       key: CaseTakingKeys.transcript,
       padding: const EdgeInsets.fromLTRB(
@@ -310,8 +334,16 @@ class _LivePanel extends StatelessWidget {
     // question is thirteen tiles plus a keyboard and a microphone, and at the
     // largest system text size that is taller than a phone — so the panel
     // gives way rather than pushing the question off the top.
+    //
+    // Anchored to the top, deliberately. `reverse: true` pins the *bottom* of
+    // the content, which does precisely what the paragraph above says it must
+    // not: the moment the panel is taller than its cap, the question scrolls
+    // out of sight and the patient is answering a question they cannot read.
+    // A contact sheet caught it showing the answer tiles sliced through the
+    // middle of their own glyphs with no question above them. If something has
+    // to fall off the bottom, let it be the microphone — every question is
+    // answerable by touch.
     return SingleChildScrollView(
-      reverse: true,
       padding: const EdgeInsets.fromLTRB(
         BentoSpace.page,
         0,
