@@ -11,7 +11,9 @@ repo.
 | `.agents/RULES.md` | The non-negotiables. **§0 is patient safety** |
 | `DESIGN.md` | The visual world, and why each rule exists |
 | `PRODUCT.md` | Who holds the device and what the backend answers with |
-| `docs/TASK_TRACKER.md` | Where the work got to, and the bugs it found |
+| `docs/CASE_TAKING_TRACKER.md` | The current work: patient case taking, and what it found |
+| `docs/PARITY_TRACKER.md` | The HMS parity port, closed |
+| `docs/TASK_TRACKER.md` | The design-system port, closed |
 
 ## The three rules that outrank everything
 
