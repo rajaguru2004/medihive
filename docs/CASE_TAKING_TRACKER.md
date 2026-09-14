@@ -52,7 +52,7 @@ Sizes: S ≤ ½ day · M 1 day · L 2–3 days · XL 4+ days.
 
 | | |
 |---|---|
-| Backend | 458 unit tests green, 30 suites · lint and build clean |
+| Backend | **523** unit tests green, 30 suites · lint and build clean |
 | Live contract | **39 checks** on `verify-patient-auth.ts` against the real API and DB |
 | Mobile | 395 unit tests · analyze zero · 4 unkeyed (baseline 4) |
 | Database | 7 new tables applied and verified in `hms_v2_dev` |
@@ -113,13 +113,13 @@ patient-scoped was enforceable.
 | 2.2 | Migration `20260914180000_add_case_taking` | ✅ | `Json` not `String`, argued in the file |
 | 2.3 | `CaseFact` append-only with `supersededById` | ✅ | a correction writes a row, never edits one |
 | 2.4 | `CaseFact.presence` NOT NULL, **no default** | ✅ | the database refuses a silent "no" |
-| 2.5 | `engine/tri-state.ts` | 🔄 | six states, collapse structurally impossible |
-| 2.6 | `engine/clinical-state.ts` | 🔄 | immutable; per-section completion |
-| 2.7 | `engine/field-registry.ts` | 🔄 | `diagnosis` is deliberately **not** a field |
-| 2.8 | `engine/question-selector.ts` | 🔄 | pure, synchronous, on the hot path |
-| 2.9 | `engine/safety-rules.ts` + `safety-engine.ts` | 🔄 | rules as versioned data, never prompt text |
-| 2.10 | `engine/case-renderer.ts` | 🔄 | throws rather than print a non-`recorded` value |
-| 2.11 | `derivePresence()` — code owns presence, not the model | 🔄 | see ledger #1 |
+| 2.5 | `engine/tri-state.ts` | ✅ | six states, collapse structurally impossible |
+| 2.6 | `engine/clinical-state.ts` | ✅ | immutable; per-section completion |
+| 2.7 | `engine/field-registry.ts` | ✅ | `diagnosis` is deliberately **not** a field |
+| 2.8 | `engine/question-selector.ts` | ✅ | pure, synchronous, on the hot path |
+| 2.9 | `engine/safety-rules.ts` + `safety-engine.ts` | ✅ | rules as versioned data, never prompt text |
+| 2.10 | `engine/case-renderer.ts` | ✅ | throws rather than print a non-`recorded` value |
+| 2.11 | `derivePresence()` — code owns presence, not the model | ✅ | see ledger #1 |
 | 2.12 | Module, controller, service, repository, DTOs | ⬜ | |
 | 2.13 | Endpoint surface under `/api/case-taking` | ⬜ | |
 | 2.14 | `test/verify-case-taking.ts` | ⬜ | |
@@ -266,7 +266,7 @@ patient-scoped was enforceable.
 | # | Finding | Why it matters | Status |
 |---|---|---|---|
 | 1 | **`gemma3:4b` collapsed the tri-state.** Given "I don't know if I'm allergic to anything" it returned `allergies.known` as `presence: recorded, value: "unknown"` | An "I don't know" encoded as a fact the patient *told* us. This is the exact path to a fabricated "no known allergies" | ✅ `presence` removed from every LLM schema; code derives it |
-| 2 | The model slot-fills eagerly and wrongly — `hpi.radiation: "when I walk"`, which is an aggravating factor | Plausible garbage in a clinical field is worse than an empty one | 🔄 per-field-kind validation in P3.6 |
+| 2 | The model slot-fills eagerly and wrongly — `hpi.radiation: "when I walk"`, which is an aggravating factor | Plausible garbage in a clinical field is worse than an empty one | ✅ `validateFieldValue` rejects it while still accepting "down my left arm when I walk"; a failed value leaves the field `not_assessed` so it is re-asked |
 | 3 | Self-reported confidence was a constant `0.95` on every fact | It is not a signal. Anything gating on it is gating on nothing | ✅ never used for safety; derived from STT + validation instead |
 | 4 | **`gemma3:4b` gets only 38% GPU offload** — 3.8 GB against 4 GB VRAM, because it loads a CLIP encoder. `num_ctx` does not help | ~10–20 tok/s: 8 s for a short extraction, 20 s for a long one, 74 s cold | ✅ architecture already answers it: the selector renders the next question, extraction runs behind |
 | 5 | **`test/one_blur_test.dart` did not exist.** `app_bento.dart` has cited it for months | An absolute stated in DESIGN.md, RULES.md and the source, enforced nowhere | ✅ written; the true count is **zero**, not one — the tab bar gave up its blur and the comment never noticed |
@@ -279,6 +279,10 @@ patient-scoped was enforceable.
 | 12 | `MicState.working` used a `CircularProgressIndicator`, which schedules frames forever and ignores Reduce Motion | Exactly the hang that stalls the e2e harness | ✅ still glyph instead |
 | 13 | `TranscriptDraft` overflowed 24 px at 1.3× text | A `Spacer` between two inflexible children lays both out unbounded | ✅ fixed; **no regression guard yet** — carry into `integration_test/` at P7 |
 | 14 | Ollama's release asset is `.tar.zst`; the documented `.tgz` URL 404s | Cost a truncated download and a confusing `Unexpected EOF in archive` | ✅ |
+| 15 | A ROS field was phrased so that **`yes` was the reassuring answer** — "Are you able to finish a whole sentence without stopping for breath?" | Every safety rule reading it would have fired on well patients. Caught while writing the rule set | ✅ renamed `ros.respiratory.cannot_complete_sentences` and re-phrased so `yes` is the dangerous answer |
+| 16 | `readFactAt` indexed the fact map directly | Field paths come from model output, so `facts['toString']` returns a truthy Function and reaches a caller as a "fact" with no presence | ✅ `hasOwnProperty` |
+| 17 | Two vocabularies for one concept: the schema said a tapped answer was `touch`, the engine says `choice` | Two spellings is two spellings somebody has to map, and one of them will be missed | ✅ `ANSWER_MODALITIES` is the single source; the schema comment now points at it |
+| 18 | Uncertainty must be tested **before** negation in `derivePresence` | Nearly every English way of saying "I don't know" contains a negation, so the obvious order silently turns every "I'm not sure" into an asserted "no" | ✅ rule order documented as load-bearing and pinned by specs |
 
 ---
 
