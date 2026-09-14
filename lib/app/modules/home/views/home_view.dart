@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/keys/app_keys.dart';
+import '../../../routes/app_pages.dart';
 import '../../../theme/theme.dart';
+import '../../more/views/more_view.dart';
 import '../controllers/home_controller.dart';
+import 'account_sheets.dart';
 
 /// The shell: one top bar, one tab bar, and the active tab's body.
 ///
@@ -23,8 +26,12 @@ class HomeView extends GetView<HomeController> {
         () => LazyIndexedStack(
           index: controller.activeIndex,
           children: [
-            for (final destination in controller.destinations)
-              destination.body(),
+            for (final destination in controller.tabs) destination.body(),
+            // The last slot, when anything did not fit on the bar. Built here
+            // rather than pushed so switching to it keeps the other tabs'
+            // scroll positions and costs no refetch, exactly like the four
+            // beside it.
+            if (controller.hasMore) const MoreView(),
           ],
         ),
       ),
@@ -102,7 +109,7 @@ class _ProfileButton extends StatelessWidget {
         message: user?.name.isNotEmpty == true ? user!.name : 'Account',
         child: InkWell(
           key: HomeKeys.profileButton,
-          onTap: () => _openAccountSheet(context, controller),
+          onTap: () => openAccountSheet(context, controller),
           borderRadius: BorderRadius.circular(AppTheme.minTapTarget / 2),
           child: SizedBox(
             width: AppTheme.minTapTarget,
@@ -132,104 +139,6 @@ class _ProfileButton extends StatelessWidget {
       );
     });
   }
-}
-
-Future<void> _openAccountSheet(
-  BuildContext context,
-  HomeController controller,
-) {
-  final user = controller.user;
-  return Get.bottomSheet<void>(
-    SheetShell(
-      title: 'Account',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (user != null)
-            SheetSection(
-              bottom: BentoSpace.section,
-              child: PatientIdentityBand(
-                name: user.name.isEmpty ? user.email : user.name,
-                extra: [
-                  if (user.role.isNotEmpty) user.role,
-                  if (user.department.isNotEmpty) user.department,
-                ].join(' · '),
-              ),
-            ),
-          SheetRow(
-            icon: Icons.brightness_6_outlined,
-            label: 'Appearance',
-            sublabel: _appearanceLabel(),
-            onTap: () {
-              Get.back<void>();
-              _openAppearanceSheet(context);
-            },
-          ),
-          const Hairline(),
-          SheetRow(
-            key: HomeKeys.signOut,
-            icon: Icons.logout_rounded,
-            label: 'Sign out',
-            // Destructive in the sense that matters on a shared ward tablet:
-            // the next person gets a sign-in screen, and anything half-typed
-            // is gone.
-            destructive: true,
-            onTap: () async {
-              Get.back<void>();
-              await controller.signOut();
-            },
-          ),
-        ],
-      ),
-    ),
-    isScrollControlled: true,
-  );
-}
-
-String _appearanceLabel() => switch (AppThemeController.to.themeMode) {
-      ThemeMode.light => 'Light',
-      ThemeMode.dark => 'Dark',
-      ThemeMode.system => 'Match device',
-    };
-
-Future<void> _openAppearanceSheet(BuildContext context) {
-  final themeCtrl = AppThemeController.to;
-  return Get.bottomSheet<void>(
-    SheetShell(
-      title: 'Appearance',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final mode in ThemeMode.values)
-            SheetRow(
-              icon: switch (mode) {
-                ThemeMode.light => Icons.light_mode_outlined,
-                ThemeMode.dark => Icons.dark_mode_outlined,
-                ThemeMode.system => Icons.phone_android_outlined,
-              },
-              label: switch (mode) {
-                ThemeMode.light => 'Light',
-                ThemeMode.dark => 'Dark',
-                ThemeMode.system => 'Match device',
-              },
-              sublabel: mode == ThemeMode.dark
-                  // Worth saying, because on a night shift it is the whole
-                  // reason somebody opened this sheet.
-                  ? 'Easier on the eyes on a night shift'
-                  : null,
-              selected: themeCtrl.themeMode == mode,
-              onTap: () {
-                themeCtrl.setMode(mode);
-                Get.back<void>();
-              },
-            ),
-        ],
-      ),
-    ),
-    isScrollControlled: true,
-  );
 }
 
 /// The tab bar.
@@ -262,14 +171,24 @@ class _ShellTabBar extends StatelessWidget {
             height: 60,
             child: Row(
               children: [
-                for (var i = 0; i < controller.destinations.length; i++)
+                for (var i = 0; i < controller.tabs.length; i++)
                   Expanded(
                     child: _Tab(
-                      key: HomeKeys.tab(controller.destinations[i].route),
-                      destination: controller.destinations[i],
+                      key: HomeKeys.tab(controller.tabs[i].route),
+                      destination: controller.tabs[i],
                       selected: controller.activeIndex == i,
                       isDark: isDark,
                       onTap: () => controller.select(i),
+                    ),
+                  ),
+                if (controller.hasMore)
+                  Expanded(
+                    child: _Tab(
+                      key: HomeKeys.tab(Routes.MORE),
+                      destination: _moreDestination,
+                      selected: controller.activeIndex == controller.tabs.length,
+                      isDark: isDark,
+                      onTap: () => controller.select(controller.tabs.length),
                     ),
                   ),
               ],
@@ -280,6 +199,20 @@ class _ShellTabBar extends StatelessWidget {
     );
   }
 }
+
+/// The last slot's destination.
+///
+/// Not part of the resolved layout: More is a property of the bar, not a module
+/// the access map has an opinion about, and giving it a module key would make
+/// it hideable by a permission nobody grants.
+final _moreDestination = ShellDestination(
+  route: Routes.MORE,
+  label: 'More',
+  group: ShellGroup.overview,
+  icon: Icons.more_horiz_rounded,
+  activeIcon: Icons.more_horiz_rounded,
+  body: () => const MoreView(),
+);
 
 class _Tab extends StatelessWidget {
   const _Tab({

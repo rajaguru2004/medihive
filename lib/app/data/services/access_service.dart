@@ -165,9 +165,14 @@ class AccessService extends GetxService {
 
       final organization = payload['organization'];
       if (organization is Map && Get.isRegistered<SettingsService>()) {
-        SettingsService.to.adopt(
-          SiteSettings.fromOrganization(organization.cast<String, dynamic>()),
-        );
+        final org = organization.cast<String, dynamic>();
+        SettingsService.to.adopt(SiteSettings.fromOrganization(org));
+        // Which modules this site runs at all. Separate from the settings
+        // because it decides whether a screen exists here, not how it behaves.
+        final modules = org['modulesEnabled'];
+        if (modules is Map) {
+          SettingsService.to.adoptModules(modules.cast<String, dynamic>());
+        }
       }
 
       return access is Map;

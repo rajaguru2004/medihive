@@ -23,8 +23,30 @@ class SettingsService extends GetxService {
 
   final _settings = SiteSettings.empty.obs;
 
+  /// Which modules this site has switched on, from the organisation record.
+  ///
+  /// Held beside the settings rather than inside them because it is a
+  /// different kind of thing: settings change how a screen behaves, this
+  /// decides whether the screen exists here at all.
+  final _modulesEnabled = <String, dynamic>{}.obs;
+
   SiteSettings get settings => _settings.value;
   Rx<SiteSettings> get rx => _settings;
+
+  /// A module absent from this map is **on**.
+  ///
+  /// The server's stored default carries `inpatient: false`, and plenty of
+  /// sites have never opened the settings screen — so treating a missing key
+  /// as off would hide the ward board from all of them. Only an explicit
+  /// `false` hides anything.
+  Map<String, dynamic> get modulesEnabled => _modulesEnabled;
+
+  /// Records the organisation's module switches, from `GET /api/auth/me`.
+  void adoptModules(Map<String, dynamic> modules) {
+    _modulesEnabled
+      ..clear()
+      ..addAll(modules);
+  }
 
   DioClient get _client => Get.find<DioClient>();
 
@@ -74,6 +96,10 @@ class SettingsService extends GetxService {
   }
 
   /// Clears back to defaults. Called on sign-out so the next account on a
-  /// shared ward tablet does not inherit the previous site's branding.
-  void clear() => _settings.value = SiteSettings.empty;
+  /// shared ward tablet does not inherit the previous site's branding — or its
+  /// module switches, which decide what the next person's navigation offers.
+  void clear() {
+    _settings.value = SiteSettings.empty;
+    _modulesEnabled.clear();
+  }
 }

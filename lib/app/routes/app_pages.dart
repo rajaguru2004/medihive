@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../data/models/access_map.dart';
 import '../modules/add_to_queue/bindings/add_to_queue_binding.dart';
 import '../modules/add_to_queue/views/add_to_queue_view.dart';
 import '../modules/admit_patient/bindings/admit_patient_binding.dart';
@@ -33,10 +34,12 @@ import '../modules/inpatient_wards/bindings/inpatient_wards_binding.dart';
 import '../modules/inpatient_wards/views/inpatient_wards_view.dart';
 import '../modules/login/bindings/login_binding.dart';
 import '../modules/login/views/login_view.dart';
+import '../modules/more/views/more_view.dart';
 import '../modules/new_screening_step1/bindings/new_screening_step1_binding.dart';
 import '../modules/new_screening_step1/views/new_screening_step1_view.dart';
 import '../modules/new_screening_step2/bindings/new_screening_step2_binding.dart';
 import '../modules/new_screening_step2/views/new_screening_step2_view.dart';
+import '../modules/no_access/views/no_access_view.dart';
 import '../modules/placeholders/views/placeholder_view.dart';
 import '../modules/pre_triage/bindings/pre_triage_binding.dart';
 import '../modules/pre_triage/views/pre_triage_view.dart';
@@ -78,6 +81,15 @@ class AppPages {
 
   static final _auth = [AuthMiddleware()];
 
+  /// A route that also needs a module.
+  ///
+  /// Navigation never offers a destination this account cannot open — the
+  /// shell resolves itself from the access map — so this only catches the ways
+  /// in that bypass navigation: a deep link, a stale shortcut, or a push from
+  /// before an administrator changed what the account may do.
+  static List<GetMiddleware> _gate(String module, String name) =>
+      [AuthMiddleware(module: module, moduleName: name)];
+
   static final routes = <GetPage<dynamic>>[
     // ── Entry ─────────────────────────────────────────────────────────────
     GetPage(
@@ -93,6 +105,21 @@ class AppPages {
     ),
 
     // ── Shell ─────────────────────────────────────────────────────────────
+    GetPage(
+      name: _Paths.MORE,
+      page: () => const MoreView(),
+      middlewares: _auth,
+      transition: _push,
+    ),
+    GetPage(
+      name: _Paths.NO_ACCESS,
+      page: () => const NoAccessView(),
+      // Auth only. Gating the refusal screen behind a permission would be a
+      // loop: the guard sends somebody here precisely because they lack one.
+      middlewares: _auth,
+      transition: _push,
+    ),
+
     GetPage(
       name: _Paths.HOME,
       page: () => const HomeView(),
@@ -112,7 +139,7 @@ class AppPages {
       name: _Paths.QUEUE,
       page: () => const QueueView(embedded: false),
       binding: QueueBinding(),
-      middlewares: _auth,
+      middlewares: _gate(Modules.queue, 'The queue'),
       transition: _push,
     ),
     GetPage(
@@ -128,7 +155,7 @@ class AppPages {
       name: _Paths.APPOINTMENTS,
       page: () => const AppointmentsView(embedded: false),
       binding: AppointmentsBinding(),
-      middlewares: _auth,
+      middlewares: _gate(Modules.appointments, 'The clinic list'),
       transition: _push,
     ),
     GetPage(
@@ -148,7 +175,7 @@ class AppPages {
       name: _Paths.CONSULTATIONS,
       page: () => const ConsultationsView(),
       binding: ConsultationsBinding(),
-      middlewares: _auth,
+      middlewares: _gate(Modules.consultations, 'Consultations'),
       transition: _push,
     ),
 
@@ -157,7 +184,7 @@ class AppPages {
       name: _Paths.PRE_TRIAGE,
       page: () => const PreTriageView(),
       binding: PreTriageBinding(),
-      middlewares: _auth,
+      middlewares: _gate(Modules.preTriage, 'Pre-triage'),
       transition: _push,
     ),
     GetPage(
@@ -194,7 +221,7 @@ class AppPages {
       name: _Paths.INPATIENT,
       page: () => const InpatientView(embedded: false),
       binding: InpatientBinding(),
-      middlewares: _auth,
+      middlewares: _gate(Modules.inpatient, 'The ward board'),
       transition: _push,
     ),
     GetPage(
@@ -270,7 +297,7 @@ class AppPages {
             'Patients registered there are searchable from every picker in '
             'this app.',
       ),
-      middlewares: _auth,
+      middlewares: _gate(Modules.patients, 'The patient register'),
       transition: _push,
     ),
     GetPage(
@@ -282,7 +309,7 @@ class AppPages {
         message: 'Dispensing is not switched on for this site yet. Pending '
             'prescription counts still appear on today’s board.',
       ),
-      middlewares: _auth,
+      middlewares: _gate(Modules.pharmacy, 'Pharmacy'),
       transition: _push,
     ),
     GetPage(
@@ -294,7 +321,7 @@ class AppPages {
         message: 'Lab ordering and results are not switched on for this site '
             'yet. Pending order counts still appear on today’s board.',
       ),
-      middlewares: _auth,
+      middlewares: _gate(Modules.laboratory, 'Laboratory'),
       transition: _push,
     ),
     GetPage(
@@ -305,7 +332,7 @@ class AppPages {
         icon: Icons.monitor_heart_outlined,
         message: 'Imaging requests are not switched on for this site yet.',
       ),
-      middlewares: _auth,
+      middlewares: _gate(Modules.radiology, 'Radiology'),
       transition: _push,
     ),
     GetPage(
@@ -317,7 +344,7 @@ class AppPages {
         message: 'Charges and payments are handled in the admin console for '
             'this site.',
       ),
-      middlewares: _auth,
+      middlewares: _gate(Modules.billing, 'Billing'),
       transition: _push,
     ),
     GetPage(
@@ -329,7 +356,7 @@ class AppPages {
         message: 'Staff accounts, roles and permissions are managed in the '
             'admin console.',
       ),
-      middlewares: _auth,
+      middlewares: _gate(Modules.users, 'Users and staff'),
       transition: _push,
     ),
     GetPage(
@@ -341,7 +368,7 @@ class AppPages {
         message: 'Device and third-party integrations are configured in the '
             'admin console.',
       ),
-      middlewares: _auth,
+      middlewares: _gate(Modules.integrations, 'Integrations'),
       transition: _push,
     ),
   ];

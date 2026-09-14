@@ -131,11 +131,11 @@ List<String> _labels(List<ShellDestination> destinations) =>
 void main() {
   group('the bar always starts with Today and leaves room for More', () {
     for (final role in _seededPermissions.keys) {
-      test('$role', () {
+      test(role, () {
         final layout = _layoutFor(role);
 
         expect(layout.tabs.first.label, 'Today');
-        // More occupies the fourth slot whenever anything is left over, so the
+        // More takes the last slot whenever anything is left over, so the
         // bar itself never holds more than three real destinations.
         expect(layout.tabs.length, lessThanOrEqualTo(ShellLayout.barSlots));
         if (layout.hasMore) {

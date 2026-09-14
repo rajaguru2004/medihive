@@ -46,6 +46,10 @@ abstract class Routes {
   static const INPATIENT_ADMIT = _Paths.INPATIENT_ADMIT;
   static const DISCHARGE_PATIENT = _Paths.DISCHARGE_PATIENT;
 
+  // ── The shell's own ───────────────────────────────────────────────────────
+  static const MORE = _Paths.MORE;
+  static const NO_ACCESS = _Paths.NO_ACCESS;
+
   // ── Routed, not yet built ─────────────────────────────────────────────────
   static const PATIENTS = _Paths.PATIENTS;
   static const PHARMACY = _Paths.PHARMACY;
@@ -86,6 +90,13 @@ abstract class _Paths {
   static const INPATIENT_ADD_BED = '/inpatient/beds/add';
   static const INPATIENT_ADMIT = '/inpatient/admit';
   static const DISCHARGE_PATIENT = '/inpatient/discharge';
+
+  /// The hub holding every destination that did not fit on the bar.
+  static const MORE = '/more';
+
+  /// Where a route guard sends somebody who asked for a module they do
+  /// not have. Reachable only by deep link or a stale shortcut.
+  static const NO_ACCESS = '/no-access';
 
   static const PATIENTS = '/patients';
   static const PHARMACY = '/pharmacy';
