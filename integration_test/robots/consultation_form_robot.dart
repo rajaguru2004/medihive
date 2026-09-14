@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:medihive/app/core/keys/consultation_form_keys.dart';
+import 'package:medihive/app/modules/consultation_form/controllers/consultation_form_controller.dart';
 import 'package:medihive/app/modules/consultations/consultation_routes.dart';
 import 'package:medihive/app/theme/theme.dart';
 
@@ -256,13 +257,15 @@ final class ConsultationFormRobot extends Robot {
   ///
   /// A save refused by a field three tabs away has to *take* the reader there;
   /// marking a field nobody can see is a form that appears to do nothing.
+  /// Read off the controller rather than the segmented control.
+  ///
+  /// `BentoSegmented<Object?>` is not a supertype of
+  /// `BentoSegmented<ConsultationTab>` — Dart function parameters are
+  /// contravariant, so `labelOf` fails the cast at the first call and the
+  /// failure reads as a type error inside the robot rather than as a tab that
+  /// is not open. The controller holds the same fact and holds it exactly.
   bool isOnTab(String label) {
-    final segmented = tester.widgetList<BentoSegmented<Object?>>(
-      find.byWidgetPredicate(
-        (widget) => widget is BentoSegmented<Object?>,
-        description: 'a segmented control',
-      ),
-    );
-    return segmented.any((control) => control.labelOf(control.selected) == label);
+    final current = Get.find<ConsultationFormController>().tab.value;
+    return current.name.toLowerCase() == label.toLowerCase();
   }
 }

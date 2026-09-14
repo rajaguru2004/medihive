@@ -189,11 +189,11 @@ final class SettingsRobot extends Robot {
   ///
   /// Off the render tree rather than out of the controller: a preview that only
   /// updates in a field nobody paints is the same bug wearing a passing test.
-  String moneyExample() => _textOf(SettingsLocaleKeys.moneyExample);
+  Future<String> moneyExample() => _textOf(SettingsLocaleKeys.moneyExample);
 
-  String dateExample() => _textOf(SettingsLocaleKeys.dateExample);
+  Future<String> dateExample() => _textOf(SettingsLocaleKeys.dateExample);
 
-  String timeExample() => _textOf(SettingsLocaleKeys.timeExample);
+  Future<String> timeExample() => _textOf(SettingsLocaleKeys.timeExample);
 
   /// Taps a segment of one of the segmented controls, by the value it selects.
   Future<void> chooseLocaleOption(String control, String value) async {
@@ -267,7 +267,10 @@ final class SettingsRobot extends Robot {
         of: find.byType(ConfirmDialog),
         matching: find.textContaining(namingTab),
       ),
-      findsOneWidget,
+      // `findsWidgets`, not `findsOneWidget`: the dialog names the tab in its
+      // question *and* again in the sentence that says when it goes. Insisting
+      // on one match makes a dialog that is clearer than required a failure.
+      findsWidgets,
       reason: 'the confirm should name the $namingTab tab that is about to go',
     );
     expect(
@@ -434,5 +437,14 @@ final class SettingsRobot extends Robot {
             'grant',
       );
 
-  String _textOf(Key key) => tester.widget<Text>(find.byKey(key)).data ?? '';
+  /// Scrolls to the keyed `Text` and reads it.
+  ///
+  /// The scroll is not politeness: a widget below the fold is not built, and
+  /// `tester.widget` on nothing is `Bad state: No element` — which reads as a
+  /// broken robot rather than as a preview that is simply further down the
+  /// screen than the phone is tall.
+  Future<String> _textOf(Key key) async {
+    await tester.scrollToKey(key);
+    return tester.widget<Text>(find.byKey(key)).data ?? '';
+  }
 }

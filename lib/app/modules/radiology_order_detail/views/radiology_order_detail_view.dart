@@ -166,6 +166,18 @@ class _RadiologyOrderDetailViewState extends State<RadiologyOrderDetailView> {
               ),
             ),
 
+          // ── What can be done next ───────────────────────────────────────
+          //
+          // Above the record rather than under it. Somebody opens an order to
+          // move it along — book it, start it, mark it performed, write the
+          // read — and this used to sit under the exam, the clinical detail,
+          // the timeline, the report and the image strip, which on a phone is
+          // three screens of scrolling to reach the one button they came for.
+          BentoSection(
+            bottom: BentoSpace.header,
+            child: _Actions(controller: _controller),
+          ),
+
           // ── What was asked for ──────────────────────────────────────────
           BentoSection(bottom: BentoSpace.header, child: _ExamCard(order: order)),
 
@@ -193,11 +205,6 @@ class _RadiologyOrderDetailViewState extends State<RadiologyOrderDetailView> {
               child: _Images(images: _controller.images),
             ),
 
-          // ── What can be done next ───────────────────────────────────────
-          BentoSection(
-            bottom: BentoSpace.page,
-            child: _Actions(controller: _controller),
-          ),
         ],
       );
     });

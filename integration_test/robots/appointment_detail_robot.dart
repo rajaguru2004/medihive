@@ -60,15 +60,23 @@ final class AppointmentDetailRobot extends Robot {
         reason: '"$status" is not a step this booking can take from here',
       );
 
-  void seeTimeline() =>
-      expect(find.byKey(AppointmentDetailKeys.timeline), findsOneWidget);
+  // Both scroll first: a booking with a patient band, its facts and its
+  // timeline on it is longer than a phone, and a sliver below the fold is not
+  // built — so an assertion that only looks reports what is there as missing.
+  Future<void> seeTimeline() async {
+    await tester.scrollToKey(AppointmentDetailKeys.timeline);
+    expect(find.byKey(AppointmentDetailKeys.timeline), findsOneWidget);
+  }
 
-  void seeClosedNotice() => expect(
-        find.byKey(AppointmentDetailKeys.closedNotice),
-        findsOneWidget,
-        reason: 'a booking that is finished with says so rather than offering '
-            'buttons that would be refused',
-      );
+  Future<void> seeClosedNotice() async {
+    await tester.scrollToKey(AppointmentDetailKeys.closedNotice);
+    expect(
+      find.byKey(AppointmentDetailKeys.closedNotice),
+      findsOneWidget,
+      reason: 'a booking that is finished with says so rather than offering '
+          'buttons that would be refused',
+    );
+  }
 
   // ── Reschedule ────────────────────────────────────────────────────────────
 

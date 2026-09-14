@@ -197,29 +197,29 @@ void registerSettingsFlows() {
       await settings.assertOnLocale();
 
       // The site as it stands: rupees, grouped in threes, two decimal places.
-      expect(settings.moneyExample(), '₹1,234,567.50');
-      expect(settings.dateExample(), '14/09/2026');
-      expect(settings.timeExample(), '16:40');
+      expect(await settings.moneyExample(), '₹1,234,567.50');
+      expect(await settings.dateExample(), '14/09/2026');
+      expect(await settings.timeExample(), '16:40');
 
       // A site that writes 1.234.567,50. Nothing is saved — the point of the
       // example is that somebody sees what a separator does before committing
       // to it.
       await settings.chooseLocaleOption('decimal', 'comma');
       await settings.chooseLocaleOption('thousand', 'dot');
-      expect(settings.moneyExample(), '₹1.234.567,50');
+      expect(await settings.moneyExample(), '₹1.234.567,50');
 
       await settings.chooseLocaleOption('precision', '0');
-      expect(settings.moneyExample(), '₹1.234.568');
+      expect(await settings.moneyExample(), '₹1.234.568');
 
       await settings.chooseLocaleOption('position', 'after');
-      expect(settings.moneyExample(), '1.234.568₹');
+      expect(await settings.moneyExample(), '1.234.568₹');
 
       // The clock and the calendar, the same way.
       await settings.toggle24Hour();
-      expect(settings.timeExample(), '4:40 PM');
+      expect(await settings.timeExample(), '4:40 PM');
 
       await settings.chooseDateFormat('yyyy-MM-dd');
-      expect(settings.dateExample(), '2026-09-14');
+      expect(await settings.dateExample(), '2026-09-14');
 
       harness.api.requireNoCall('PUT', '/api/settings/organization');
     });
@@ -239,7 +239,7 @@ void registerSettingsFlows() {
       // Picking a currency moves the symbol with it: a site that switches to
       // euros and keeps ₹ prices every invoice in the wrong currency while
       // looking configured.
-      expect(settings.moneyExample().startsWith('€'), isTrue);
+      expect((await settings.moneyExample()).startsWith('€'), isTrue);
 
       await settings.saveLocale();
 

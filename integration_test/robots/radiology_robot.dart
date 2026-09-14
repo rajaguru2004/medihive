@@ -220,8 +220,13 @@ final class RadiologyRobot extends Robot {
         reason: 'the action keyed $key should be absent on this order',
       );
 
-  void seeTimeline() =>
-      expect(find.byKey(RadiologyKeys.orderTimeline), findsOneWidget);
+  /// Scrolls first, because a sliver below the fold is **not built** — so an
+  /// assertion that only looks reports the timeline as missing on any screen
+  /// long enough to need one.
+  Future<void> seeTimeline() async {
+    await tester.scrollToKey(RadiologyKeys.orderTimeline);
+    expect(find.byKey(RadiologyKeys.orderTimeline), findsOneWidget);
+  }
 
   /// Schedules the study for today through the date sheet.
   Future<void> scheduleForToday() async {
@@ -265,14 +270,19 @@ final class RadiologyRobot extends Robot {
     await settle();
   }
 
-  void seeImages() => expect(
-        find.byKey(RadiologyKeys.images),
-        findsOneWidget,
-        reason: 'the study should show the images attached to its report',
-      );
+  Future<void> seeImages() async {
+    await tester.scrollToKey(RadiologyKeys.images);
+    expect(
+      find.byKey(RadiologyKeys.images),
+      findsOneWidget,
+      reason: 'the study should show the images attached to its report',
+    );
+  }
 
-  void seeImage(String url) =>
-      expect(find.byKey(RadiologyKeys.image(url)), findsOneWidget);
+  Future<void> seeImage(String url) async {
+    await tester.scrollToKey(RadiologyKeys.image(url));
+    expect(find.byKey(RadiologyKeys.image(url)), findsOneWidget);
+  }
 
   // ── The read ──────────────────────────────────────────────────────────────
 

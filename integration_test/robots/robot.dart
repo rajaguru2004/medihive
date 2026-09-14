@@ -133,14 +133,23 @@ abstract base class Robot {
     await tester.pumpUntilViewportStable();
     await tester.pumpUntilRouteSettled();
 
-    final rows =
+    // Exact text first, then a row that merely *contains* it. A picker labels
+    // its options the way the screen wants to read them — a drug row says
+    // "Amoxicillin 500mg capsule" — and a test that names the drug is naming
+    // the row correctly even though the strings differ.
+    final exact =
         find.ancestor(of: find.text(label), matching: find.byType(SheetRow));
+    final containing = find.ancestor(
+      of: find.textContaining(label),
+      matching: find.byType(SheetRow),
+    );
+    Finder rows() => exact.evaluate().isNotEmpty ? exact : containing;
 
     // Narrow the sheet to what is being picked, the way a person does. The
     // sheet is capped at 62% of the screen, so anything past the fifth or
     // sixth option is never built — and an unbuilt row is indistinguishable
     // from an option the picker does not carry.
-    if (rows.evaluate().isEmpty &&
+    if (rows().evaluate().isEmpty &&
         find.byKey(kPickerSearchKey).evaluate().isNotEmpty) {
       await tester.enterText(find.byKey(kPickerSearchKey), label);
       FocusManager.instance.primaryFocus?.unfocus();
@@ -150,8 +159,11 @@ abstract base class Robot {
     // Waited on unfiltered, tapped filtered. `.last` does not evaluate to
     // nothing while the sheet is still filling — it throws — so the wait has
     // to be on the finder that can answer "not yet".
-    await tester.pumpUntilFound(rows);
-    await tester.tap(rows.last);
+    await tester.pumpUntil(
+      () => rows().evaluate().isNotEmpty,
+      reason: 'expected a sheet row reading "$label" to appear',
+    );
+    await tester.tap(rows().last);
     await settle();
   }
 

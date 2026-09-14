@@ -74,16 +74,27 @@ final class ConsultationDetailRobot extends Robot {
 
   // ── What the encounter produced ───────────────────────────────────────────
 
-  void seePrescription() =>
-      expect(find.byKey(ConsultationDetailKeys.prescription), findsOneWidget);
+  // Each of these scrolls first. A record with vitals, notes, a diagnosis and
+  // a plan on it is longer than a phone, and a sliver below the fold is **not
+  // built** — so an assertion that only looks reports a script the screen is
+  // carrying as missing.
+  Future<void> seePrescription() async {
+    await tester.scrollToKey(ConsultationDetailKeys.prescription);
+    expect(find.byKey(ConsultationDetailKeys.prescription), findsOneWidget);
+  }
 
-  void seeLabOrders() =>
-      expect(find.byKey(ConsultationDetailKeys.labOrders), findsOneWidget);
+  Future<void> seeLabOrders() async {
+    await tester.scrollToKey(ConsultationDetailKeys.labOrders);
+    expect(find.byKey(ConsultationDetailKeys.labOrders), findsOneWidget);
+  }
 
-  void seeImagingOrders() => expect(
-        find.byKey(ConsultationDetailKeys.radiologyOrders),
-        findsOneWidget,
-      );
+  Future<void> seeImagingOrders() async {
+    await tester.scrollToKey(ConsultationDetailKeys.radiologyOrders);
+    expect(
+      find.byKey(ConsultationDetailKeys.radiologyOrders),
+      findsOneWidget,
+    );
+  }
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
@@ -91,7 +102,7 @@ final class ConsultationDetailRobot extends Robot {
   void seeNoAction(Key key) => expect(find.byKey(key), findsNothing);
 
   /// Every gated control at once, for a role that may only read.
-  void seeNoActionsAtAll() {
+  Future<void> seeNoActionsAtAll() async {
     for (final key in const [
       ConsultationDetailKeys.edit,
       ConsultationDetailKeys.delete,
@@ -105,6 +116,7 @@ final class ConsultationDetailRobot extends Robot {
         reason: '$key must be absent, not disabled, for a read-only account',
       );
     }
+    await tester.scrollToKey(ConsultationDetailKeys.noActions);
     expect(find.byKey(ConsultationDetailKeys.noActions), findsOneWidget);
   }
 

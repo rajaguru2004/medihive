@@ -67,7 +67,7 @@ void registerRadiologyFlows() {
       expect(raised.jsonBody['clinicalIndication'], isNotEmpty);
 
       await imaging.assertOnOrderDetail();
-      imaging.seeTimeline();
+      await imaging.seeTimeline();
 
       // A study nobody has booked cannot be marked performed, and the control
       // is absent rather than disabled.
@@ -251,7 +251,7 @@ void registerRadiologyFlows() {
             'string and not a list',
       );
 
-      imaging.seeImages();
+      await imaging.seeImages();
       await imaging.letToastsExpire();
     });
 

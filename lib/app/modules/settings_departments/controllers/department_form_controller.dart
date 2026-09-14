@@ -150,7 +150,10 @@ class DepartmentFormController extends GetxController {
       organizationId:
           isEdit ? null : AuthService.to.currentUser?.organizationId,
       name: label,
-      code: code.text,
+      // Upper-cased on the way out. The server stores whatever it is sent, so
+      // `physio` beside `PHYSIO` is two departments to anything that groups by
+      // code — which is every report that does.
+      code: code.text.trim().toUpperCase(),
       description: description.text,
       headId: rxHeadId.value,
       isActive: rxActive.value,

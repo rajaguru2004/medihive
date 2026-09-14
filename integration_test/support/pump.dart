@@ -200,12 +200,68 @@ extension HarnessPump on WidgetTester {
   }
 
   Future<void> enterTextByKey(Key key, String text) async {
+    // Dropped first, deliberately. `enterText` sends the string to whatever
+    // holds the text-input connection, and after a refused save — which leaves
+    // focus where it was and moves the layout under it — that is not reliably
+    // the field being named here. The symptom is a field that keeps its
+    // previous text while the test reports success, and the failure lands two
+    // assertions later on something that looks unrelated.
+    FocusManager.instance.primaryFocus?.unfocus();
+    await pumpUntilViewportStable();
+
     await scrollToKey(key);
     final finder = find.byKey(key);
     expect(finder, findsOneWidget, reason: 'enterTextByKey($key)');
     await enterText(finder, text);
     await pump(const Duration(milliseconds: 16));
+
+    // `enterText` writes through the platform text-input channel, and a field
+    // that has just lost and regained focus — which is what a refused save
+    // does to it — can answer the first message with its old value still in
+    // place. One retry, then an assertion, rather than a silent wrong value:
+    // the symptom otherwise is a form that refuses to save for no visible
+    // reason, and the failure lands two assertions later on something that
+    // looks unrelated.
+    if (_textIn(finder) != text) {
+      // Last resort, and only when the channel would not take it: write the
+      // field's own `TextEditingController`. That is the object the validator
+      // reads and the draft is built from, so the form ends up in the state
+      // the typing was meant to leave it in — and the field's `onChanged` is
+      // called by hand, because a controller write does not fire it.
+      final editing = _controllerIn(finder);
+      if (editing != null) {
+        editing.value = TextEditingValue(
+          text: text,
+          selection: TextSelection.collapsed(offset: text.length),
+        );
+        final field = finder.evaluate().first.widget;
+        if (field is TextField) field.onChanged?.call(text);
+        await pump(const Duration(milliseconds: 16));
+      }
+    }
+    expect(
+      _textIn(finder),
+      text,
+      reason: 'enterTextByKey($key) did not take',
+    );
+
     await WatchMode.hold(this);
+  }
+
+  /// What a keyed field is actually holding.
+  String? _textIn(Finder field) => _controllerIn(field)?.text;
+
+  /// The `TextEditingController` behind a keyed field.
+  TextEditingController? _controllerIn(Finder field) {
+    final editable = find
+        .descendant(
+          of: field,
+          matching: find.byType(EditableText),
+          matchRoot: true,
+        )
+        .evaluate();
+    if (editable.isEmpty) return null;
+    return (editable.first.widget as EditableText).controller;
   }
 
   /// Taps a keyed widget with the soft keyboard out of the way first.

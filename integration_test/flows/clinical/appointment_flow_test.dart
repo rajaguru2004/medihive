@@ -104,7 +104,7 @@ void registerAppointmentFlows() {
       await detail.open(ClinicalWorld.scheduledAppointment);
       await detail.assertVisible();
       detail.seeOpenOn(ClinicalWorld.scheduledAppointment);
-      detail.seeTimeline();
+      await detail.seeTimeline();
 
       detail.seeStep('confirmed');
       detail.seeStep('checked_in');
@@ -137,7 +137,7 @@ void registerAppointmentFlows() {
       await detail.open(ClinicalWorld.completedAppointment);
       await detail.assertVisible();
 
-      detail.seeClosedNotice();
+      await detail.seeClosedNotice();
       detail.seeNoStep('completed');
       detail.seeNoReschedule();
       detail.seeNoCancel();

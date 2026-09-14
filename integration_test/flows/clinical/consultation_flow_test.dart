@@ -236,8 +236,8 @@ void registerConsultationFlows() {
       await detail.open(ClinicalWorld.flaggedConsultation);
       await detail.assertVisible();
 
-      detail.seeLabOrders();
-      detail.seeImagingOrders();
+      await detail.seeLabOrders();
+      await detail.seeImagingOrders();
     });
 
     testWidgets('carries the script it was written with', (tester) async {
@@ -247,7 +247,7 @@ void registerConsultationFlows() {
       await detail.open(ClinicalWorld.normalConsultation);
       await detail.assertVisible();
 
-      detail.seePrescription();
+      await detail.seePrescription();
       detail.seeText(ClinicalWorld.amoxicillinName);
     });
 
@@ -261,7 +261,7 @@ void registerConsultationFlows() {
       await detail.open(ClinicalWorld.normalConsultation);
       await detail.assertVisible();
 
-      detail.seeNoActionsAtAll();
+      await detail.seeNoActionsAtAll();
     });
   });
 }
