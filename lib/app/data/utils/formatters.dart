@@ -65,6 +65,36 @@ abstract final class Formatters {
     return DateFormat(use24Hour ? 'HH:mm' : 'h:mm a').format(local);
   }
 
+  /// A clock time this backend stores as text — an appointment's `"15:30"`.
+  ///
+  /// Exists so a model never hand-rolls the 12-hour conversion. Two of them
+  /// did, with `h > 12 ? h - 12 : h`, which renders midnight as `0:00 AM` and
+  /// disagrees with the time the same value is shown as two screens away.
+  ///
+  /// Text that is not a clock time is handed back untouched rather than
+  /// blanked: a value nobody parsed is still a value somebody wrote.
+  static String clockTime(String? raw, {bool use24Hour = true}) {
+    final text = (raw ?? '').trim();
+    if (text.isEmpty) return '—';
+
+    final parts = text.split(':');
+    final hour = parts.isEmpty ? null : int.tryParse(parts.first);
+    if (parts.length < 2 || hour == null || hour < 0 || hour > 23) return text;
+    final minute = int.tryParse(parts[1]) ?? 0;
+
+    // A date only so `DateFormat` has something to format. It is never shown.
+    return time(DateTime(2000, 1, 1, hour, minute), use24Hour: use24Hour);
+  }
+
+  /// `Mon, 22 Jun` — a date in a clinic list, where the year is implied by the
+  /// list being this week's.
+  ///
+  /// Through `intl`, so the month and day names follow the locale. Two models
+  /// carried their own English arrays, and one of them indexed its day names
+  /// with `weekday - 1` against a list that started on Sunday.
+  static String dayAndMonth(DateTime? value) =>
+      value == null ? '—' : DateFormat('EEE, d MMM').format(value.toLocal());
+
   // ── Clinical durations ────────────────────────────────────────────────────
 
   /// How long since [since] — a wait, a time on the board, a length of stay.

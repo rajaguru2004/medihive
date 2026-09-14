@@ -71,7 +71,7 @@ class DashboardController extends GetxController with LoadStateMixin {
   AppointmentStatuses get appointmentStatuses =>
       _dashboard.value?.appointmentStatuses ?? const AppointmentStatuses();
 
-  List<QueueService> get queueByService =>
+  List<QueueServiceCount> get queueByService =>
       _dashboard.value?.queueByService ?? const [];
 
   String get siteName => _organization.value?.name ?? 'MediHive';
@@ -88,22 +88,15 @@ class DashboardController extends GetxController with LoadStateMixin {
 
   Future<void> load({bool silent = false}) => runGuarded(
         () async {
-          // In parallel: neither call needs the other, and a cold start on
-          // hospital wifi pays for every round trip it makes in series.
-          final results = await Future.wait([
-            _homeService.fetchDashboard(),
-            _homeService.fetchOrganization(),
-          ]);
+          // Both started before either is awaited: neither call needs the
+          // other, and a cold start on hospital wifi pays for every round trip
+          // it makes in series. Not `Future.wait`, which would erase the two
+          // different result types into `Object`.
+          final dashboard = _homeService.fetchDashboard();
+          final organization = _homeService.fetchOrganization();
 
-          final dashboardBody = results[0].data;
-          if (dashboardBody is Map<String, dynamic>) {
-            _dashboard.value = DashboardData.fromJson(dashboardBody);
-          }
-
-          final organizationBody = results[1].data;
-          if (organizationBody is Map<String, dynamic>) {
-            _organization.value = OrganizationData.fromJson(organizationBody);
-          }
+          _dashboard.value = await dashboard;
+          _organization.value = await organization;
 
           _renderedTick = _currentTick;
         },

@@ -1,56 +1,6 @@
-class AppointmentPatient {
-  final String id;
-  final String mrn;
-  final String firstName;
-  final String lastName;
-  final String? phonePrimary;
-  final String? gender;
-  final DateTime? dateOfBirth;
-
-  const AppointmentPatient({
-    required this.id,
-    required this.mrn,
-    required this.firstName,
-    required this.lastName,
-    this.phonePrimary,
-    this.gender,
-    this.dateOfBirth,
-  });
-
-  factory AppointmentPatient.fromJson(Map<String, dynamic> json) =>
-      AppointmentPatient(
-        id: json['id'] as String? ?? '',
-        mrn: json['mrn'] as String? ?? '',
-        firstName: json['firstName'] as String? ?? '',
-        lastName: json['lastName'] as String? ?? '',
-        phonePrimary: json['phonePrimary'] as String?,
-        gender: json['gender'] as String?,
-        dateOfBirth: json['dateOfBirth'] != null
-            ? DateTime.tryParse(json['dateOfBirth'] as String)
-            : null,
-      );
-
-  String get fullName => '$firstName $lastName'.trim();
-
-  String get initials {
-    final f =
-        firstName.trim().isNotEmpty ? firstName.trim()[0].toUpperCase() : '';
-    final l =
-        lastName.trim().isNotEmpty ? lastName.trim()[0].toUpperCase() : '';
-    return f.isNotEmpty || l.isNotEmpty ? '$f$l' : '?';
-  }
-
-  int get age {
-    if (dateOfBirth == null) return 0;
-    final now = DateTime.now();
-    int age = now.year - dateOfBirth!.year;
-    if (now.month < dateOfBirth!.month ||
-        (now.month == dateOfBirth!.month && now.day < dateOfBirth!.day)) {
-      age--;
-    }
-    return age;
-  }
-}
+import '../utils/formatters.dart';
+import 'json.dart';
+import 'patient_ref.dart';
 
 class AppointmentDoctor {
   final String id;
@@ -89,7 +39,7 @@ class AppointmentModel {
   final DateTime? completedAt;
   final DateTime? cancelledAt;
   final bool reminderSent;
-  final AppointmentPatient patient;
+  final PatientRef patient;
   final AppointmentDoctor doctor;
 
   const AppointmentModel({
@@ -142,10 +92,8 @@ class AppointmentModel {
             ? DateTime.tryParse(json['cancelledAt'] as String)
             : null,
         reminderSent: json['reminderSent'] as bool? ?? false,
-        patient: AppointmentPatient.fromJson(
-            (json['patient'] as Map<String, dynamic>?) ?? {}),
-        doctor: AppointmentDoctor.fromJson(
-            (json['doctor'] as Map<String, dynamic>?) ?? {}),
+        patient: PatientRef.of(json['patient']),
+        doctor: AppointmentDoctor.fromJson(asMap(json['doctor'])),
       );
 
   AppointmentModel copyWith({
@@ -177,36 +125,12 @@ class AppointmentModel {
         doctor: doctor,
       );
 
-  String get formattedTime {
-    final parts = appointmentTime.split(':');
-    if (parts.length < 2) return appointmentTime;
-    final h = int.tryParse(parts[0]) ?? 0;
-    final m = parts[1].padLeft(2, '0');
-    final period = h >= 12 ? 'PM' : 'AM';
-    final displayH = h > 12 ? h - 12 : (h == 0 ? 12 : h);
-    return '$displayH:$m $period';
-  }
+  /// `15:30`, or `3:30 PM` where the site charts in 12-hour.
+  String formattedTime({bool use24Hour = true}) =>
+      Formatters.clockTime(appointmentTime, use24Hour: use24Hour);
 
-  String get formattedDate {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec'
-    ];
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    final d = appointmentDate;
-    final dayName = days[d.weekday % 7];
-    return '$dayName, ${d.day} ${months[d.month - 1]}';
-  }
+  /// `Mon, 22 Jun`.
+  String get formattedDate => Formatters.dayAndMonth(appointmentDate);
 
   String get formattedType {
     switch (appointmentType.toLowerCase()) {

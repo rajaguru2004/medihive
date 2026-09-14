@@ -41,6 +41,71 @@ class SiteSettings {
     return SiteSettings(out);
   }
 
+  /// Builds from the `organization` block of `GET /api/auth/me`.
+  ///
+  /// The same site, in the other shape the backend speaks it in. `/api/settings`
+  /// answers a flat map of strings; `/auth/me` answers the organisation as a
+  /// structure — branding at the top, then `settings.{locale, appearance,
+  /// clinical, scheduling}`. Flattening it onto the same keys here is what lets
+  /// every getter below stay the one reader, whichever call the settings
+  /// arrived on.
+  factory SiteSettings.fromOrganization(Map<String, dynamic> organization) {
+    final settings = asMap(organization['settings']);
+    final locale = asMap(settings['locale']);
+    final appearance = asMap(settings['appearance']);
+    final clinical = asMap(settings['clinical']);
+    final scheduling = asMap(settings['scheduling']);
+    final workingHours = asMap(scheduling['workingHours']);
+
+    // The flat map spells custom colours as one comma-joined string, and
+    // `ThemeService` parses that. Sending the object through unchanged would
+    // re-theme the app on every load, because the signature would never match
+    // the one persisted from the flat route.
+    final custom = asMap(appearance['customColors']);
+    final customColors = [
+      asString(custom['primary']),
+      asString(custom['secondary']),
+      asString(custom['accent']),
+    ].where((c) => c.isNotEmpty).join(',');
+
+    return SiteSettings({
+      'site_name': asString(organization['name']),
+      'site_logo': asString(organization['logoUrl']),
+      'logo_text_url': asString(organization['logoTextUrl']),
+      'primary_color': asString(organization['primaryColor']),
+      'secondary_color': asString(organization['secondaryColor']),
+
+      'theme_preset': asString(appearance['themePreset']),
+      'theme_custom_colors': customColors,
+      'theme_font': asString(appearance['themeFont']),
+
+      'triage_scale': asString(clinical['triageScale']),
+      'wait_breach_minutes': clinical['waitBreachMinutes'],
+      'show_patient_names': clinical['showPatientNames'],
+      'session_lock_minutes': clinical['sessionLockMinutes'],
+
+      'default_currency_code': asString(locale['currency']),
+      'currency_symbol': asString(locale['currencySymbol']),
+      'currency_position': asString(locale['currencyPosition']),
+      'decimal_sep': asString(locale['decimalSeparator']),
+      'thousand_sep': asString(locale['thousandSeparator']),
+      'cent_precision': locale['centPrecision'],
+      'zero_format': locale['showZeroCents'],
+      'date_format': asString(locale['dateFormat']),
+      'use_24_hour_clock': locale['use24HourClock'],
+      'timezone': asString(locale['timezone']),
+      'language': asString(locale['language']),
+      'calendar': asString(locale['calendar']),
+
+      'working_hours_start': asString(workingHours['start']),
+      'working_hours_end': asString(workingHours['end']),
+      'appointment_duration': scheduling['appointmentDuration'],
+    // An absent key falls back to the documented default; a key present and
+    // empty overwrites a good value with a blank one, which is how a site that
+    // has a name loses it on a round trip.
+    }..removeWhere((_, value) => value == null || value == ''));
+  }
+
   Map<String, dynamic> toJson() => Map<String, dynamic>.unmodifiable(_values);
 
   // ── Raw access ────────────────────────────────────────────────────────────
@@ -76,6 +141,9 @@ class SiteSettings {
 
   String get siteLogo => string('site_logo', '');
 
+  /// The wordmark, where a site has one drawn separately from its mark.
+  String get logoTextUrl => string('logo_text_url', '');
+
   // ── Theming ───────────────────────────────────────────────────────────────
   //
   // The three keys `ThemeService` watches. Changing anything else in settings
@@ -103,6 +171,12 @@ class SiteSettings {
   /// Off in departments whose screens are visible from a waiting area — the
   /// same board, with the identifying column suppressed.
   bool get showPatientNames => boolean('show_patient_names', fallback: true);
+
+  /// Idle minutes before a shared device locks itself. Zero is never.
+  ///
+  /// A ward tablet is put down mid-shift with a patient list open on it, and
+  /// the next person to pick it up is not always staff.
+  int get sessionLockMinutes => integer('session_lock_minutes', 5);
 
   // ── Money ─────────────────────────────────────────────────────────────────
   //
@@ -132,6 +206,25 @@ class SiteSettings {
   /// 24-hour clocks are the clinical default and the app's, but a site that
   /// charts in 12-hour gets 12-hour.
   bool get use24HourClock => boolean('use_24_hour_clock', fallback: true);
+
+  /// The site's own zone, for reading a timestamp the way the ward reads it.
+  String get timezone => string('timezone', 'Asia/Kolkata');
+
+  String get language => string('language', 'en');
+
+  /// `gregorian` or `ethiopian`. Named here because the first deployments
+  /// include a site that charts in neither of the app's assumptions.
+  String get calendar => string('calendar', 'gregorian');
+
+  // ── Scheduling ────────────────────────────────────────────────────────────
+
+  /// `08:00`. The first slot a clinic's day grid draws.
+  String get workingHoursStart => string('working_hours_start', '08:00');
+
+  String get workingHoursEnd => string('working_hours_end', '17:00');
+
+  /// How long a slot is, in minutes — the default a new appointment takes.
+  int get appointmentDuration => integer('appointment_duration', 30);
 }
 
 class MoneyFormat {

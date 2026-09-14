@@ -13,6 +13,10 @@
 /// Collection routes follow one shape (`/<entity>`, `/<entity>/<id>`), so
 /// [Crud] builds them rather than listing four near-identical constants per
 /// entity.
+///
+/// **Only routes that exist live here.** A constant for a route the server does
+/// not mount is worse than no constant: it reads as verified, and the 404 it
+/// produces arrives on a screen rather than in a review.
 /// ─────────────────────────────────────────────────────────────────────────────
 abstract class Endpoints {
   /// The server this build talks to.
@@ -24,19 +28,21 @@ abstract class Endpoints {
   /// ```
   ///
   /// The default is the emulator's loopback to the host machine
-  /// (`10.0.2.2` on Android), which is where the backend serves in dev.
+  /// (`10.0.2.2` on Android) on **3000**, which is the port the Nest API
+  /// listens on in dev. It was 8000 here for a while, which is nothing at all:
+  /// every request failed to connect and the app read as "no network".
   static const String baseUrl = String.fromEnvironment(
     'MEDIHIVE_API',
-    defaultValue: 'http://10.0.2.2:8000/',
+    defaultValue: 'http://10.0.2.2:3000/',
   );
 
   /// Where uploaded files live. The API returns storage-relative paths, which
-  /// `fileUrl()` joins onto this. When object storage is configured the API
-  /// returns absolute URLs instead, and `fileUrl()` passes those through
+  /// [fileUrl] joins onto this. When object storage is configured the API
+  /// returns absolute URLs instead, and [fileUrl] passes those through
   /// untouched.
   static const String fileBaseUrl = String.fromEnvironment(
     'MEDIHIVE_FILES',
-    defaultValue: 'http://10.0.2.2:8000/',
+    defaultValue: 'http://10.0.2.2:3000/',
   );
 
   /// Whether this build is pointed somewhere only a developer can reach.
@@ -48,13 +54,38 @@ abstract class Endpoints {
   /// its first screen with nothing explaining why. `main()` checks this and
   /// says so out loud in debug.
   static bool get isLoopback =>
-      baseUrl.contains('10.0.2.2') || baseUrl.contains('localhost');
+      baseUrl.contains('10.0.2.2') ||
+      baseUrl.contains('localhost') ||
+      baseUrl.contains('127.0.0.1');
+
+  /// An absolute URL for a stored file — an avatar, a site logo, a scan.
+  ///
+  /// Absolute URLs pass through: once object storage is configured the API
+  /// answers with the bucket's own URL, and joining that onto [fileBaseUrl]
+  /// produces a path that resolves to nothing.
+  static String fileUrl(String? path) {
+    final value = (path ?? '').trim();
+    if (value.isEmpty) return '';
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+    final base = fileBaseUrl.endsWith('/')
+        ? fileBaseUrl.substring(0, fileBaseUrl.length - 1)
+        : fileBaseUrl;
+    return value.startsWith('/') ? '$base$value' : '$base/$value';
+  }
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   static const String login = '/api/auth/login';
+
+  /// Requires `{refreshToken}` in the body and answers 204.
   static const String logout = '/api/auth/logout';
   static const String refreshToken = '/api/auth/refresh';
+
+  /// The user, their access map and their organisation, in one round trip.
   static const String me = '/api/auth/me';
+
+  /// The access map alone, for a refresh that does not need the rest.
   static const String meAccess = '/api/auth/me/access';
   static const String changePassword = '/api/auth/change-password';
 
@@ -62,65 +93,169 @@ abstract class Endpoints {
   //
   // One [Crud] per resource. Anything that is not list/read/create/update/
   // delete gets a named constant below its group.
+  //
+  // `updateVerb` is not decoration: this API is PATCH for most resources and
+  // PUT for patients, users and the three settings collections. Sending the
+  // wrong one is a 404 on a route that exists.
 
-  static const users = Crud('/api/users');
+  static const users = Crud('/api/users', updateVerb: HttpVerb.put);
   static const roles = Crud('/api/roles');
-  static const permissions = Crud('/api/permissions');
-  static const patients = Crud('/api/patients');
+  static const patients = Crud('/api/patients', updateVerb: HttpVerb.put);
   static const appointments = Crud('/api/appointments');
   static const consultations = Crud('/api/consultations');
-  static const inpatient = Crud('/api/inpatient');
+  static const preTriage = Crud('/api/pre-triage');
+  static const queue = Crud('/api/queue');
+
+  // ── Inpatient ─────────────────────────────────────────────────────────────
+  //
+  // No `Crud('/api/inpatient')`, and none for the other four module roots
+  // below. Those roots exist, but as multiplexed GET/POST/PATCH handlers kept
+  // for a Next.js console — there is no `/:id` under any of them, so a `Crud`
+  // there would offer a `byId` and a `delete` that 404 on a path that looks
+  // right. The sub-collections are the real routes.
   static const wards = Crud('/api/inpatient/wards');
   static const beds = Crud('/api/inpatient/beds');
   static const admissions = Crud('/api/inpatient/admissions');
-  static const laboratory = Crud('/api/laboratory');
-  static const radiology = Crud('/api/radiology');
-  static const pharmacy = Crud('/api/pharmacy');
-  static const preTriage = Crud('/api/pre-triage');
-  static const queue = Crud('/api/queue');
-  static const billing = Crud('/api/billing');
-  static const integrations = Crud('/api/integrations');
+  static const String inpatientStats = '/api/inpatient/stats';
+
+  // ── Laboratory ────────────────────────────────────────────────────────────
+  static const labTests = Crud('/api/laboratory/tests');
+  static const labOrders = Crud('/api/laboratory/orders');
+  static const labResults = Crud('/api/laboratory/results');
+  static const String labStats = '/api/laboratory/stats';
+
+  // ── Radiology ─────────────────────────────────────────────────────────────
+  static const radiologyExams = Crud('/api/radiology/exams');
+  static const radiologyOrders = Crud('/api/radiology/orders');
+  static const radiologyReports = Crud('/api/radiology/reports');
+
+  /// Multipart. A study's images, attached to an order.
+  static const String radiologyUpload = '/api/radiology/upload';
+
+  /// The one stats route that is not `/stats` — it is `/stats/summary`, and
+  /// the other spelling 404s.
+  static const String radiologyStats = '/api/radiology/stats/summary';
+
+  // ── Pharmacy ──────────────────────────────────────────────────────────────
+  static const drugs = Crud('/api/pharmacy/drugs');
+  static const prescriptions = Crud('/api/pharmacy/prescriptions');
+  static const pharmacySales = Crud('/api/pharmacy/sales');
+  static const String pharmacyStats = '/api/pharmacy/stats';
+
+  // ── Billing ───────────────────────────────────────────────────────────────
+  static const billingServices = Crud('/api/billing/services');
+  static const invoices = Crud('/api/billing/invoices');
+  static const payments = Crud('/api/billing/payments');
+  static const String billingStats = '/api/billing/stats';
+
+  // ── Integrations ──────────────────────────────────────────────────────────
+  //
+  // `/api/integrations` itself is not a collection — the module mounts only the
+  // three routes below. The integrations a site *configures* are a settings
+  // collection, [settingsIntegrations].
+
+  /// Analysers and imaging devices that post results back.
+  static const machines = Crud('/api/integrations/machines');
+
+  /// Results a machine sent that nobody has verified yet.
+  static const String resultsQueue = '/api/integrations/results-queue';
+
+  /// Multipart. A result file from a device with no live link.
+  static const String resultsUpload = '/api/integrations/results/upload';
+
+  // ── Settings ──────────────────────────────────────────────────────────────
+  //
+  // These three are PUT, unlike every other collection in this file.
+  static const departments = Crud(
+    '/api/settings/departments',
+    updateVerb: HttpVerb.put,
+  );
+  static const settingsUsers = Crud(
+    '/api/settings/users',
+    updateVerb: HttpVerb.put,
+  );
+  static const settingsIntegrations = Crud(
+    '/api/settings/integrations',
+    updateVerb: HttpVerb.put,
+  );
 
   // ── Named actions ─────────────────────────────────────────────────────────
 
   /// Turns a screening into a live queue entry or appointment.
   static String convertPreTriage(String id) => '/api/pre-triage/$id/convert';
 
-  /// Moves a queue entry to the next state (called, in progress, done).
-  static String advanceQueue(String id) => '/api/queue/$id/advance';
-
-  /// Discharges an admission. Not a `delete`: the record stays, its state
-  /// moves, and the bed is released as a side effect the server owns.
-  static String discharge(String id) =>
-      '/api/inpatient/admissions/$id/discharge';
-
-  /// Moves an admission to another bed.
-  static String transferBed(String id) =>
-      '/api/inpatient/admissions/$id/transfer';
-
-  /// The beds belonging to one ward.
-  static String bedsInWard(String wardId) =>
-      '/api/inpatient/wards/$wardId/beds';
-
+  /// The permissions granted to one role. PUT replaces the whole set.
   static String assignPermission(String roleId) =>
       '/api/roles/$roleId/permissions';
 
+  /// The users holding one role. POST adds one.
+  static String roleUsers(String roleId) => '/api/roles/$roleId/users';
+
+  /// One user's hold on one role. DELETE removes it.
+  static String roleUser(String roleId, String userId) =>
+      '/api/roles/$roleId/users/$userId';
+
   // ── Singletons ────────────────────────────────────────────────────────────
   static const String dashboard = '/api/dashboard';
+
+  /// The permission catalogue. Read-only: the rows an administrator grants a
+  /// role through [assignPermission]. There is no create, update or delete —
+  /// the set ships with the server.
+  static const String permissions = '/api/permissions';
+
+  /// The site's settings as a flat `{key: value}` map of strings.
   static const String settings = '/api/settings';
-  static const String audit = '/api/audit';
-  static const String upload = '/api/upload';
+
+  /// The organisation as a shape — branding plus grouped settings. GET reads,
+  /// PUT replaces.
+  static const String organization = '/api/settings/organization';
+
+  /// Which modules this site has switched on. PUT only.
+  static const String settingsModules = '/api/settings/modules';
+
+  /// Multipart logo upload.
+  ///
+  /// **Not mounted yet** — the server currently takes `logoUrl` through
+  /// [organization]. Named here because the upload screen is the one caller and
+  /// this is where it will look.
+  static const String settingsLogo = '/api/settings/organization/logo';
+
+  /// Clinicians and other staff, for the pickers that assign work.
+  static const String staff = '/api/users/staff';
 }
 
-/// The five routes every collection has, built from one base path.
+/// The verbs this app sends.
+///
+/// Named rather than stringly-typed because the two that matter — PATCH and
+/// PUT — are interchangeable to read and are not interchangeable to this API.
+enum HttpVerb { get, post, put, patch, delete }
+
+/// The five routes a collection can have, built from one base path.
 ///
 /// Exists so that adding a resource is one line rather than five near-identical
 /// constants, and so that a rename is one edit rather than five.
+///
+/// It builds paths; it does not promise routes. Several collections here are
+/// list/create/update only — a ward has no delete, a lab order has no `GET
+/// /:id` — so a module reaching past [list], [create] and [update] should check
+/// the route exists before assuming a 404 is a bug in the app.
 class Crud {
-  const Crud(this.base);
+  const Crud(this.base, {this.updateVerb = HttpVerb.patch})
+      : assert(
+          updateVerb == HttpVerb.patch || updateVerb == HttpVerb.put,
+          'an update is PATCH or PUT; nothing else reaches this route',
+        );
 
   /// The collection path, with no trailing slash.
   final String base;
+
+  /// Which verb this resource's update route answers to.
+  ///
+  /// PATCH almost everywhere; PUT on patients, users and the settings
+  /// collections. `CrudRepository.update` reads this rather than assuming, so
+  /// an edit screen written against the wrong one fails in review rather than
+  /// on a ward.
+  final HttpVerb updateVerb;
 
   String get list => base;
   String get create => base;

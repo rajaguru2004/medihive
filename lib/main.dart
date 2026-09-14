@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
+import 'app/bindings/initial_binding.dart';
+import 'app/core/app_log.dart';
 import 'app/data/network/dio_client.dart';
+import 'app/data/network/endpoints.dart';
+import 'app/data/services/access_service.dart';
 import 'app/data/services/auth_service.dart';
 import 'app/data/services/data_bus.dart';
 import 'app/data/services/session_manager.dart';
@@ -23,6 +27,19 @@ Future<void> main() async {
   // content itself clear.
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
+  // A build nobody pointed at a server reaches a host that does not exist,
+  // over cleartext both platforms refuse, and shows a network error on its
+  // first screen with nothing explaining why. `Endpoints.isLoopback` has always
+  // promised that main() says so; until now it did not.
+  if (Endpoints.isLoopback) {
+    AppLog.warn(
+      'main',
+      'API base is ${Endpoints.baseUrl} — a developer loopback. '
+          'Pass --dart-define=MEDIHIVE_API=https://… for any build that '
+          'leaves this machine.',
+    );
+  }
+
   // ── Services ──────────────────────────────────────────────────────────────
   // Order matters: DioClient first, because AuthInterceptor reads AuthService
   // per request and SessionManager needs both.
@@ -31,6 +48,12 @@ Future<void> main() async {
   final authService = Get.put(AuthService());
   Get.put(SessionManager());
   Get.put(SettingsService());
+  final accessService = Get.put(AccessService());
+
+  // The services every module reaches for with `Get.find`. Registered here
+  // rather than through `initialBinding:`, which runs after the first route is
+  // resolved — and the splash screen is a route.
+  registerDomainServices();
 
   // Rehydrate from secure storage before the first route resolves. Without
   // this, AuthMiddleware sees no session on a cold start and bounces a
@@ -38,6 +61,11 @@ Future<void> main() async {
   // between picking the tablet up and using it, and picking it up and hunting
   // for a password.
   await authService.tryRestoreSession();
+
+  // The access map from the same storage, so the shell paints the tabs this
+  // account actually has rather than all of them and then fewer. Refreshed
+  // against the server on the splash screen.
+  await accessService.restore();
 
   // Both restored before the first frame — reading either later paints one
   // frame in the wrong theme, which is visible and looks like a bug.

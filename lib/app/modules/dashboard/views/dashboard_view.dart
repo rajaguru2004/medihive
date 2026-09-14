@@ -285,7 +285,7 @@ class _QuickActions extends StatelessWidget {
 class _QueueLoadCard extends StatelessWidget {
   const _QueueLoadCard({required this.services});
 
-  final List<QueueService> services;
+  final List<QueueServiceCount> services;
 
   @override
   Widget build(BuildContext context) {

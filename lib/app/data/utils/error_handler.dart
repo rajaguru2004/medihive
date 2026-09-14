@@ -17,13 +17,23 @@ String parseErrorMessage(
   dynamic error, [
   String fallback = 'Something went wrong. Please try again.',
 ]) {
-  if (error is ApiException) return _clamp(error.message, fallback);
+  if (error is ApiException) {
+    final fields = _joinFieldErrors(error.fieldErrors);
+    return _clamp(fields ?? error.message, fallback);
+  }
 
   if (error is DioException) {
     final response = error.response;
     if (response != null && response.data != null) {
       final data = response.data;
       if (data is Map) {
+        // A rejected write names the field. The server answers a validation
+        // failure with `message: 'Validation failed'` — which tells a user
+        // nothing they can act on — and puts the part that matters under
+        // `errors`.
+        final fields = _joinFieldErrors(data['errors']);
+        if (fields != null) return _clamp(fields, fallback);
+
         // `msg` as well: two core routes answer with that key and no envelope.
         final message = data['message'] ?? data['msg'];
         if (message is String) {
@@ -75,6 +85,29 @@ String parseErrorMessage(
   }
 
   return fallback;
+}
+
+/// The field messages of a validation failure, as one sentence.
+///
+/// Each message already begins with its field name (`email must be an email`),
+/// so the key is not repeated in front of it. Joined with commas rather than
+/// newlines: these land in a toast a few lines tall, and one item per line eats
+/// the whole pill.
+///
+/// Returns null when there is nothing to join, so a caller can fall through to
+/// the generic message rather than showing an empty string.
+String? _joinFieldErrors(dynamic errors) {
+  if (errors is! Map || errors.isEmpty) return null;
+  final messages = <String>[];
+  for (final value in errors.values) {
+    if (value is List) {
+      messages.addAll(value.map((m) => m.toString().trim()));
+    } else if (value != null) {
+      messages.add(value.toString().trim());
+    }
+  }
+  messages.removeWhere((m) => m.isEmpty);
+  return messages.isEmpty ? null : messages.join(', ');
 }
 
 String _clamp(String message, String fallback) {

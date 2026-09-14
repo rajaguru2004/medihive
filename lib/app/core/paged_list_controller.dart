@@ -24,7 +24,7 @@ abstract class PagedListController<T> extends GetxController {
   PagedListController({
     required this.repository,
     required this.sortOptions,
-    this.searchFields = 'name',
+    this.searchParam = 'search',
     this.pageSize = 20,
   })  : assert(sortOptions.isNotEmpty, 'a list needs at least one order'),
         _sort = sortOptions.first.obs;
@@ -34,8 +34,14 @@ abstract class PagedListController<T> extends GetxController {
   /// The orders this list offers, most useful first.
   final List<SortOption> sortOptions;
 
-  /// Which fields a search term is matched against.
-  final String searchFields;
+  /// The query parameter this route matches a search term against.
+  ///
+  /// `search` on every list route in this API, and the server decides which
+  /// columns that covers — the old `q` + `fields` pair named columns the DTO
+  /// does not declare, and validation runs `forbidNonWhitelisted`, so every
+  /// search was a 400. A route that ever names it something else gets the term
+  /// through [PagedQuery.params] instead.
+  final String searchParam;
 
   final int pageSize;
 
@@ -63,6 +69,10 @@ abstract class PagedListController<T> extends GetxController {
       filters.values.fold(0, (sum, values) => sum + values.length);
 
   bool get isEmpty => items.isEmpty && phase.value == ListPhase.ready;
+
+  /// True when the server refused this module to this account. Distinct from
+  /// an error: there is nothing to retry and nothing broken.
+  bool get isForbidden => phase.value == ListPhase.forbidden;
 
   /// Guards concurrent page fetches. Two `load more` calls in flight append the
   /// same page twice, and the duplicate looks exactly like bad data.
@@ -100,16 +110,36 @@ abstract class PagedListController<T> extends GetxController {
 
   // ── Query building ────────────────────────────────────────────────────────
 
+  /// This resource's own fixed parameters — `status: 'all'`, a ward id, a
+  /// date. Overridden by a subclass; merged under [filters], so a filter the
+  /// user chose wins over the default.
+  ///
+  /// Every key here has to be one this route's DTO declares. Validation runs
+  /// `whitelist` with `forbidNonWhitelisted`, so an invented parameter is a
+  /// 400 for the whole request rather than a key the server ignores.
+  Map<String, dynamic> get baseParams => const {};
+
   /// The query for a page. Subclasses override to add their own parameters.
-  PagedQuery queryFor(int page) => PagedQuery(
-        page: page,
-        items: pageSize,
-        sortBy: sort.field,
-        sortValue: sort.sortValue,
-        q: query.value.trim().isEmpty ? null : query.value.trim(),
-        fields: searchFields,
-        filters: Map.of(filters),
-      );
+  PagedQuery queryFor(int page) {
+    final term = query.value.trim();
+    final usesDefaultParam = searchParam == 'search';
+
+    return PagedQuery(
+      page: page,
+      limit: pageSize,
+      orderBy: sort.field,
+      orderDir: sort.orderDir,
+      search: usesDefaultParam && term.isNotEmpty ? term : null,
+      params: {
+        ...baseParams,
+        // Multi-value filters travel comma-separated — `status=waiting,called`
+        // — which is the one multi-value shape this API's DTOs transform.
+        for (final entry in filters.entries)
+          if (entry.value.isNotEmpty) entry.key: entry.value.join(','),
+        if (!usesDefaultParam && term.isNotEmpty) searchParam: term,
+      },
+    );
+  }
 
   // ── Loading ───────────────────────────────────────────────────────────────
 
@@ -134,6 +164,17 @@ abstract class PagedListController<T> extends GetxController {
       items.assignAll(result.items);
       _pagination.value = result.pagination;
       phase.value = ListPhase.ready;
+    } on ApiForbiddenException catch (e) {
+      // Not an error state: no banner, no retry, and the rows go — whatever is
+      // on screen was fetched under a grant this account no longer has.
+      items.clear();
+      _pagination.value = Pagination.none;
+      // The server's own wording is "Insufficient permissions", which names the
+      // problem and not the next step. It goes to the log for a support
+      // session; the screen keeps the line that tells somebody what to do.
+      errorMessage.value = null;
+      phase.value = ListPhase.forbidden;
+      AppLog.info('$runtimeType', 'list refused: ${e.message}');
     } catch (e, stack) {
       AppLog.error('$runtimeType', 'list load failed', e, stack);
       errorMessage.value = parseErrorMessage(e, couldNotLoadMessage);

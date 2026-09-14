@@ -1,7 +1,39 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- The INTERNET permission is required for development. Specifically,
          the Flutter tool needs it to communicate with the running application
          to allow setting breakpoints, to provide hot reload, etc.
-    -->
+
+         The main manifest declares it too, because the release build needs it
+         to reach the API at all. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <application
+        android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config"
+        tools:replace="android:usesCleartextTraffic">
+        <!-- Cleartext is re-enabled here and nowhere else, narrowed by the
+             config above to the three loopback addresses a local backend
+             answers on. It lives in the debug source set so it cannot reach a
+             release APK: this app carries patient data over ward wifi, which is
+             shared, often open, and exactly where an attacker sits. A release
+             build that trusts cleartext can be silently read and rewritten in
+             transit — a bed state or a triage code changed on the way to the
+             device is a clinical event, not a networking one. -->
+        <activity android:name=".MainActivity">
+            <!-- Lets the screenshot harness drive a route directly:
+                   adb shell am start -a android.intent.action.VIEW \
+                     -d "medihive://<route>" com.medihive.app
+                 Debug-only because a custom scheme is claimable by any app on
+                 the device — nothing verifies it the way an App Link is
+                 verified — so shipping one invites a look-alike to intercept
+                 whatever a link carries. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="medihive"/>
+            </intent-filter>
+        </activity>
+    </application>
 </manifest>

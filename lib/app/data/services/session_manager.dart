@@ -5,7 +5,9 @@ import 'package:get/get.dart';
 import '../../core/app_log.dart';
 import '../../core/live_obx.dart';
 import '../../routes/app_pages.dart';
+import 'access_service.dart';
 import 'auth_service.dart';
+import 'settings_service.dart';
 
 /// Why a session ended. Surfaced on the sign-in screen so the user is told
 /// what happened instead of being dropped on a blank form.
@@ -104,6 +106,14 @@ class SessionManager extends GetxService {
     liveScopeEpoch.value++;
     _disposeScoped();
     await AuthService.to.clearSession();
+
+    // The two services that hold the *site* rather than the screens.
+    // `registerScoped` covers controllers; these are permanent by design and
+    // would otherwise carry one clinician's modules and their hospital's
+    // branding into the next person's session on the same ward tablet — the
+    // access map deciding which tabs they see being the half that matters.
+    if (Get.isRegistered<AccessService>()) await AccessService.to.clear();
+    if (Get.isRegistered<SettingsService>()) SettingsService.to.clear();
 
     // Not awaited: the future completes when the *next* route is popped,
     // which for a sign-in screen is never. Awaiting it hangs every caller of

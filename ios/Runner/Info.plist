@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Medihive</string>
+	<string>MediHive</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -45,5 +45,39 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- ─────────────────────────────────────────────────────────────────────
+	     DEVELOPMENT ONLY. Remove before the first TestFlight or App Store
+	     build, or split this file per configuration.
+
+	     App Transport Security blocks http outright, so a simulator cannot
+	     reach the MediHive API running on the developer's own machine — which
+	     it sees as localhost, not as Android's 10.0.2.2. The two entries below
+	     are the whole exception: arbitrary loads stay off, so any other host
+	     still has to present TLS.
+
+	     Unlike Android, a stock Flutter iOS target has one Info.plist for every
+	     configuration, so there is no debug-only source set to hide this in and
+	     it WILL ship unless somebody takes it out. Loopback is not reachable
+	     from the ward wifi that makes cleartext dangerous, which is why this is
+	     narrowed to loopback and nothing else.
+	     ───────────────────────────────────────────────────────────────────── -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+			<key>127.0.0.1</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
 </dict>
 </plist>

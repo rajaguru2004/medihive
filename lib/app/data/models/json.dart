@@ -15,6 +15,8 @@
 /// ─────────────────────────────────────────────────────────────────────────────
 library;
 
+import 'dart:convert';
+
 /// A string, with `null`, `'null'` and `'undefined'` all reading as empty.
 String asString(dynamic value, {String fallback = ''}) {
   if (value == null) return fallback;
@@ -60,14 +62,49 @@ DateTime? asDate(dynamic value) {
 Map<String, dynamic> asMap(dynamic value) =>
     value is Map ? value.cast<String, dynamic>() : const {};
 
-/// A list of objects, tolerating the single-object form and nulls inside.
-List<Map<String, dynamic>> asMapList(dynamic value) {
-  if (value is List) {
-    return value.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
+/// A list, whether it arrived as one or as a JSON string holding one.
+///
+/// This backend stores several list columns as text and hands them back
+/// unparsed: an invoice's `items`, an order's `tests`, a study's `images`, a
+/// consultation's `icd10Codes`, a patient's `allergies`, a test's
+/// `referenceRanges`. A model that reads those with `value is List` sees a
+/// String, returns empty, and the screen shows a prescription with no drugs on
+/// it — silently, against a perfectly good 200.
+///
+/// A string that is not JSON at all reads as a single entry rather than as
+/// nothing. `allergies: "penicillin"` is one allergy, and an allergy this app
+/// drops on the floor is the worst possible way to be tidy.
+List<dynamic> asJsonList(dynamic value) {
+  if (value is List) return value;
+  if (value is Map) return [value];
+
+  final text = asString(value);
+  if (text.isEmpty) return const [];
+
+  if (text.startsWith('[') || text.startsWith('{')) {
+    try {
+      final decoded = jsonDecode(text);
+      if (decoded is List) return decoded;
+      if (decoded is Map) return [decoded];
+    } on FormatException {
+      // Text that merely looks like JSON. Fall through and keep it whole.
+    }
   }
-  if (value is Map) return [value.cast<String, dynamic>()];
-  return const [];
+  return [text];
 }
+
+/// A list of objects, tolerating the single-object form, a JSON string, and
+/// nulls inside.
+List<Map<String, dynamic>> asMapList(dynamic value) => asJsonList(value)
+    .whereType<Map>()
+    .map((e) => e.cast<String, dynamic>())
+    .toList();
+
+/// A list of strings — codes, allergies, tags — from any of the shapes above.
+List<String> asStringList(dynamic value) => asJsonList(value)
+    .map(asString)
+    .where((entry) => entry.isNotEmpty)
+    .toList();
 
 /// Maps a list of objects through a model constructor.
 List<T> asModelList<T>(dynamic value, T Function(Map<String, dynamic>) fromJson) =>

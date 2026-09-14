@@ -163,6 +163,13 @@ enum ListPhase {
   /// The first fetch failed. Shows a retry, never an empty list — the two look
   /// identical to a user and only one is worth waiting through.
   error,
+
+  /// The server refused: this account may not read this module.
+  ///
+  /// Its own phase because it is neither of the two above. A retry cannot fix
+  /// it, so it must not offer one; and an empty list would say "there is
+  /// nobody waiting" about a board this user simply cannot see.
+  forbidden,
 }
 
 /// A paged list: skeletons, rows, an end, and the three states that are not
@@ -222,6 +229,18 @@ class InfiniteList extends StatelessWidget {
         child: ErrorRetryBanner(
           message: error ?? 'Something went wrong.',
           onRetry: onRetry,
+        ),
+      );
+    }
+
+    // No retry, and no red. Nothing is broken: this account was not granted
+    // this module, and the only useful next step is a person, not a button.
+    if (phase == ListPhase.forbidden) {
+      return BentoSection(
+        child: EmptyState(
+          icon: Icons.lock_outline_rounded,
+          title: 'Not available to your role',
+          message: error ?? 'Ask an administrator if you need access to this.',
         ),
       );
     }
@@ -886,8 +905,12 @@ class SortOption {
   /// date, largest for an amount, A–Z for a name.
   final bool descending;
 
-  /// 1 or -1, as the API wants it.
-  int get sortValue => descending ? -1 : 1;
+  /// `desc` or `asc`, as this API's `orderDir` parameter wants it.
+  ///
+  /// It was `-1` / `1` here, which belongs to a different backend: this one
+  /// validates `orderDir` with `@IsIn(['asc','desc'])`, so a number rejected
+  /// the whole request rather than the sort.
+  String get orderDir => descending ? 'desc' : 'asc';
 
   SortOption flipped() =>
       SortOption(field: field, label: label, descending: !descending);

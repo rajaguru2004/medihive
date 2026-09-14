@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:get/get.dart' hide Response;
 
 import '../network/dio_client.dart';
+import '../network/endpoints.dart';
 
 class AppointmentService extends GetxService {
   /// The one client. Constructing a bare `Dio()` here would skip the
@@ -9,12 +10,14 @@ class AppointmentService extends GetxService {
   /// `.agents/RULES.md` §3.
   DioClient get _dio => Get.find<DioClient>();
 
-  Future<Response> fetchAppointments({
-    int page = 1,
-    int limit = 1000, // Make limit large to fetch all appointments
-  }) =>
+  /// One page of the clinic list.
+  ///
+  /// The server caps `limit` at 100 whatever is asked for, so the old 1000 was
+  /// not "all appointments" — it was the first hundred, with the other pages
+  /// silently missing from the board.
+  Future<Response> fetchAppointments({int page = 1, int limit = 100}) =>
       _dio.get(
-        '/api/appointments',
+        Endpoints.appointments.list,
         queryParameters: {'page': page, 'limit': limit},
       );
 
@@ -28,13 +31,13 @@ class AppointmentService extends GetxService {
       if (additionalData != null) ...additionalData,
     };
     return _dio.patch(
-      '/api/appointments/$id',
+      Endpoints.appointments.update(id),
       data: payload,
     );
   }
 
   Future<Response> sendReminder(String id) => _dio.patch(
-        '/api/appointments/$id',
+        Endpoints.appointments.update(id),
         data: {'reminderSent': true},
       );
 
@@ -44,7 +47,7 @@ class AppointmentService extends GetxService {
     String time,
   ) =>
       _dio.patch(
-        '/api/appointments/$id',
+        Endpoints.appointments.update(id),
         data: {
           'appointmentDate': date.toIso8601String(),
           'appointmentTime': time,
@@ -52,7 +55,7 @@ class AppointmentService extends GetxService {
       );
 
   Future<Response> fetchDoctors() => _dio.get(
-        '/api/users/staff',
+        Endpoints.staff,
         queryParameters: {'role': 'DOCTOR'},
       );
 }

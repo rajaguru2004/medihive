@@ -1,4 +1,4 @@
-package com.example.medihive
+package com.medihive.app
 
 import io.flutter.embedding.android.FlutterActivity
 

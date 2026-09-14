@@ -1,8 +1,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Every screen in this app is a view onto the MediHive API. Flutter's
+         tooling adds this to the debug and profile manifests for hot reload,
+         which is why it was never missed: debug worked and release came back
+         with an unexplained network error on every call. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
-        android:label="medihive"
+        android:label="MediHive"
         android:name="${applicationName}"
-        android:icon="@mipmap/launcher_icon">
+        android:icon="@mipmap/launcher_icon"
+        android:usesCleartextTraffic="false">
         <activity
             android:name=".MainActivity"
             android:exported="true"

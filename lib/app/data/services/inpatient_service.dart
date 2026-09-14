@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:get/get.dart' hide Response;
 
 import '../network/dio_client.dart';
+import '../network/endpoints.dart';
 
 class InpatientService extends GetxService {
   static InpatientService get to => Get.find();
@@ -12,31 +13,31 @@ class InpatientService extends GetxService {
 
   /// GET /api/inpatient/stats
   Future<Response> fetchStats() {
-    return _dio.get('/api/inpatient/stats');
+    return _dio.get(Endpoints.inpatientStats);
   }
 
   /// GET /api/inpatient/wards
   Future<Response> fetchWards() {
-    return _dio.get('/api/inpatient/wards');
+    return _dio.get(Endpoints.wards.list);
   }
 
   /// GET /api/inpatient/admissions?status=all
   Future<Response> fetchAdmissions() {
     return _dio.get(
-      '/api/inpatient/admissions',
+      Endpoints.admissions.list,
       queryParameters: {'status': 'all'},
     );
   }
 
   /// GET /api/users/staff?role=DOCTOR
   Future<Response> fetchDoctors() {
-    return _dio.get('/api/users/staff', queryParameters: {'role': 'DOCTOR'});
+    return _dio.get(Endpoints.staff, queryParameters: {'role': 'DOCTOR'});
   }
 
   /// GET /api/patients
   Future<Response> fetchPatients({required String query, int limit = 50}) {
     return _dio.get(
-      '/api/patients',
+      Endpoints.patients.list,
       queryParameters: {'search': query, 'limit': limit},
     );
   }
@@ -44,19 +45,19 @@ class InpatientService extends GetxService {
   /// GET /api/inpatient/beds?wardId=xxx&status=all
   Future<Response> fetchBeds({required String wardId, String status = 'all'}) {
     return _dio.get(
-      '/api/inpatient/beds',
+      Endpoints.beds.list,
       queryParameters: {'wardId': wardId, 'status': status},
     );
   }
 
   /// PATCH /api/inpatient/wards/:id
   Future<Response> updateWardStatus(String id, bool isActive) {
-    return _dio.patch('/api/inpatient/wards/$id', data: {'isActive': isActive});
+    return _dio.patch(Endpoints.wards.update(id), data: {'isActive': isActive});
   }
 
   /// PATCH /api/inpatient/beds/:id
   Future<Response> updateBedStatus(String id, String status) {
-    return _dio.patch('/api/inpatient/beds/$id', data: {'status': status});
+    return _dio.patch(Endpoints.beds.update(id), data: {'status': status});
   }
 
   /// POST /api/inpatient/admissions
@@ -69,7 +70,7 @@ class InpatientService extends GetxService {
     required String attendingDoctorId,
   }) {
     return _dio.post(
-      '/api/inpatient/admissions',
+      Endpoints.admissions.create,
       data: {
         'patientId': patientId,
         'bedId': bedId,
@@ -91,7 +92,7 @@ class InpatientService extends GetxService {
     String? followUpNotes,
   }) {
     return _dio.patch(
-      '/api/inpatient/admissions/$admissionId',
+      Endpoints.admissions.update(admissionId),
       data: {
         'status': 'discharged',
         'dischargeReason': dischargeReason,
@@ -113,7 +114,7 @@ class InpatientService extends GetxService {
     required int capacity,
   }) {
     return _dio.post(
-      '/api/inpatient/wards',
+      Endpoints.wards.create,
       data: {
         'name': name,
         'code': code,
@@ -132,7 +133,7 @@ class InpatientService extends GetxService {
     required int capacity,
   }) {
     return _dio.patch(
-      '/api/inpatient/wards/$id',
+      Endpoints.wards.update(id),
       data: {
         'name': name,
         'code': code,
@@ -150,7 +151,7 @@ class InpatientService extends GetxService {
     required String status,
   }) {
     return _dio.post(
-      '/api/inpatient/beds',
+      Endpoints.beds.create,
       data: {
         'wardId': wardId,
         'bedNumber': bedNumber,

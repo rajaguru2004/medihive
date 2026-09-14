@@ -96,7 +96,7 @@ class ConsultationService extends GetxService {
   /// Fetch all doctors
   Future<Response> getDoctors() {
     return _dio.get(
-      '/api/users/staff',
+      Endpoints.staff,
       queryParameters: {'role': 'DOCTOR'},
     );
   }

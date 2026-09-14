@@ -1,3 +1,7 @@
+import '../utils/formatters.dart';
+import 'json.dart';
+import 'patient_ref.dart';
+
 class DashboardStats {
   final int totalPatients;
   final int todayAppointments;
@@ -58,14 +62,21 @@ class DashboardStats {
       );
 }
 
+/// A patient registered in the last few days, for the board's tail.
 class RecentPatient {
   final String id;
   final String mrn;
   final String firstName;
   final String lastName;
   final String gender;
-  final DateTime dateOfBirth;
-  final DateTime createdAt;
+
+  /// Null when the route sent none, never today.
+  ///
+  /// These both defaulted to `DateTime.now()`, which made a patient with no
+  /// recorded date of birth a newborn on the board and one with no `createdAt`
+  /// "registered today". An absent field has to read as absent.
+  final DateTime? dateOfBirth;
+  final DateTime? createdAt;
 
   const RecentPatient({
     required this.id,
@@ -73,20 +84,18 @@ class RecentPatient {
     required this.firstName,
     required this.lastName,
     required this.gender,
-    required this.dateOfBirth,
-    required this.createdAt,
+    this.dateOfBirth,
+    this.createdAt,
   });
 
   factory RecentPatient.fromJson(Map<String, dynamic> json) => RecentPatient(
-        id: json['id'] as String? ?? '',
-        mrn: json['mrn'] as String? ?? '',
-        firstName: json['firstName'] as String? ?? '',
-        lastName: json['lastName'] as String? ?? '',
-        gender: json['gender'] as String? ?? '',
-        dateOfBirth: DateTime.tryParse(json['dateOfBirth'] as String? ?? '') ??
-            DateTime.now(),
-        createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
-            DateTime.now(),
+        id: asString(json['id']),
+        mrn: asString(json['mrn']),
+        firstName: asString(json['firstName']),
+        lastName: asString(json['lastName']),
+        gender: asString(json['gender']),
+        dateOfBirth: asDate(json['dateOfBirth']),
+        createdAt: asDate(json['createdAt']),
       );
 
   String get fullName => '$firstName $lastName'.trim();
@@ -94,64 +103,30 @@ class RecentPatient {
   String get initials {
     final f = firstName.isNotEmpty ? firstName[0].toUpperCase() : '';
     final l = lastName.isNotEmpty ? lastName[0].toUpperCase() : '';
-    return '$f$l';
+    return f.isEmpty && l.isEmpty ? '?' : '$f$l';
   }
 
-  int get age {
-    final now = DateTime.now();
-    int age = now.year - dateOfBirth.year;
-    if (now.month < dateOfBirth.month ||
-        (now.month == dateOfBirth.month && now.day < dateOfBirth.day)) {
-      age--;
-    }
-    return age;
-  }
-}
-
-class AppointmentPatient {
-  final String id;
-  final String mrn;
-  final String firstName;
-  final String lastName;
-
-  const AppointmentPatient({
-    required this.id,
-    required this.mrn,
-    required this.firstName,
-    required this.lastName,
-  });
-
-  factory AppointmentPatient.fromJson(Map<String, dynamic> json) =>
-      AppointmentPatient(
-        id: json['id'] as String? ?? '',
-        mrn: json['mrn'] as String? ?? '',
-        firstName: json['firstName'] as String? ?? '',
-        lastName: json['lastName'] as String? ?? '',
-      );
-
-  String get fullName => '$firstName $lastName'.trim();
-
-  String get initials {
-    final f =
-        firstName.trim().isNotEmpty ? firstName.trim()[0].toUpperCase() : '';
-    final l =
-        lastName.trim().isNotEmpty ? lastName.trim()[0].toUpperCase() : '';
-    return '$f$l';
-  }
+  /// `42y`, `7mo`, `—`. Through `Formatters`, which reads `AppClock` — age
+  /// computed inline against `DateTime.now()` is age a golden cannot capture.
+  String get age => Formatters.age(dateOfBirth);
 }
 
 class UpcomingAppointment {
   final String id;
-  final DateTime appointmentDate;
 
-  /// Raw time string from API e.g. "11:00" or "15:30"
+  /// Null when the route sent none. An appointment dated "now" because its
+  /// date failed to parse sorts into today's clinic and is kept by every
+  /// "today" filter on the board.
+  final DateTime? appointmentDate;
+
+  /// The clock time as the API stores it — `"11:00"`, `"15:30"`.
   final String appointmentTime;
   final String status;
-  final AppointmentPatient patient;
+  final PatientRef patient;
 
   const UpcomingAppointment({
     required this.id,
-    required this.appointmentDate,
+    this.appointmentDate,
     required this.appointmentTime,
     required this.status,
     required this.patient,
@@ -159,47 +134,19 @@ class UpcomingAppointment {
 
   factory UpcomingAppointment.fromJson(Map<String, dynamic> json) =>
       UpcomingAppointment(
-        id: json['id'] as String? ?? '',
-        appointmentDate:
-            DateTime.tryParse(json['appointmentDate'] as String? ?? '') ??
-                DateTime.now(),
-        appointmentTime: json['appointmentTime'] as String? ?? '',
-        status: json['status'] as String? ?? '',
-        patient: AppointmentPatient.fromJson(
-            (json['patient'] as Map<String, dynamic>?) ?? {}),
+        id: asString(json['id']),
+        appointmentDate: asDate(json['appointmentDate']),
+        appointmentTime: asString(json['appointmentTime']),
+        status: asString(json['status']),
+        patient: PatientRef.of(json['patient']),
       );
 
-  /// Converts "15:30" → "3:30 PM"
-  String get formattedTime {
-    final parts = appointmentTime.split(':');
-    if (parts.length < 2) return appointmentTime;
-    final h = int.tryParse(parts[0]) ?? 0;
-    final m = parts[1].padLeft(2, '0');
-    final period = h >= 12 ? 'PM' : 'AM';
-    final displayH = h > 12 ? h - 12 : (h == 0 ? 12 : h);
-    return '$displayH:$m $period';
-  }
+  /// `15:30`, or `3:30 PM` where the site charts in 12-hour.
+  String formattedTime({bool use24Hour = true}) =>
+      Formatters.clockTime(appointmentTime, use24Hour: use24Hour);
 
-  /// Formats date as "Mon, 22 Jun"
-  String get formattedDate {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec'
-    ];
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    final d = appointmentDate;
-    return '${days[d.weekday - 1]}, ${d.day} ${months[d.month - 1]}';
-  }
+  /// `Mon, 22 Jun`.
+  String get formattedDate => Formatters.dayAndMonth(appointmentDate);
 }
 
 class AppointmentStatuses {
@@ -226,17 +173,23 @@ class AppointmentStatuses {
       );
 }
 
-class QueueService {
+/// How many people are waiting in one service area.
+///
+/// `QueueServiceCount`, not `QueueService`: that name already belongs to the
+/// `GetxService` in `data/services/queue_service.dart`, and a file importing
+/// both got whichever it imported second — or, in the dashboard's case, a
+/// `Get.find<QueueService>()` that would not compile beside its own model.
+class QueueServiceCount {
   final String name;
   final int count;
 
-  const QueueService({required this.name, required this.count});
+  const QueueServiceCount({required this.name, required this.count});
 }
 
 class DashboardData {
   final DashboardStats stats;
   final AppointmentStatuses appointmentStatuses;
-  final List<QueueService> queueByService;
+  final List<QueueServiceCount> queueByService;
   final List<RecentPatient> recentPatients;
   final List<UpcomingAppointment> upcomingAppointments;
 
@@ -248,18 +201,20 @@ class DashboardData {
     required this.upcomingAppointments,
   });
 
+  /// Takes the **payload**, not the envelope around it.
+  ///
+  /// This read `json['data']` itself, so it only worked when handed the whole
+  /// response body — unlike every other model in this app, and impossible to
+  /// use with `ApiEnvelope`. Unwrapping happens once, in `HomeService`.
   factory DashboardData.fromJson(Map<String, dynamic> json) {
-    final data = json['data'] as Map<String, dynamic>? ?? {};
-
-    final statsJson = data['stats'] as Map<String, dynamic>? ?? {};
-    final apptJson = data['appointmentStatuses'] as Map<String, dynamic>? ?? {};
-    final queueJson = data['queueByService'] as Map<String, dynamic>? ?? {};
-    final patientsJson = data['recentPatients'] as List<dynamic>? ?? [];
-    final appointmentsJson =
-        data['upcomingAppointments'] as List<dynamic>? ?? [];
+    final statsJson = asMap(json['stats']);
+    final apptJson = asMap(json['appointmentStatuses']);
+    final queueJson = asMap(json['queueByService']);
+    final patientsJson = asMapList(json['recentPatients']);
+    final appointmentsJson = asMapList(json['upcomingAppointments']);
 
     final queueServices = queueJson.entries
-        .map((e) => QueueService(
+        .map((e) => QueueServiceCount(
               name: e.key,
               count: (e.value as num?)?.toInt() ?? 0,
             ))
@@ -269,12 +224,9 @@ class DashboardData {
       stats: DashboardStats.fromJson(statsJson),
       appointmentStatuses: AppointmentStatuses.fromJson(apptJson),
       queueByService: queueServices,
-      recentPatients: patientsJson
-          .map((e) => RecentPatient.fromJson(e as Map<String, dynamic>))
-          .toList(),
-      upcomingAppointments: appointmentsJson
-          .map((e) => UpcomingAppointment.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      recentPatients: patientsJson.map(RecentPatient.fromJson).toList(),
+      upcomingAppointments:
+          appointmentsJson.map(UpcomingAppointment.fromJson).toList(),
     );
   }
 }
@@ -306,20 +258,20 @@ class OrganizationData {
     required this.country,
   });
 
-  factory OrganizationData.fromJson(Map<String, dynamic> json) {
-    final data = json['data'] as Map<String, dynamic>? ?? {};
-    return OrganizationData(
-      id: data['id'] as String? ?? '',
-      name: data['name'] as String? ?? 'MediHive',
-      logoUrl: data['logoUrl'] as String?,
-      logoTextUrl: data['logoTextUrl'] as String?,
-      primaryColor: data['primaryColor'] as String? ?? '#0A84FF',
-      secondaryColor: data['secondaryColor'] as String? ?? '#30D158',
-      email: data['email'] as String? ?? '',
-      phone: data['phone'] as String? ?? '',
-      address: data['address'] as String? ?? '',
-      city: data['city'] as String? ?? '',
-      country: data['country'] as String? ?? '',
-    );
-  }
+  /// Takes the **payload**, not the envelope around it — see
+  /// [DashboardData.fromJson].
+  factory OrganizationData.fromJson(Map<String, dynamic> json) =>
+      OrganizationData(
+        id: asString(json['id']),
+        name: asString(json['name'], fallback: 'MediHive'),
+        logoUrl: asStringOrNull(json['logoUrl']),
+        logoTextUrl: asStringOrNull(json['logoTextUrl']),
+        primaryColor: asString(json['primaryColor'], fallback: '#0A84FF'),
+        secondaryColor: asString(json['secondaryColor'], fallback: '#30D158'),
+        email: asString(json['email']),
+        phone: asString(json['phone']),
+        address: asString(json['address']),
+        city: asString(json['city']),
+        country: asString(json['country']),
+      );
 }

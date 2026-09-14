@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only. This file lives in `src/debug/res/`, so it is compiled into the
+  debug APK and cannot reach a release one.
+
+  The base config keeps the platform default — TLS or nothing — and the
+  exception below is the whole of the hole: the three addresses the MediHive
+  Express API answers on when it is running on the developer's own machine.
+  10.0.2.2 is the host as seen from an Android emulator; the two loopback
+  entries cover a device on `adb reverse` and a local instrumentation run.
+
+  Nothing else is listed, and nothing here is a wildcard, so a stray call to a
+  staging host over http fails during development rather than after it.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false"/>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain>10.0.2.2</domain>
+        <domain>localhost</domain>
+        <domain>127.0.0.1</domain>
+    </domain-config>
+</network-security-config>
