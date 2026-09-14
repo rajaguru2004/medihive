@@ -24,7 +24,7 @@ Backend gates: `npm run lint`, `npm run build`, `npm test`, `npm run verify:mobi
 
 | Phase | Scope | Size | Status |
 |---|---|---|---|
-| [P0](#p0--foundation-and-local-stack) | Foundation, local stack, backend contract, RBAC plumbing | L | 🔄 |
+| [P0](#p0--foundation-and-local-stack) | Foundation, local stack, backend contract, RBAC plumbing | L | 🔄 backend done; mobile next |
 | [P1](#p1--shell-navigation-and-design-contract) | Role-shaped shell, More hub, tablet rail | M | ⬜ |
 | [P2](#p2--patients) | Registry, search, form, patient hub | L | ⬜ |
 | [P3](#p3--clinical-parity) | Appointments, consultations, queue/triage/inpatient gating | L | ⬜ |
@@ -51,36 +51,36 @@ layer stops sending a vocabulary the backend rejects.
 | 0.1 | Branch `feat/mobile-parity` (hms_v2) | ✅ | from `main` |
 | 0.2 | Branch `feat/full-hms-parity` (medihive) | ✅ | from `feat/design-system-port` |
 | 0.3 | `docker-compose.local.yml` — postgres 5432 `hms_v2_dev`, redis 6379, `postgres_test` 5433 under profile `test` | ✅ | the shipped compose file attaches to an external proxy network that does not exist locally |
-| 0.4 | `.env.local` pointing at localhost, long dev token, `ALLOW_REMOTE_DB=0` | ⬜ | **the tracked `.env` points at production `140.245.10.145`** |
-| 0.5 | `database-url.util.ts` + `PrismaService` startup guard (refuse non-local outside production unless `ALLOW_REMOTE_DB=1`) | ⬜ | |
-| 0.6 | `cleanDatabase()` hardened: local host **and** a `_test` database name | ⬜ | today it truncates whatever `.env.local` points at |
-| 0.7 | Env precedence `['.env.test']` when `NODE_ENV=test` in `app.module.ts`, `prisma.config.ts`, `prisma/load-env.ts` | ⬜ | Jest currently resolves `.env.local` first |
-| 0.8 | Containers up, `prisma migrate deploy`, `prisma generate`, host confirmed in the Prisma startup log | ⬜ | never `migrate dev` — migrations are gitignored |
-| 0.9 | Seeds: `db:seed` → `db:seed:catalog` | ⬜ | |
+| 0.4 | `.env.local` pointing at localhost, long dev token, `ALLOW_REMOTE_DB=0` | ✅ | **the tracked `.env` points at production `140.245.10.145`** |
+| 0.5 | `database-url.util.ts` + `PrismaService` startup guard (refuse non-local outside production unless `ALLOW_REMOTE_DB=1`) | ✅ | |
+| 0.6 | `cleanDatabase()` hardened: local host **and** a `_test` database name | ✅ | today it truncates whatever `.env.local` points at |
+| 0.7 | Env precedence `['.env.test']` when `NODE_ENV=test` in `app.module.ts`, `prisma.config.ts`, `prisma/load-env.ts` | ✅ | Jest currently resolves `.env.local` first |
+| 0.8 | Containers up, `prisma migrate deploy`, `prisma generate`, host confirmed in the Prisma startup log | ✅ | never `migrate dev` — migrations are gitignored |
+| 0.9 | Seeds: `db:seed` → `db:seed:catalog` | ✅ | |
 
 ### P0.B — Backend auth (B1)
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 0.10 | Refresh-token storage → deterministic `sha256`; rotation in one transaction; family revoke on replay; `logout` revokes its row | ⬜ | today `findUnique` re-hashes with a fresh bcrypt salt, so refresh **always** 401s |
-| 0.11 | `expiresIn` derived from `JWT_EXPIRES_IN` via `ms()` | ⬜ | hard-coded 900 today |
-| 0.12 | `GET /api/auth/me` bootstrap: user + roles + permissions + access map + organization(settings) | ⬜ | the app already calls this route and swallows the 404 |
-| 0.13 | `POST /api/auth/change-password` (existing DTO, revoke all tokens, audit) | ⬜ | |
-| 0.14 | `ThrottlerGuard` registered before `JwtAuthGuard`; per-route limits; `@SkipThrottle` on health | ⬜ | configured but never registered |
-| 0.15 | Roles/permissions reads gated on permissions, not the literal SUPER_ADMIN role | ⬜ | ADMIN with `roles.read` gets 403 today |
-| 0.16 | `AuthCacheService.invalidateUser` wired into roles, users, settings-users, change-password | ⬜ | `auth:access-map` is never busted today |
+| 0.10 | Refresh-token storage → deterministic `sha256`; rotation in one transaction; family revoke on replay; `logout` revokes its row | ✅ | today `findUnique` re-hashes with a fresh bcrypt salt, so refresh **always** 401s |
+| 0.11 | `expiresIn` derived from `JWT_EXPIRES_IN` via `ms()` | ✅ | hard-coded 900 today |
+| 0.12 | `GET /api/auth/me` bootstrap: user + roles + permissions + access map + organization(settings) | ✅ | the app already calls this route and swallows the 404 |
+| 0.13 | `POST /api/auth/change-password` (existing DTO, revoke all tokens, audit) | ✅ | |
+| 0.14 | `ThrottlerGuard` registered before `JwtAuthGuard`; per-route limits; `@SkipThrottle` on health | ✅ | configured but never registered |
+| 0.15 | Roles/permissions reads gated on permissions, not the literal SUPER_ADMIN role | ✅ | ADMIN with `roles.read` gets 403 today |
+| 0.16 | `AuthCacheService.invalidateUser` wired into roles, users, settings-users, change-password | ✅ | `auth:access-map` is never busted today |
 | 0.17 | CORS origin from `CORS_ORIGINS` in production | ⬜ | SHOULD |
-| 0.18 | `auth.service.spec.ts` extended (expiresIn, rotation, replay, logout, change-password, getMe) | ⬜ | |
+| 0.18 | `auth.service.spec.ts` extended (expiresIn, rotation, replay, logout, change-password, getMe) | ✅ | |
 
 ### P0.C — Backend settings and tenancy (B2)
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 0.19 | `OrganizationSettingsDto` — `locale` / `appearance` / `clinical` / `scheduling` + legacy flat aliases | ⬜ | no migration; stays JSON-in-String |
-| 0.20 | `resolveOrganizationSettings` (defaults deep-merged) + `mergeOrganizationSettings` (partial merge, unknown keys preserved) | ⬜ | a PUT must not wipe keys it did not send |
-| 0.21 | `GET /api/settings` — JWT-only flat site map the app's `SiteSettings` already parses | ⬜ | the app calls this on every sign-in |
-| 0.22 | Org resolved from the JWT everywhere (`tenant.util.ts`); `'org-demo'` fallbacks removed; `UserService` org-scoped | ⬜ | cross-tenant read **and** write today |
-| 0.23 | `/settings/users`: never return `password`; optional initial password; `USER_*` + `ROLE_UPDATE` alongside `SETTINGS_UPDATE` | ⬜ | password hashes are returned today |
+| 0.19 | `OrganizationSettingsDto` — `locale` / `appearance` / `clinical` / `scheduling` + legacy flat aliases | ✅ | no migration; stays JSON-in-String |
+| 0.20 | `resolveOrganizationSettings` (defaults deep-merged) + `mergeOrganizationSettings` (partial merge, unknown keys preserved) | ✅ | a PUT must not wipe keys it did not send |
+| 0.21 | `GET /api/settings` — JWT-only flat site map the app's `SiteSettings` already parses | ✅ | the app calls this on every sign-in |
+| 0.22 | Org resolved from the JWT everywhere (`tenant.util.ts`); `'org-demo'` fallbacks removed; `UserService` org-scoped | ✅ | cross-tenant read **and** write today |
+| 0.23 | `/settings/users`: never return `password`; optional initial password; `USER_*` + `ROLE_UPDATE` alongside `SETTINGS_UPDATE` | ✅ | password hashes are returned today |
 | 0.24 | `POST /api/settings/organization/logo` (multipart) so the phone can change logos | ⬜ | |
 | 0.25 | Seed: ADMIN gains `ROLE_UPDATE` + `PERMISSION_READ`; `DEATH_CERTIFICATE_*` seeded | ⬜ | enum/seed drift |
 
@@ -302,18 +302,22 @@ what broke, why it was invisible, and what now prevents it.
 
 | Bug | Why it matters | Status |
 |---|---|---|
-| Refresh tokens are stored as a **salted** bcrypt hash and looked up by re-hashing the same plaintext — the lookup can never match | `POST /auth/refresh` always 401s and `logout` revokes nothing while returning 204, so it looks like it works | ⬜ |
-| `expiresIn` hard-coded to 900 s regardless of `JWT_EXPIRES_IN` | A client that schedules a refresh off this value is wrong by a factor of 96 in dev | ⬜ |
-| `ThrottlerModule` configured, `ThrottlerGuard` never registered | Unlimited credential stuffing on `/auth/login`, with a comment claiming the opposite | ⬜ |
-| Settings routes take the organisation id from the query string or body | Any `SETTINGS_READ` holder can read — and `PUT` — another tenant's organisation | ⬜ |
+| Two refresh tokens minted in the same second were byte-identical, so the new deterministic hash collided on a unique index | Surfaced only once the bcrypt bug was fixed; login and refresh both 409'd. Tokens now carry a `jti` | ✅ |
+| `laboratory.getStats` counted unverified critical results with **no tenant filter** | A clinician saw every hospital's criticals as their own | ✅ |
+| `dashboard` and `laboratory` specs asserted against implementations rewritten as single SQL aggregates | 15 tests failing before this work started; both suites were green-looking noise | ✅ |
+|---|---|---|
+| Refresh tokens are stored as a **salted** bcrypt hash and looked up by re-hashing the same plaintext — the lookup can never match | `POST /auth/refresh` always 401s and `logout` revokes nothing while returning 204, so it looks like it works | ✅ |
+| `expiresIn` hard-coded to 900 s regardless of `JWT_EXPIRES_IN` | A client that schedules a refresh off this value is wrong by a factor of 96 in dev | ✅ |
+| `ThrottlerModule` configured, `ThrottlerGuard` never registered | Unlimited credential stuffing on `/auth/login`, with a comment claiming the opposite | ✅ |
+| Settings routes take the organisation id from the query string or body | Any `SETTINGS_READ` holder can read — and `PUT` — another tenant's organisation | ✅ |
 | `GET /api/users` is not organisation-scoped | Same class of leak, on the staff directory | ⬜ |
-| `/settings/users` returns the bcrypt password hash | Hashes reach any client that can read the staff list | ⬜ |
-| `POST /settings/users` creates users with no password | They cannot log in, and no invitation flow exists to fix it | ⬜ |
+| `/settings/users` returns the bcrypt password hash | Hashes reach any client that can read the staff list | ✅ |
+| `POST /settings/users` creates users with no password | They cannot log in, and no invitation flow exists to fix it | ✅ |
 | Queue rejects the `p1..p5` priorities the app sends | Every add-to-queue from the phone is a 400 | ⬜ |
 | Consultations query DTO has no `search`, which the app sends | 400 under `forbidNonWhitelisted` | ⬜ |
-| Roles and permissions reads are gated on the literal SUPER_ADMIN role | An ADMIN the access map says can read roles still gets 403 | ⬜ |
-| Jest resolves `.env.local` before `.env.test`, and `cleanDatabase()` truncates every table | A test run can truncate the dev database — or worse, whatever `.env` points at | ⬜ |
-| The tracked `.env` points `DATABASE_URL` at a production host | `npm run start:dev` with no `.env.local` connects to production; only the seeds are guarded | ⬜ |
+| Roles and permissions reads are gated on the literal SUPER_ADMIN role | An ADMIN the access map says can read roles still gets 403 | ✅ |
+| Jest resolves `.env.local` before `.env.test`, and `cleanDatabase()` truncates every table | A test run can truncate the dev database — or worse, whatever `.env` points at | ✅ |
+| The tracked `.env` points `DATABASE_URL` at a production host | `npm run start:dev` with no `.env.local` connects to production; only the seeds are guarded | ✅ |
 | `DEATH_CERTIFICATE_*` in the permission enum but not in the seed | The whole module is 403 for every role but SUPER_ADMIN, unfixable through the API | ⬜ |
 
 ### Mobile
