@@ -36,12 +36,12 @@ Legend: ✅ done · 🔄 in progress · ⬜ not started · ⛔ blocked · ⏭ de
 |---|---|---|---|
 | [P0](#p0--environment) | Ollama, gemma3:4b, Python sidecar, API, device | M | ✅ |
 | [P1](#p1--patient-identity-and-self-login) | `Patient`↔`User`, MRN+DOB claim, self-scoping guard | L | ✅ |
-| [P2](#p2--case-taking-domain-and-engine) | Schema, tri-state, question selector, safety rules | XL | 🔄 live tier |
-| [P3](#p3--ai-module-and-sidecar-wiring) | `LlmProvider`, prompts, sidecar client, degradation | L | 🔄 live tier |
-| [P4](#p4--medical-document-intelligence) | Upload, OCR, classify, extract, presigned reads | XL | 🔄 live tier |
+| [P2](#p2--case-taking-domain-and-engine) | Schema, tri-state, question selector, safety rules | XL | ✅ |
+| [P3](#p3--ai-module-and-sidecar-wiring) | `LlmProvider`, prompts, sidecar client, degradation | L | ✅ |
+| [P4](#p4--medical-document-intelligence) | Upload, OCR, classify, extract, presigned reads | XL | ✅ |
 | [P5](#p5--flutter-foundations) | Media seams, conversation kit, permissions, language seam | L | ✅ |
 | [P6](#p6--patient-shell-and-entry) | Patient shell, claim/activate, language, consent | M | ✅ |
-| [P7](#p7--the-interview) | Adaptive interview by voice, text and touch | XL | 🔄 |
+| [P7](#p7--the-interview) | Adaptive interview by voice, text and touch | XL | ✅ |
 | [P8](#p8--documents-on-the-phone) | Capture, upload, review extraction, correct | L | ⬜ |
 | [P9](#p9--review-submit-handoff) | Verification, submission, doctor handoff | L | ⬜ |
 | [P10](#p10--languages) | Tamil and Hindi — **deliberately last** | M | ⬜ |
@@ -52,14 +52,15 @@ Sizes: S ≤ ½ day · M 1 day · L 2–3 days · XL 4+ days.
 
 | | |
 |---|---|
-| Backend | **760** unit tests green, 46 suites · lint and build clean |
-| Live contract | **39 checks** on `verify-patient-auth.ts`; case-taking and documents still to come |
-| Mobile | **399** unit tests · analyze zero · 4 unkeyed (baseline 4) |
-| Device | **9 portal flows green on a real vivo I2219, Android 16** — no emulator, no host RAM |
+| Backend | **764** unit tests green, 47 suites · lint and build clean |
+| Live contract | **178 checks** against the running API, local Postgres, real PP-OCR and a real `gemma3:4b` — 39 auth · 68 case-taking · 71 documents |
+| Mobile | **431** unit tests · analyze zero · 4 unkeyed (baseline 4) |
+| Device | **20 flows green** — 9 portal, 11 interview |
 | Database | 7 new tables applied and verified in `hms_v2_dev` |
 | Models | `gemma3:4b` serving · faster-whisper, Piper and PP-OCRv5 all answering |
 | Routes | case-taking, patient-documents and patient-auth all mounted and guarded |
-| Commits | 6 on `hms_v2/main`, 5 on `medihive/main` |
+| Measured | `POST /turns` **15 ms median**; OCR read a real prescription at **0.9859** |
+| Commits | 8 on `hms_v2/main`, 9 on `medihive/main` |
 
 ---
 
@@ -142,9 +143,9 @@ patient-scoped was enforceable.
 | 2.9 | `engine/safety-rules.ts` + `safety-engine.ts` | ✅ | rules as versioned data, never prompt text |
 | 2.10 | `engine/case-renderer.ts` | ✅ | throws rather than print a non-`recorded` value |
 | 2.11 | `derivePresence()` — code owns presence, not the model | ✅ | see ledger #1 |
-| 2.12 | Module, controller, service, repository, DTOs | ⬜ | |
-| 2.13 | Endpoint surface under `/api/case-taking` | ⬜ | |
-| 2.14 | `test/verify-case-taking.ts` | ⬜ | |
+| 2.12 | Module, controller, service, repository, DTOs | ✅ | on the pre-triage shape |
+| 2.13 | Endpoint surface under `/api/case-taking` | ✅ | all behind `PatientSelfGuard`; parameters named `:sessionId`/`:factId`, never `:id` — see ledger 26 |
+| 2.14 | `test/verify-case-taking.ts` | ✅ | **68/68** live |
 
 ---
 
@@ -153,17 +154,17 @@ patient-scoped was enforceable.
 | # | Task | Status | Notes |
 |---|---|---|---|
 | 3.1 | Sidecar built and answering | ✅ | P0.4–0.7 |
-| 3.2 | `src/modules/ai/` — `LlmProvider` + `OllamaProvider` | ⬜ | the only place that knows an LLM exists |
-| 3.3 | Schema-constrained output via Ollama `format` | ⬜ | **proven working** against the real model |
-| 3.4 | `presence` removed from every LLM schema | ⬜ | ledger #1 |
-| 3.5 | Registry allow-list on returned `fieldPath` | ⬜ | discard, never store |
-| 3.6 | Per-field-kind value validation | ⬜ | ledger #2 |
-| 3.7 | Medication names via `fuzzyset.js`, never normalised into a guess | ⬜ | already a dependency |
-| 3.8 | JSON repair → deterministic fallback question | ⬜ | the interview never dies on a bad turn |
-| 3.9 | `SidecarClient` with timeout + circuit breaker | ⬜ | |
-| 3.10 | Degradation paths written and tested | ⬜ | sidecar down, Ollama down |
-| 3.11 | Prompts as versioned constants, pinned by specs | ⬜ | |
-| 3.12 | Env in `validation.schema.ts`, optional with defaults | ⬜ | a box with no Ollama still boots |
+| 3.2 | `src/modules/ai/` — `LlmProvider` + `OllamaProvider` | ✅ | the only place that knows an LLM exists |
+| 3.3 | Schema-constrained output via Ollama `format` | ✅ | **proven working** against the real model |
+| 3.4 | `presence` removed from every LLM schema | ✅ | ledger #1 |
+| 3.5 | Registry allow-list on returned `fieldPath` | ✅ | discard, never store |
+| 3.6 | Per-field-kind value validation | ✅ | ledger #2 |
+| 3.7 | Medication names via `fuzzyset.js`, never normalised into a guess | ✅ | already a dependency |
+| 3.8 | JSON repair → deterministic fallback question | ✅ | the interview never dies on a bad turn |
+| 3.9 | `SidecarClient` with timeout + circuit breaker | ✅ | |
+| 3.10 | Degradation paths written and tested | ✅ | sidecar down, Ollama down |
+| 3.11 | Prompts as versioned constants, pinned by specs | ✅ | |
+| 3.12 | Env in `validation.schema.ts`, optional with defaults | ✅ | a box with no Ollama still boots |
 
 ---
 
@@ -171,14 +172,14 @@ patient-scoped was enforceable.
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 4.1 | `POST /api/patient-documents` multipart, field `file` | ⬜ | the shape the mobile client already posts |
-| 4.2 | **Presigned reads** on `ObjectStorageService` | ⬜ | only `PutObject` exists today; the bucket is private, so a patient cannot see their own evidence |
-| 4.3 | Quality check before OCR, with a written retake | ⬜ | never `PP-OCR inference exception` on screen |
-| 4.4 | OCR → classify → extract → validate → confidence | ⬜ | lands as *pending verification*, never auto-merged |
-| 4.5 | Duplicate detection: sha256, then text similarity | ⬜ | |
-| 4.6 | Vision fallback on low OCR confidence | ⬜ | same `gemma3:4b` — it is multimodal |
-| 4.7 | "Not found" never becomes "no" | ⬜ | documents spec §19 |
-| 4.8 | `test/verify-patient-documents.ts` | ⬜ | a real prescription image |
+| 4.1 | `POST /api/patient-documents` multipart, field `file` | ✅ | the shape the mobile client already posts |
+| 4.2 | **Presigned reads** on `ObjectStorageService` | ✅ | only `PutObject` exists today; the bucket is private, so a patient cannot see their own evidence |
+| 4.3 | Quality check before OCR, with a written retake | ✅ | never `PP-OCR inference exception` on screen |
+| 4.4 | OCR → classify → extract → validate → confidence | ✅ | lands as *pending verification*, never auto-merged |
+| 4.5 | Duplicate detection: sha256, then text similarity | ✅ | |
+| 4.6 | Vision fallback on low OCR confidence | ✅ | same `gemma3:4b` — it is multimodal |
+| 4.7 | "Not found" never becomes "no" | ✅ | documents spec §19 |
+| 4.8 | `test/verify-patient-documents.ts` | ✅ | a real prescription image |
 
 ---
 
@@ -218,14 +219,15 @@ patient-scoped was enforceable.
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 7.1 | `CaseTakingController` with `LoadStateMixin`, `UnsavedChanges` | ⬜ | `onReady`, never `onInit`; never name a method `refresh()` |
-| 7.2 | Server session is the source of truth | ⬜ | secure-storage write-behind for dropped wifi, never `shared_preferences` — this is PHI |
-| 7.3 | Every question answerable three ways | ⬜ | voice is never required |
-| 7.4 | Next question renders instantly from the selector | ⬜ | extraction runs behind it — ledger #4 |
-| 7.5 | `SessionLockService` pinged on interaction | ⬜ | or a long interview locks mid-sentence |
-| 7.6 | Red flag mid-interview | ⬜ | plain words, no diagnosis |
-| 7.7 | Progress, resume, section completion | ⬜ | read from server state |
-| 7.8 | Flow tests — the cases in the plan, not the happy path | ⬜ | |
+| 7.1 | `CaseTakingController` with `LoadStateMixin`, `UnsavedChanges` | ✅ | `onReady`, never `onInit`; the reload is `reload()` |
+| 7.2 | Server session is the source of truth | ✅ | `flutter_secure_storage` snapshot keyed on the signed-in account restores the conversation; while it is showing, answering is refused with a sentence rather than posting into nothing |
+| 7.3 | Every question answerable three ways | ✅ | all three on screen at once, no mode to switch. `touchOptions` is the single place the row is derived, and tiles are keyed by **the token they send**, so a test asserts what a tap becomes rather than which widget drew it |
+| 7.4 | Next question renders instantly from the selector | ✅ | 15 ms median measured server-side. A queued extraction marks the **previous** bubble quietly and disables nothing |
+| 7.5 | `SessionLockService` pinged on interaction | ✅ | |
+| 7.6 | Red flag mid-interview | ✅ | pinned, not a list row — a "do not wait" notice that can be scrolled away will be. The server's `patientMessage` is deliberately **not** rendered: the notice can emit no free text but the patient's own quoted words, and that structural guarantee outranks echoing a string the fixed copy already says |
+| 7.7 | Progress, resume, section completion | ✅ | read from server state; the phone is never the authority on what is known |
+| 7.8 | Flow tests — the cases in the plan, not the happy path | ✅ | **11/11 on the Pixel 6 Pro** |
+| 7.9 | Re-run the flow gate on the vivo handset | ⬜ | it auto-locked with a PIN mid-run and was then unplugged; `adb` cannot dismiss a secure keyguard. Screen timeout raised to 30 min so the next run holds |
 
 ---
 
@@ -315,6 +317,8 @@ patient-scoped was enforceable.
 | 26 | **A patient-scoped route may never take a bare `:id`.** `PatientSelfGuard` resolves the caller's patient from `patientId` **or `id`** and overwrites both, so a document id was replaced by a patient id before the controller saw it | `GET /patient-documents/:id`, `/:id/original` and `/verify` all returned **404 to the document's own owner**. Every patient-facing read in the module was dead, and the unit tier structurally could not see it — it calls the service, and the damage happens in the guard above | ✅ renamed `:documentId`; `patient-scoped-routes.spec.ts` now reads the controller sources and fails on a bare `:id`. Confirmed non-vacuous by reintroducing the defect |
 | 27 | Two parallel Flutter streams: one added a `GET /api/patient-documents` call on a shared path without a fixture in the shared world | `AppHarness` fails any test touching an unfixtured endpoint, so **all 11 case-taking flows went red for a reason that had nothing to do with case taking** | 🔄 shared routes belong in `world.dart`, not in a module's fixtures; a module fixture only overrides |
 | 28 | A PDF of a page is not detected as a text-duplicate of its PNG — 0.52 against a measured 0.88 threshold | The sidecar renders PDFs at a different DPI and PP-OCR collapses word spacing (`Tab.METFORMIN500mg`), changing the content signature wholesale. Outside what §21's second signal claims, which is the re-*photographed* page | ⏭ left alone rather than loosening a threshold `duplicates.ts` argues at length was measured. Matters if PDF re-uploads are common in the field |
+| 29 | **A 65-point overflow that only appears on the red-flag screen.** Panel heights were budgeted from `MediaQuery.sizeOf(context).height` | That counts height the app bar and safe areas have already taken. It shows only when all three pinned bands are up at once — which is precisely the screen a deteriorating patient sees | ✅ budgeted from a `LayoutBuilder`'s own `maxHeight`, both capped bands holding their own scroll |
+| 30 | The phone auto-locked with a PIN mid-run, then was unplugged | `MainActivity` pauses, no frames are produced, and the harness sits at `+0` until it times out — it reads as a hang, not a lock. `wm dismiss-keyguard`, swipes and `cmd statusbar collapse` all fail against a secure credential | ⏭ finished on `emulator-5554`; screen timeout raised to 30 min for next time |
 
 ---
 
