@@ -2,6 +2,8 @@ import 'package:integration_test/integration_test.dart';
 
 import '../flows/auth/login_flow_test.dart';
 import '../flows/billing/billing_flow_test.dart';
+import '../flows/case_review/case_review_flow_test.dart';
+import '../flows/case_taking/case_taking_flow_test.dart';
 import '../flows/clinical/appointment_flow_test.dart';
 import '../flows/clinical/consultation_flow_test.dart';
 import '../flows/dashboard/shift_flow_test.dart';
@@ -9,6 +11,7 @@ import '../flows/home/shell_flow_test.dart';
 import '../flows/inpatient/beds_flow_test.dart';
 import '../flows/integrations/integrations_flow_test.dart';
 import '../flows/laboratory/laboratory_flow_test.dart';
+import '../flows/patient_documents/patient_documents_flow_test.dart';
 import '../flows/patient_portal/patient_portal_flow_test.dart';
 import '../flows/patients/patients_flow_test.dart';
 import '../flows/pharmacy/pharmacy_flow_test.dart';
@@ -54,8 +57,20 @@ void main() {
   registerIntegrationsFlows();
   registerShiftFlows();
 
-  // Last, and the only one whose account is not a member of staff: a patient
-  // reading their own record. It boots a role the flows above never use, so it
-  // is also the run that proves the landing decision has two answers.
+  // Last, and the only two whose account is not a member of staff: a patient
+  // reading their own record, and then that same patient answering questions
+  // about themselves. They boot a role the flows above never use, so this is
+  // also the run that proves the landing decision has two answers.
+  //
+  // The portal goes first because it walks the entry sequence that ends at the
+  // interview — language, consent, and then the first question.
   registerPatientPortalFlows();
+  registerCaseTakingFlows();
+
+  // Then the two the interview hands over to: the papers the patient brought
+  // with them, and the case they read back before it is sent. After the
+  // interview because that is the order a patient meets them in, and because
+  // both boot the same portal account.
+  registerPatientDocumentsFlows();
+  registerCaseReviewFlows();
 }

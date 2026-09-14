@@ -117,6 +117,101 @@ abstract class Endpoints {
   /// holds no `patients` module, so `/api/patients/:id` is a 403.
   static const String patientPortalMe = '/api/patient-auth/me';
 
+  // ── Case taking ───────────────────────────────────────────────────────────
+  //
+  // The interview. Not a [Crud]: there is no collection a patient can list —
+  // every one of these routes reads the `patientId` off the bearer token and
+  // refuses a caller who has none, so there is no shape of the request that
+  // asks about somebody else's intake.
+  //
+  // The server names the parameter `:sessionId` rather than `:id`, because
+  // `PatientSelfGuard` rewrites `params.id` to the caller's own patient id and
+  // a session id arriving under that name would be overwritten before the
+  // handler saw it. That is a server-side concern; the paths built here are
+  // the same either way.
+
+  /// POST: start an interview, or hand back the one already open.
+  ///
+  /// 200 for both, with `resumed` saying which happened — from the patient's
+  /// side both are "carry on", so neither is an error.
+  static const String caseSessions = '/api/case-taking/sessions';
+
+  /// GET: the interview this patient has open, or **200 with a null payload**
+  /// when there is none. Not a 404: "you have not started one" is an answer.
+  static const String caseSessionCurrent = '/api/case-taking/sessions/current';
+
+  static String caseSession(String sessionId) => '$caseSessions/$sessionId';
+
+  /// POST: consent, or a refusal. The wording's version travels with it.
+  static String caseSessionConsent(String sessionId) =>
+      '$caseSessions/$sessionId/consent';
+
+  /// POST: an answer in, the next question out.
+  ///
+  /// The hot path, and the one this whole module's design is arranged around:
+  /// the next question comes from a deterministic selector and is in the
+  /// response, while any model work the answer triggers runs behind it and
+  /// lands as facts later. The patient never waits on the model.
+  static String caseSessionTurns(String sessionId) =>
+      '$caseSessions/$sessionId/turns';
+
+  /// PATCH: correct an answer. Writes a new fact and retires the old one —
+  /// never an update, because the disagreement is the part a clinician reads.
+  static String caseSessionFact(String sessionId, String factId) =>
+      '$caseSessions/$sessionId/facts/$factId';
+
+  /// GET: "here is what we understood about you".
+  static String caseSessionReview(String sessionId) =>
+      '$caseSessions/$sessionId/review';
+
+  /// POST: send the finished case to the hospital.
+  static String caseSessionSubmit(String sessionId) =>
+      '$caseSessions/$sessionId/submit';
+
+  /// Multipart, field `file`: a recorded answer in, a transcript out.
+  ///
+  /// A refusal here is a 400 with a written sentence rather than a 500,
+  /// because voice is never the only way to answer a question — the client is
+  /// expected to read that as "carry on with the keyboard".
+  static const String caseStt = '/api/case-taking/stt';
+
+  /// A question read aloud. Answers `audio/wav`, outside the envelope.
+  static const String caseTts = '/api/case-taking/tts';
+
+  // ── The patient's own documents ───────────────────────────────────────────
+  //
+  // A [Crud] this time, because there genuinely is a collection: a patient can
+  // list the prescriptions and reports they have handed over, and a staff
+  // caller can list one patient's by naming them. What it does **not** have is
+  // an update or a delete — a document is evidence (§22), and the only write
+  // past the upload is the patient confirming what was read out of it.
+  //
+  // The server names the parameter `:documentId` rather than `:id`, and that is
+  // not tidiness to be undone. `PatientSelfGuard` overwrites a param called
+  // `id` with the caller's own patient id, so every one of these routes
+  // answered its own owner with "That document could not be found." The URL
+  // shape is identical either way, so nothing here has to know — but anyone
+  // adding a route below does.
+  static const patientDocuments = Crud('/api/patient-documents');
+
+  /// GET: a **short-lived signed URL** to the file the extraction came from.
+  ///
+  /// The bucket is private, so this is the only way a patient can look at their
+  /// own evidence. It expires in minutes: fetch it when the patient asks to
+  /// see the original, never at list time.
+  static String patientDocumentOriginal(String documentId) =>
+      '${patientDocuments.base}/$documentId/original';
+
+  /// POST: the patient confirming that what was read out of this document is
+  /// correct.
+  ///
+  /// The **only** transition out of `needs_review`. Nothing else verifies a
+  /// document — not a high confidence, not a successful extraction — because
+  /// the server refuses to treat anything it read as clinical truth until the
+  /// person it is about says so.
+  static String patientDocumentVerify(String documentId) =>
+      '${patientDocuments.base}/$documentId/verify';
+
   // ── Collections ───────────────────────────────────────────────────────────
   //
   // One [Crud] per resource. Anything that is not list/read/create/update/

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../../core/i18n/patient_text.dart';
 import '../../../../core/keys/app_keys.dart';
 import '../../../../data/models/appointment_model.dart';
 import '../../../../data/services/settings_service.dart';
@@ -61,8 +62,14 @@ class PatientDashboardView extends GetView<PatientDashboardController> {
 
           BentoSection(
             top: BentoSpace.section,
+            bottom: 0,
             child: _StartCaseTakingCard(controller: c),
           ),
+
+          // §39. Absent when there is nothing to say, which is the first
+          // screen a patient ever sees; present the moment there is an
+          // interview open or one already sent.
+          BentoSection(top: BentoSpace.action, child: _YourCase(controller: c)),
 
           const SliverToBoxAdapter(
             child: Padding(
@@ -101,7 +108,7 @@ class PatientDashboardView extends GetView<PatientDashboardController> {
               child: SectionHeader(title: 'Your documents'),
             ),
           ),
-          const BentoSection(child: _Documents()),
+          BentoSection(child: _Documents(controller: c)),
         ],
       ),
     );
@@ -381,31 +388,173 @@ class _Record extends StatelessWidget {
   }
 }
 
-/// The prescriptions, reports and letters a patient brought with them.
+/// What has happened to the answers this patient has already given. §39.
 ///
-/// Nothing is fetched here, on purpose. `GET /api/patient-documents` is not
-/// mounted on the server yet — the upload and extraction phase owns it — and a
-/// card that asked for it would render an error state on a patient's first
-/// screen for a feature nobody promised them. `Endpoints` says the same thing
-/// the other way round: only routes that exist live in it.
-///
-/// So the section says what it is for and where documents come from, which is
-/// true today and stays true once the phase lands.
-class _Documents extends StatelessWidget {
-  const _Documents();
+/// Three states and no fourth, because there is no fourth the app can know:
+/// an interview open, a case sent from this device, or nothing to say. The
+/// middle one is the reason `PatientCaseService` exists —
+/// `sessions/current` finds sessions that are still open, so it answers a
+/// submitted case with the same null it answers a patient who never started.
+class _YourCase extends StatelessWidget {
+  const _YourCase({required this.controller});
+
+  final PatientDashboardController controller;
 
   @override
   Widget build(BuildContext context) {
-    return const BentoCard(
-      child: EmptyState(
+    return Obx(() {
+      final receipt = controller.submission;
+      final open = controller.openCase.value;
+      if (receipt == null && open == null) return const SizedBox.shrink();
+
+      final sent = receipt != null;
+      final when = receipt?.submittedAt;
+
+      return BentoCard(
+        key: CaseReviewKeys.dashboardCard,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  sent
+                      ? Icons.mark_email_read_outlined
+                      : Icons.pending_actions_outlined,
+                  size: 20,
+                  color: sent
+                      ? semanticInk(context, AppColors.success)
+                      : brandInkColor(context),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    sent
+                        ? PatientText.caseSent
+                        : 'You have answers we have not sent yet',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).brightness == Brightness.dark
+                        ? AppTextStyles.darkTitle3()
+                        : AppTextStyles.lightTitle3(),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              sent
+                  ? PatientText.caseSentBody
+                  : 'You can read them back, change anything that is not '
+                      'right, and send them when you are ready.',
+              style: (Theme.of(context).brightness == Brightness.dark
+                      ? AppTextStyles.darkBody()
+                      : AppTextStyles.lightBody())
+                  .copyWith(color: secondaryLabelColor(context), height: 1.45),
+            ),
+            if (sent && when != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                '${SettingsService.to.date(when)} · '
+                '${SettingsService.to.time(when)}',
+                style: (Theme.of(context).brightness == Brightness.dark
+                        ? AppTextStyles.darkFootnote()
+                        : AppTextStyles.lightFootnote())
+                    .copyWith(color: tertiaryLabelColor(context)),
+              ),
+            ],
+            const SizedBox(height: BentoSpace.section),
+            SecondaryBar(
+              key: CaseReviewKeys.openFromDashboard,
+              label: sent ? 'See what you sent' : PatientText.reviewTitle,
+              icon: Icons.fact_check_outlined,
+              onPressed: controller.openCaseReview,
+            ),
+          ],
+        ),
+      );
+    });
+  }
+}
+
+/// The prescriptions, reports and letters a patient brought with them.
+///
+/// The card keeps `PatientPortalKeys.documents` in **both** states — full and
+/// empty — because it is the section, not the empty message. A key that moved
+/// when the first document arrived would be a key every assertion about this
+/// part of the screen had to branch on.
+class _Documents extends StatelessWidget {
+  const _Documents({required this.controller});
+
+  final PatientDashboardController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final error = controller.documentsError.value;
+      final rows = controller.documents;
+
+      return BentoCard(
         key: PatientPortalKeys.documents,
-        compact: true,
-        icon: Icons.description_outlined,
-        title: 'Nothing added yet',
-        message: 'While you answer the questions you can photograph your old '
-            'prescriptions and reports, and they will be kept here.',
-      ),
-    );
+        padding: const EdgeInsets.symmetric(vertical: BentoSpace.listCardPad),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (error != null)
+              Padding(
+                padding: const EdgeInsets.all(BentoSpace.listPad),
+                child: Text(
+                  error,
+                  style: (Theme.of(context).brightness == Brightness.dark
+                          ? AppTextStyles.darkSubheadline()
+                          : AppTextStyles.lightSubheadline())
+                      .copyWith(color: secondaryLabelColor(context)),
+                ),
+              )
+            else if (rows.isEmpty)
+              EmptyState(
+                compact: true,
+                icon: Icons.description_outlined,
+                title: PatientText.noDocumentsYet,
+                message: PatientText.noDocumentsYetBody,
+              )
+            else
+              for (var i = 0; i < rows.length; i++) ...[
+                if (i > 0) const Hairline(indent: BentoSpace.listPad),
+                // Unkeyed on purpose: the same document has a keyed row on
+                // the documents screen, and two widgets sharing one key while
+                // that screen is pushed over this one is a `find.byKey` that
+                // cannot say which it found.
+                BentoRow(
+                  icon: Icons.description_outlined,
+                  title: rows[i].kind.label,
+                  // The server's own sentence about it. Two lines, because it
+                  // is a sentence and half a sentence is a status nobody can
+                  // act on.
+                  subtitle: rows[i].message,
+                  subtitleMaxLines: 2,
+                  showChevron: false,
+                ),
+              ],
+            const Hairline(indent: BentoSpace.listPad),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                BentoSpace.listPad,
+                BentoSpace.action,
+                BentoSpace.listPad,
+                4,
+              ),
+              child: SecondaryBar(
+                key: PatientDocumentsKeys.openFromDashboard,
+                label: PatientText.addADocument,
+                icon: Icons.add_a_photo_outlined,
+                onPressed: controller.openDocuments,
+              ),
+            ),
+          ],
+        ),
+      );
+    });
   }
 }
 

@@ -36,6 +36,10 @@ const Map<String, String> _idsForPattern = {
   '/pharmacy/prescriptions/:id/dispense': 'rx-1',
   '/billing/invoices/:id': 'inv-1',
   '/billing/invoices/:id/pay': 'inv-4',
+  // The shared world holds no documents — a patient with nothing uploaded
+  // is the ordinary starting state — so this one opens on "that document
+  // could not be found", which is a screen and is what this test is for.
+  '/patient/documents/:documentId': 'doc-1',
 };
 
 /// Routes this test does not drive, and why.

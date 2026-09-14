@@ -172,8 +172,13 @@ final class PatientPortalRobot extends Robot {
     await settle();
   }
 
+  /// Consent answered; the questions have started.
+  ///
+  /// The anchor is the interview's own, not the portal's: this robot walks the
+  /// entry sequence and hands over here. Everything that happens on the
+  /// interview belongs to `CaseTakingRobot`.
   Future<void> assertOnCaseHandoff() async {
-    await tester.pumpUntilFound(find.byKey(PatientPortalKeys.casePending));
+    await tester.pumpUntilFound(find.byKey(CaseTakingKeys.screen));
     expect(Get.currentRoute, PatientPortalRoutes.caseTaking);
   }
 

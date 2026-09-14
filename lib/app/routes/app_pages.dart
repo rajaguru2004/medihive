@@ -14,6 +14,7 @@ import '../modules/appointments/appointment_routes.dart';
 import '../modules/appointments/bindings/appointments_binding.dart';
 import '../modules/appointments/views/appointments_view.dart';
 import '../modules/billing/billing_routes.dart';
+import '../modules/case_review/case_review_routes.dart';
 import '../modules/consultation_detail/bindings/consultation_detail_binding.dart';
 import '../modules/consultation_detail/views/consultation_detail_view.dart';
 import '../modules/consultation_form/bindings/consultation_form_binding.dart';
@@ -53,6 +54,7 @@ import '../modules/new_screening_step1/views/new_screening_step1_view.dart';
 import '../modules/new_screening_step2/bindings/new_screening_step2_binding.dart';
 import '../modules/new_screening_step2/views/new_screening_step2_view.dart';
 import '../modules/no_access/views/no_access_view.dart';
+import '../modules/patient_documents/patient_documents_routes.dart';
 import '../modules/patient_form/bindings/patient_form_binding.dart';
 import '../modules/patient_form/views/patient_form_view.dart';
 import '../modules/patient_hub/bindings/patient_hub_binding.dart';
@@ -450,6 +452,15 @@ class AppPages {
     // screens are gated on the one verb only a patient holds rather than on a
     // role name — see `PatientShell`.
     ...PatientPortalPages.routes,
+
+    // The two screens the portal grew into: the documents a patient hands
+    // over, and the case they read back before it is sent. Their own tables
+    // rather than more entries in `PatientPortalPages`, because each one
+    // owns a registration order of its own — `/patient/documents` has to be
+    // declared before `/patient/documents/:documentId` or the list opens as
+    // a document with no id.
+    ...PatientDocumentsPages.routes,
+    ...CaseReviewPages.routes,
   ];
 
   /// Where an unrecognised route lands.

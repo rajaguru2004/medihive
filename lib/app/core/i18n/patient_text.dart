@@ -182,4 +182,350 @@ abstract final class PatientText {
             'take a new photo instead.',
       );
   static String get openSettings => _of('permission.settings', 'Open Settings');
+
+  // ── The interview ─────────────────────────────────────────────────────────
+  //
+  // The screen a patient spends the longest on, so this is the block where the
+  // register matters most. Every line is about them rather than about the
+  // system: "We are still reading that" and not "Extraction in progress", and
+  // nothing anywhere says what might be wrong with them.
+
+  static String get interviewTitle => _of('interview.title', 'Your answers');
+
+  /// The heading of the answer area, above the tiles and the keyboard.
+  static String get howToAnswer => _of(
+        'interview.how',
+        'Tap an answer, type it, or say it out loud.',
+      );
+
+  /// The keyboard path, offered on every question — voice is never required.
+  static String get typeYourAnswer =>
+      _of('interview.type.label', 'Type your answer');
+  static String get typeHere => _of('interview.type.hint', 'Type here');
+  static String get sendAnswer => _of('interview.type.send', 'Send');
+
+  /// While a turn is in flight. Short: the next question is milliseconds away,
+  /// so this is a state nobody should have time to read twice.
+  static String get sending => _of('interview.sending', 'Sending');
+
+  /// Under an answer the app has taken but has not finished reading.
+  ///
+  /// **Not a spinner and not a blocker.** Understanding a long answer costs the
+  /// model up to twenty seconds on this hardware, and the next question is
+  /// already on screen — so this says what is happening and gets out of the
+  /// way. "Still" is doing real work in the sentence: it tells somebody the
+  /// answer arrived, which is the part they were worried about.
+  static String get stillReadingThat =>
+      _of('interview.extracting', 'Still reading that');
+
+  /// Where the microphone is not available at all.
+  static String get voiceUnavailable => _of(
+        'interview.voice.unavailable',
+        'Answering out loud is not working right now. You can type your '
+            'answer or tap one below.',
+      );
+
+  /// When the recogniser heard nothing worth showing back.
+  static String get didNotHearAnything => _of(
+        'interview.voice.empty',
+        'We did not hear anything. Try again, or type your answer.',
+      );
+
+  /// A recording that was a thumb on the button rather than an answer.
+  static String get recordingTooShort => _of(
+        'interview.voice.short',
+        'That was too short to hear. Hold on a moment longer, or type your '
+            'answer.',
+      );
+
+  // ── Finishing ─────────────────────────────────────────────────────────────
+
+  static String get thatIsEverything =>
+      _of('interview.done.heading', 'That is everything we needed to ask');
+
+  static String get aDoctorWillRead => _of(
+        'interview.done.body',
+        'A doctor will read your answers before they see you. You can go back '
+            'and change anything you need to.',
+      );
+
+  static String get done => _of('interview.done.action', 'Done for now');
+
+  /// Nothing left to ask, but an answer is still being read. **Not the same as
+  /// finished**: saying so would invite somebody to close the app while the
+  /// last thing they said was still being written down.
+  static String get almostThere => _of(
+        'interview.settling',
+        'We are finishing writing down your last answer.',
+      );
+
+  // ── When something goes wrong ─────────────────────────────────────────────
+
+  static String get couldNotStart => _of(
+        'interview.error.start',
+        'We could not open your questions. Check your connection and try '
+            'again.',
+      );
+
+  static String get couldNotSendAnswer => _of(
+        'interview.error.turn',
+        'That answer did not reach us. Try it again.',
+      );
+
+  static String get tryAgain => _of('interview.error.retry', 'Try again');
+
+  /// Where the phone has a saved position and the server could not be reached.
+  ///
+  /// Says what is on screen and how old it is, rather than pretending the
+  /// interview is live. A patient answering questions into a screen that is
+  /// not recording them is the worst outcome available here.
+  static String get showingWhereYouLeftOff => _of(
+        'interview.offline',
+        'This is where you left off. We could not reach the hospital just '
+            'now, so nothing new can be saved until you try again.',
+      );
+
+  // ── Documents ─────────────────────────────────────────────────────────────
+  //
+  // Conspicuously short, and that is the design. **Every sentence about what
+  // happened to a document comes from the server**, which writes one for each
+  // outcome in `pipeline/messages.ts` and sends it on the row as `message`.
+  // The app prints it verbatim. Documents §27 names the failure this avoids —
+  // `PP-OCR inference exception` reaching somebody who only wanted to know
+  // whether to take another photograph — and the way that leaks is never a
+  // decision: it is one layer inventing its own wording for a state it did not
+  // measure. So what is here is the furniture around the sentence, and never a
+  // second opinion about the sentence itself.
+
+  static String get documentsTitle => _of('documents.title', 'Your documents');
+
+  static String get addADocument =>
+      _of('documents.add', 'Add a document');
+
+  static String get takeAPhoto => _of('documents.camera', 'Take a photo');
+  static String get chooseAPhoto =>
+      _of('documents.gallery', 'Choose a photo you already have');
+  static String get chooseAPdf => _of('documents.pdf', 'Choose a PDF');
+
+  static String get noDocumentsYet =>
+      _of('documents.empty.title', 'Nothing added yet');
+
+  static String get noDocumentsYetBody => _of(
+        'documents.empty.body',
+        'Photograph a prescription, a report or a discharge letter and we '
+            'will read it through with you.',
+      );
+
+  /// `Sending — 40%`. Tabular, and never a bare spinner: a send with no figure
+  /// on it reads as a hung screen, and the second tap sends the photo twice.
+  static String sendingPercent(int percent) => _of(
+        'documents.sending',
+        'Sending — {percent}%',
+        {'percent': '$percent'},
+      );
+
+  /// A file the route would drop the connection on. Refused here so the
+  /// patient is told a fact about their photo rather than shown a network
+  /// error for a file that is merely too big.
+  static String fileTooLarge(String size) => _of(
+        'documents.too.large',
+        'That file is {size}, which is more than we can take. Photograph one '
+            'page at a time, or send a smaller file.',
+        {'size': size},
+      );
+
+  static String get couldNotSendDocument => _of(
+        'documents.error.send',
+        'That document did not reach us. Try it again.',
+      );
+
+  static String get couldNotLoadDocuments => _of(
+        'documents.error.list',
+        "We couldn't load your documents just now.",
+      );
+
+  static String get couldNotOpenDocument => _of(
+        'documents.error.read',
+        "We couldn't open that document just now.",
+      );
+
+  static String get couldNotOpenFile => _of(
+        'documents.error.pick',
+        "We couldn't open that file.",
+      );
+
+  /// The heading over the extracted values. Never "what we found in your
+  /// record": nothing on this screen has been added to anything yet.
+  static String get checkWhatWeFound =>
+      _of('documents.review.title', 'Please check what we found');
+
+  static String get seeTheOriginal =>
+      _of('documents.original', 'See the original');
+
+  static String get couldNotOpenOriginal => _of(
+        'documents.original.error',
+        "We couldn't open the original just now. Try again.",
+      );
+
+  /// The two measured numbers, each named for what it measures.
+  ///
+  /// Two figures and never one. They are measurements of different things —
+  /// how well the page was *read*, and how much of what was structured out of
+  /// it was actually **on** the page — and a single blended "accuracy" is a
+  /// number nobody measured presented as one somebody did.
+  static String get howThisWasRead =>
+      _of('documents.confidence.title', 'How this was read');
+
+  static String get textRecognition =>
+      _of('documents.confidence.ocr', 'Text read from the page');
+
+  static String get informationFound =>
+      _of('documents.confidence.extraction', 'Information found in that text');
+
+  static String get notMeasured =>
+      _of('documents.confidence.none', 'Not measured');
+
+  /// Section headings inside one document.
+  static String get medicines => _of('documents.section.medications', 'Medicines');
+  static String get testResults =>
+      _of('documents.section.investigations', 'Test results');
+  static String get diagnosesRecorded => _of(
+        'documents.section.diagnoses',
+        // §14: the document recorded it. The app did not decide it, and the
+        // heading is the reminder.
+        'Diagnoses written in this document',
+      );
+  static String get proceduresRecorded =>
+      _of('documents.section.procedures', 'Procedures');
+  static String get followUpRecorded =>
+      _of('documents.section.followup', 'What to do next');
+  static String get allergiesRecorded =>
+      _of('documents.section.allergies', 'Allergies');
+
+  /// Under a value the patient has corrected. Replaces the document as the
+  /// authority for that line, and says so.
+  static String get youCorrectedThis =>
+      _of('documents.value.corrected', 'You corrected this');
+
+  static String get youConfirmedThis =>
+      _of('documents.value.confirmed', 'You confirmed this');
+
+  static String get youAreNotSure =>
+      _of('documents.value.unsure', 'You are not sure about this');
+
+  static String get notCheckedYet =>
+      _of('documents.value.unchecked', 'Not checked yet');
+
+  static String get whatShouldItSay =>
+      _of('documents.correct.hint', 'What should it say?');
+
+  static String get saveCorrection => _of('documents.correct.save', 'Save');
+
+  /// The document-level confirmation. Offered only when every value on the
+  /// screen has been agreed with, because that is what the server's `verify`
+  /// route means — see [documentGoesToAClinician] for the other ending.
+  static String get confirmThisDocument =>
+      _of('documents.verify', 'Confirm this document');
+
+  static String get documentConfirmedGoBack =>
+      _of('documents.verify.done', 'Thank you. That is confirmed.');
+
+  static String get documentGoesToAClinician => _of(
+        'documents.verify.blocked',
+        'Because something here is wrong or uncertain, we will not mark this '
+            'document as correct. A clinician will look at it with you.',
+      );
+
+  static String get couldNotConfirmDocument => _of(
+        'documents.verify.error',
+        "We couldn't record that just now. Try again.",
+      );
+
+  // ── Reviewing everything, and sending it ──────────────────────────────────
+
+  static String get reviewTitle =>
+      _of('review.title', 'What we understood');
+
+  static String get reviewIntro => _of(
+        'review.intro',
+        'Here is what we understood about you. Please read it and change '
+            'anything that is not right before we send it.',
+      );
+
+  /// §43. On screen, above the sections, and not in a footnote.
+  static String get notADiagnosis => _of(
+        'review.disclaimer',
+        'This is what you told us, written down. It is not a diagnosis, and '
+            'nothing here has been decided about you.',
+      );
+
+  /// §36: printed, never omitted. An omitted line reads as nothing to report.
+  static String get stillToAsk => _of('review.missing.title', 'Still to ask');
+
+  static String get stillToAskBody => _of(
+        'review.missing.body',
+        'Nobody has asked you about these yet. They are listed so that silence '
+            'is not read as an answer.',
+      );
+
+  /// §33 / §20. Both values are shown and neither is changed.
+  static String get pleaseCheckThese =>
+      _of('review.contradiction.title', 'Please check these');
+
+  static String get contradictionIntro => _of(
+        'review.contradiction.body',
+        'These differ from what the hospital already holds. We have changed '
+            'nothing either way — please tell the desk which is right.',
+      );
+
+  static String get inYourDocument =>
+      _of('review.contradiction.document', 'In the document you sent');
+
+  static String get inYourRecord =>
+      _of('review.contradiction.record', 'In your record already');
+
+  /// The first entry case, which is new information rather than a conflict.
+  static String get notInYourRecordYet => _of(
+        'review.contradiction.new',
+        'Your record does not mention this yet',
+      );
+
+  static String get sendToTheHospital =>
+      _of('review.submit', 'Send this to the hospital');
+
+  static String get caseSent =>
+      _of('review.submitted.title', 'Your answers have been sent');
+
+  static String get caseSentBody => _of(
+        'review.submitted.body',
+        'A doctor will read them before they see you.',
+      );
+
+  static String get alreadySent => _of(
+        'review.submitted.locked',
+        'This has already been sent to the hospital, so it cannot be changed '
+            'here. Tell the desk if something is wrong.',
+      );
+
+  static String get couldNotLoadReview => _of(
+        'review.error.load',
+        "We couldn't load your answers just now.",
+      );
+
+  static String get couldNotSendCase => _of(
+        'review.error.submit',
+        'That did not reach the hospital. Try again.',
+      );
+
+  static String get couldNotChangeAnswer => _of(
+        'review.error.correct',
+        'That change did not reach us. Try it again.',
+      );
+
+  /// `4 of 11 answered`, under the rail on the review screen.
+  static String answeredProgress(int addressed, int expected) => _of(
+        'review.progress',
+        '{addressed} of {expected} answered',
+        {'addressed': '$addressed', 'expected': '$expected'},
+      );
 }

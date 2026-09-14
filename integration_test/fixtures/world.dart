@@ -3,9 +3,12 @@ import 'package:medihive/app/core/app_clock.dart';
 import '../fakes/fake_api.dart';
 import 'fake_jwt.dart';
 import 'modules/billing_fixtures.dart';
+import 'modules/case_review_fixtures.dart';
+import 'modules/case_taking_fixtures.dart';
 import 'modules/clinical_fixtures.dart';
 import 'modules/integrations_fixtures.dart';
 import 'modules/laboratory_fixtures.dart';
+import 'modules/patient_documents_fixtures.dart';
 import 'modules/patient_portal_fixtures.dart';
 import 'modules/patients_fixtures.dart';
 import 'modules/pharmacy_fixtures.dart';
@@ -80,6 +83,36 @@ abstract final class World {
     // and the portal asking for one patient's rows is the same request the
     // hub's Visits tab makes.
     installPatientPortalFixtures(api);
+
+    // The documents a patient hands over. Installed for **every** flow rather
+    // than only the documents one: `GET /api/patient-documents` is on a shared
+    // path now — the patient's dashboard reads it and so does the case review —
+    // and `AppHarness.dispose` fails any test that touches an endpoint nothing
+    // answered. A module whose routes live only in its own flow is a landmine
+    // under every other flow that renders the same screen.
+    //
+    // Empty by default. A patient with nothing uploaded is the ordinary
+    // starting state, and the documents flow installs this again with its two
+    // rows — later registrations win, which is the mechanism the whole file is
+    // ordered around.
+    installPatientDocumentsFixtures(api);
+
+    // "Here is what we understood about you", and the submission it becomes.
+    //
+    // **Before** the interview, deliberately. Both register
+    // `PATCH /sessions/:sessionId/facts/:factId` — a correction is a correction
+    // whichever screen makes it — and later registrations win, so this order
+    // leaves the interview's own answer standing in the shared world. The
+    // review flow installs this again in its overrides when it needs the
+    // correction to come back attributed to the line it actually changed.
+    installCaseReviewFixtures(api);
+
+    // The interview, which is the portal's other half and shares none of its
+    // routes. Installed unconditionally rather than only for the patient role:
+    // `every_route_builds_test` opens every page in the table as the account
+    // that can reach them all, and a screen with no fixture behind it fails
+    // that run as an unstubbed call rather than as a missing feature.
+    installCaseTakingFixtures(api);
   }
 
   /// The refresh token every session in this world holds.

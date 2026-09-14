@@ -2,9 +2,10 @@ import 'package:get/get.dart';
 
 import '../../data/models/access_map.dart';
 import '../../routes/middlewares/auth_middleware.dart';
+import '../case_taking/bindings/case_taking_binding.dart';
+import '../case_taking/views/case_taking_view.dart';
 import 'patient_activate/bindings/patient_activate_binding.dart';
 import 'patient_activate/views/patient_activate_view.dart';
-import 'patient_case_pending/views/patient_case_pending_view.dart';
 import 'patient_claim/bindings/patient_claim_binding.dart';
 import 'patient_claim/views/patient_claim_view.dart';
 import 'patient_consent/bindings/patient_consent_binding.dart';
@@ -95,17 +96,17 @@ abstract final class PatientPortalPages {
           transition: Transition.cupertino,
         ),
 
-        // The seam the interview lands on.
+        // The interview, which lives in its own module.
         //
-        // The entry sequence has to end somewhere a patient can read, and
-        // `/not-found` is not it. This screen says what happens next and gives
-        // them their dashboard back; the case-taking phase replaces the one
-        // `page:` builder below with its own view and deletes the file. The
-        // route name, the middleware and the arguments it is handed
-        // (`PatientEntry`) are already what that phase needs.
+        // It is routed from here rather than from a table of its own because
+        // this is where the entry sequence ends: the language and the consent
+        // it needs arrive in the arguments as `PatientEntry`, handed over by
+        // the consent screen two lines above. A second route table holding one
+        // page would put the two halves of one journey in two files.
         GetPage<dynamic>(
           name: PatientPortalRoutes.caseTaking,
-          page: () => const PatientCasePendingView(),
+          page: () => const CaseTakingView(),
+          binding: CaseTakingBinding(),
           middlewares: _portal,
           transition: Transition.cupertino,
         ),

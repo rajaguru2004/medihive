@@ -87,10 +87,8 @@ abstract final class PatientPortalKeys {
 
   // ── The hand-off to the interview ─────────────────────────────────────────
   //
-  // Both keys belong to a screen the case-taking phase replaces. They are
-  // here rather than in the flow tree because a flow may not call `find.*`,
-  // and the entry sequence has to be walkable end to end today.
-
-  static const Key casePending = Key('patient_case_pending_screen');
-  static const Key casePendingBack = Key('patient_case_pending_back');
+  // Nothing here. The two keys that used to sit in this block belonged to a
+  // placeholder screen that said "the questions are coming"; the interview has
+  // since been built, so the consent screen now hands over to a real one and
+  // the keys for it live in `case_taking_keys.dart`.
 }

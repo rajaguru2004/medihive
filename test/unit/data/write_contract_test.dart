@@ -1,4 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+// The answer tokens a tapped tile carries live beside the model they describe,
+// not in the draft — a token and the words on the tile have to travel together
+// or a call site can pair the label of one answer with the value of another.
+import 'package:medihive/app/data/models/case_session.dart';
 import 'package:medihive/app/data/models/drafts/drafts.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
@@ -1789,6 +1793,208 @@ void main() {
         draft.toCreateJson(),
         allowed: create,
         expected: create.difference({'email'}),
+      );
+    });
+  });
+
+  // ── Case taking ───────────────────────────────────────────────────────────
+  //
+  // The interview's four writes. Two keys are absent from every one of them and
+  // the absences are the contract rather than an oversight: `patientId` arrives
+  // from the bearer token, and **`presence` cannot be sent at all**. A client
+  // that could post "this is unknown" would be a client that could post "this
+  // is a no", and the whole tri-state exists because that is the mistake worth
+  // making structurally impossible.
+
+  group('CaseSessionStartDraft', () {
+    // hms_v2/src/modules/case-taking/dto/case-taking.dto.ts — StartCaseSessionDto
+    const create = {'kind', 'language', 'appointmentId'};
+
+    test('sends the kind and the language', () {
+      const draft = CaseSessionStartDraft(language: 'en');
+      expectBody(
+        draft.toCreateJson(),
+        allowed: create,
+        // No appointment: an intake taken at a desk belongs to no booking, and
+        // `draftBody` drops the null rather than sending one.
+        expected: create.difference({'appointmentId'}),
+      );
+    });
+
+    test('never sends a patient or an organisation', () {
+      const draft = CaseSessionStartDraft();
+      // Both arrive from the token. Sending either is a 400, which is the
+      // server making a tenant-hopping request a syntax error.
+      expect(draft.toCreateJson().containsKey('patientId'), isFalse);
+      expect(draft.toCreateJson().containsKey('organizationId'), isFalse);
+    });
+  });
+
+  group('CaseConsentDraft', () {
+    // CaseConsentDto
+    const create = {'consentVersion', 'accepted'};
+
+    test('sends the wording and the answer', () {
+      const draft = CaseConsentDraft(
+        consentVersion: '2026.09.1',
+        accepted: true,
+      );
+      expectBody(draft.toCreateJson(), allowed: create, expected: create);
+    });
+
+    test('a refusal is sent, not omitted', () {
+      // `false` is a value and never an absence — see `draftBody`. A refusal
+      // that arrived as a missing key would leave the session open in a state
+      // where the next request could still ask a question.
+      const draft = CaseConsentDraft(
+        consentVersion: '2026.09.1',
+        accepted: false,
+      );
+      expect(draft.toCreateJson()['accepted'], isFalse);
+    });
+  });
+
+  group('CaseTurnDraft', () {
+    // SubmitTurnDto
+    const create = {
+      'fieldPath',
+      'modality',
+      'text',
+      'value',
+      'transcriptConfidence',
+      'audioKey',
+    };
+
+    test('a spoken answer carries the recogniser\'s own confidence', () {
+      final draft = CaseTurnDraft.spoken(
+        fieldPath: 'hpi.duration',
+        text: 'About three days now',
+        confidence: 0.84,
+      );
+      expectBody(
+        draft.toCreateJson(),
+        allowed: create,
+        expected: {'fieldPath', 'modality', 'text', 'transcriptConfidence'},
+      );
+      expect(draft.toCreateJson()['modality'], 'voice');
+    });
+
+    test('a typed answer is text, and nothing is inferred from it', () {
+      final draft = CaseTurnDraft.typed(
+        fieldPath: 'chief_complaint.symptom',
+        text: 'Chest pain',
+      );
+      expectBody(
+        draft.toCreateJson(),
+        allowed: create,
+        expected: {'fieldPath', 'modality', 'text'},
+      );
+      expect(draft.toCreateJson()['modality'], 'text');
+    });
+
+    test('a tapped tile is `choice`, never `touch`', () {
+      // Two spellings of one concept is one of them eventually being missed;
+      // the backend ledger records exactly that drift between its schema and
+      // its engine. `ANSWER_MODALITIES` is the single source and `choice` is
+      // the word in it.
+      final draft = CaseTurnDraft.tapped(
+        fieldPath: 'hpi.onset',
+        option: const CaseAnswerOption(
+          token: 'sudden',
+          label: 'Sudden',
+          modality: CaseAnswerModality.choice,
+        ),
+      );
+      expect(draft.toCreateJson()['modality'], 'choice');
+      expect(draft.toCreateJson()['value'], 'sudden');
+    });
+
+    test("\"I don't know\" goes out as not_sure and never as no", () {
+      // The single most important assertion in this file. A tapped "I don't
+      // know" is a statement about what the patient knows; a "no" is a clinical
+      // finding. A chart that says "no known allergies" because nobody asked is
+      // wrong in the direction that gets somebody prescribed the drug that
+      // kills them.
+      final draft = CaseTurnDraft.tapped(
+        fieldPath: 'allergies.reported',
+        option: CaseAnswerOption.unsure,
+      );
+      final body = draft.toCreateJson();
+
+      expect(body['value'], 'not_sure');
+      expect(body['value'], isNot('no'));
+      expect(body['modality'], 'choice');
+      // And the state itself is never asserted by the client: `derivePresence`
+      // reads the patient's own words and decides, and it is the only thing
+      // that does.
+      expect(body.containsKey('presence'), isFalse);
+    });
+
+    test('a skip carries its meaning in the modality, not in a value', () {
+      final draft = CaseTurnDraft.tapped(
+        fieldPath: 'family.any_relevant',
+        option: CaseAnswerOption.skip,
+      );
+      final body = draft.toCreateJson();
+
+      expect(body['modality'], 'skip');
+      expect(
+        body.containsKey('value'),
+        isFalse,
+        reason: 'a skip that carried a value would be an answer nobody gave',
+      );
+    });
+  });
+
+  group('PatientDocumentUploadDraft', () {
+    // hms_v2/src/modules/patient-documents/dto/upload-patient-document.dto.ts
+    const create = {'sessionId', 'patientId'};
+
+    test('attaches the document to the interview it was taken during', () {
+      const draft = PatientDocumentUploadDraft(sessionId: 'cs-1');
+      expectBody(
+        draft.toCreateJson(),
+        allowed: create,
+        // `patientId` is declared by the DTO and deliberately never sent. It
+        // exists for a receptionist scanning somebody else's referral letter;
+        // a patient's own id is on the bearer token, and the guard prefers the
+        // token over the body whatever the body says.
+        expected: create.difference({'patientId'}),
+      );
+    });
+
+    test('a document added from the dashboard names no session', () {
+      const draft = PatientDocumentUploadDraft();
+      // Dropped rather than sent empty: the server checks the session belongs
+      // to this patient and answers a blank one with "That case-taking session
+      // could not be found."
+      expect(draft.toCreateJson(), isEmpty);
+      expect(draft.toFormFields(), isEmpty);
+    });
+
+    test('every part of a multipart body goes out as text', () {
+      // `forbidNonWhitelisted` applies to a multipart body too, and everything
+      // in one arrives as a string no matter what it was on the client. Spelled
+      // out here rather than left to `FormData.fromMap` to coerce.
+      const draft = PatientDocumentUploadDraft(sessionId: 'cs-1');
+      expect(draft.toFormFields(), isA<Map<String, String>>());
+      expect(draft.toFormFields(), {'sessionId': 'cs-1'});
+    });
+  });
+
+  group('CaseFactCorrectionDraft', () {
+    // CorrectFactDto
+    const update = {'modality', 'text', 'value'};
+
+    test('sends the corrected words and nothing about the fact it replaces',
+        () {
+      // The fact id is in the path. A correction that also named its target in
+      // the body would be a second place for the two to disagree.
+      const draft = CaseFactCorrectionDraft(text: 'Four days, not three');
+      expectBody(
+        draft.toUpdateJson(),
+        allowed: update,
+        expected: {'text'},
       );
     });
   });
