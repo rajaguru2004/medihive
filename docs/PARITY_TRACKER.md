@@ -24,7 +24,7 @@ Backend gates: `npm run lint`, `npm run build`, `npm test`, `npm run verify:mobi
 
 | Phase | Scope | Size | Status |
 |---|---|---|---|
-| [P0](#p0--foundation-and-local-stack) | Foundation, local stack, backend contract, RBAC plumbing | L | 🔄 backend done; mobile next |
+| [P0](#p0--foundation-and-local-stack) | Foundation, local stack, backend contract, RBAC plumbing | L | 🔄 nearly done — test infra + drafts remain |
 | [P1](#p1--shell-navigation-and-design-contract) | Role-shaped shell, More hub, tablet rail | M | ⬜ |
 | [P2](#p2--patients) | Registry, search, form, patient hub | L | ⬜ |
 | [P3](#p3--clinical-parity) | Appointments, consultations, queue/triage/inpatient gating | L | ⬜ |
@@ -69,7 +69,7 @@ layer stops sending a vocabulary the backend rejects.
 | 0.14 | `ThrottlerGuard` registered before `JwtAuthGuard`; per-route limits; `@SkipThrottle` on health | ✅ | configured but never registered |
 | 0.15 | Roles/permissions reads gated on permissions, not the literal SUPER_ADMIN role | ✅ | ADMIN with `roles.read` gets 403 today |
 | 0.16 | `AuthCacheService.invalidateUser` wired into roles, users, settings-users, change-password | ✅ | `auth:access-map` is never busted today |
-| 0.17 | CORS origin from `CORS_ORIGINS` in production | ⬜ | SHOULD |
+| 0.17 | CORS origin from `CORS_ORIGINS` in production | ✅ | SHOULD |
 | 0.18 | `auth.service.spec.ts` extended (expiresIn, rotation, replay, logout, change-password, getMe) | ✅ | |
 
 ### P0.C — Backend settings and tenancy (B2)
@@ -81,57 +81,57 @@ layer stops sending a vocabulary the backend rejects.
 | 0.21 | `GET /api/settings` — JWT-only flat site map the app's `SiteSettings` already parses | ✅ | the app calls this on every sign-in |
 | 0.22 | Org resolved from the JWT everywhere (`tenant.util.ts`); `'org-demo'` fallbacks removed; `UserService` org-scoped | ✅ | cross-tenant read **and** write today |
 | 0.23 | `/settings/users`: never return `password`; optional initial password; `USER_*` + `ROLE_UPDATE` alongside `SETTINGS_UPDATE` | ✅ | password hashes are returned today |
-| 0.24 | `POST /api/settings/organization/logo` (multipart) so the phone can change logos | ⬜ | |
-| 0.25 | Seed: ADMIN gains `ROLE_UPDATE` + `PERMISSION_READ`; `DEATH_CERTIFICATE_*` seeded | ⬜ | enum/seed drift |
+| 0.24 | `POST /api/settings/organization/logo` (multipart) so the phone can change logos | ✅ | |
+| 0.25 | Seed: ADMIN gains `ROLE_UPDATE` + `PERMISSION_READ`; `DEATH_CERTIFICATE_*` seeded | ✅ | enum/seed drift |
 
 ### P0.D — Backend contract normalisation (B3 MUST)
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 0.26 | Remove the 18 hand-rolled envelopes (inpatient, laboratory, pharmacy, radiology) | ⬜ | |
-| 0.27 | Settings/roles/death-certificate deletes return the entity, not a double-wrapped message | ⬜ | |
-| 0.28 | Queue meta → standard shape + legacy keys for one release; `pagination.util.ts` | ⬜ | web reads the legacy keys |
-| 0.29 | Queue accepts `p1..p5`; rank-table sort | ⬜ | **every add-to-queue from the app is a 400 today** |
-| 0.30 | `search` on consultations and appointments queries | ⬜ | the app already sends it → 400 |
-| 0.31 | `patientId` filter + embedded `patient{}` on lab orders, radiology orders, prescriptions | ⬜ | the patient hub needs it |
-| 0.32 | `totalBeds` on dashboard stats | ⬜ | fixes the occupancy undercount |
+| 0.26 | Remove the 18 hand-rolled envelopes (inpatient, laboratory, pharmacy, radiology) | ✅ | |
+| 0.27 | Settings/roles/death-certificate deletes return the entity, not a double-wrapped message | ✅ | |
+| 0.28 | Queue meta → standard shape + legacy keys for one release; `pagination.util.ts` | ✅ | web reads the legacy keys |
+| 0.29 | Queue accepts `p1..p5`; rank-table sort | ✅ | **every add-to-queue from the app is a 400 today** |
+| 0.30 | `search` on consultations and appointments queries | ✅ | the app already sends it → 400 |
+| 0.31 | `patientId` filter + embedded `patient{}` on lab orders, radiology orders, prescriptions | ✅ | the patient hub needs it |
+| 0.32 | `totalBeds` on dashboard stats | ✅ | fixes the occupancy undercount |
 | 0.33 | Web one-liners: `axios.ts` refresh unwrap, queue/patients/pre-triage meta types | ⬜ | |
 
 ### P0.E — Mobile data layer
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 0.34 | `registerDomainServices()` shared by `main()` and the harness | ⬜ | **domain services are never registered in production today** |
-| 0.35 | `Endpoints`: base URL → `:3000`, dead routes removed, every new module route added, `Crud.updateVerb` | ⬜ | |
-| 0.36 | `ApiEnvelope`: keep `statusCode`, lift `{data,meta}`, 204 = success; `Pagination.fromMeta` reads both shapes | ⬜ | |
-| 0.37 | `PagedQuery` re-targeted to this backend's query vocabulary | ⬜ | current keys are a 400 under `forbidNonWhitelisted` |
-| 0.38 | `CrudRepository`: paged + bare lists, `listAll` follows `hasMore`, honours `updateVerb`, accepts 204, `action()`, `upload()` | ⬜ | |
-| 0.39 | `asJsonList()` for JSON-string fields; `PatientRef` replaces the three patient copies; `QueueServiceCount` rename; `DashboardData`/`OrganizationData` unwrapped | ⬜ | |
+| 0.34 | `registerDomainServices()` shared by `main()` and the harness | ✅ | **domain services are never registered in production today** |
+| 0.35 | `Endpoints`: base URL → `:3000`, dead routes removed, every new module route added, `Crud.updateVerb` | ✅ | |
+| 0.36 | `ApiEnvelope`: keep `statusCode`, lift `{data,meta}`, 204 = success; `Pagination.fromMeta` reads both shapes | ✅ | |
+| 0.37 | `PagedQuery` re-targeted to this backend's query vocabulary | ✅ | current keys are a 400 under `forbidNonWhitelisted` |
+| 0.38 | `CrudRepository`: paged + bare lists, `listAll` follows `hasMore`, honours `updateVerb`, accepts 204, `action()`, `upload()` | ✅ | |
+| 0.39 | `asJsonList()` for JSON-string fields; `PatientRef` replaces the three patient copies; `QueueServiceCount` rename; `DashboardData`/`OrganizationData` unwrapped | ✅ | |
 | 0.40 | Write drafts per entity + `write_contract_test.dart` pinning each key set | ⬜ | |
-| 0.41 | `status_registry.dart` + unit test forbidding red for non-clinical states | ⬜ | RULES §0 rule 1 |
-| 0.42 | 21 inline `/api/...` paths moved into `Endpoints`; hard-coded org id removed | ⬜ | |
+| 0.41 | `status_registry.dart` + unit test forbidding red for non-clinical states | ✅ | RULES §0 rule 1 |
+| 0.42 | 21 inline `/api/...` paths moved into `Endpoints`; hard-coded org id removed | ✅ | |
 
 ### P0.F — Mobile RBAC plumbing
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 0.43 | `access_map.dart` — `AccessVerb`, `Modules`, `ModuleAccess`, `AccessMap` (+ `fromPermissions` fallback) | ⬜ | |
-| 0.44 | `AccessService` — bootstrap → access → JWT claims → empty; persisted; `refreshIfStale`; cleared on teardown | ⬜ | |
-| 0.45 | `jwt_claims.dart`; `AuthUser` gains `organizationId`/`roles`; logout sends the refresh token; expired token dropped on restore | ⬜ | |
-| 0.46 | 403 pipeline: `ApiForbiddenException`, `rxNoAccess`, `ListPhase.forbidden`, `NoAccessState` | ⬜ | **403 arrives as a normal response, not a `DioException`** |
-| 0.47 | `SiteSettings.fromOrganization` adapter | ⬜ | |
+| 0.43 | `access_map.dart` — `AccessVerb`, `Modules`, `ModuleAccess`, `AccessMap` (+ `fromPermissions` fallback) | ✅ | |
+| 0.44 | `AccessService` — bootstrap → access → JWT claims → empty; persisted; `refreshIfStale`; cleared on teardown | ✅ | |
+| 0.45 | `jwt_claims.dart`; `AuthUser` gains `organizationId`/`roles`; logout sends the refresh token; expired token dropped on restore | ✅ | |
+| 0.46 | 403 pipeline: `ApiForbiddenException`, `rxNoAccess`, `ListPhase.forbidden`, `NoAccessState` | ✅ | **403 arrives as a normal response, not a `DioException`** |
+| 0.47 | `SiteSettings.fromOrganization` adapter | ✅ | |
 
 ### P0.G — Platform, test infra, gate
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 0.48 | Android: INTERNET, debug cleartext config, `com.medihive.app`, label, `medihive://` deep-link filter | ⬜ | **a release build cannot reach any API today** |
-| 0.49 | iOS: bundle id, display name, debug ATS exception | ⬜ | not verifiable on this machine |
+| 0.48 | Android: INTERNET, debug cleartext config, `com.medihive.app`, label, `medihive://` deep-link filter | ✅ | **a release build cannot reach any API today** |
+| 0.49 | iOS: bundle id, display name, debug ATS exception | ✅ | not verifiable on this machine |
 | 0.50 | `WorldRole` + fake JWT + `api.forbid` + `bootSignedIn(role:)` | ⬜ | |
 | 0.51 | `DeviceClass` wired into the harness; role-parameterised screenshot suite; `NEX_HIVE_TEXT_SCALE` | ⬜ | defined but never applied today |
 | 0.52 | Live tier skeleton `test/contract/live/` + `tool/live.env.example` | ⬜ | |
 | 0.53 | Unit tests: access map, both metas, `PagedQuery`, write contracts, status registry | ⬜ | |
-| 0.54 | Backend `seed-mobile-demo.ts` + `verify:mobile` green for all roles | ⬜ | |
+| 0.54 | Backend `seed-mobile-demo.ts` + `verify:mobile` green for all roles | ✅ | |
 | 0.55 | **P0 gate**: analyze clean · unit green · the existing 12 flows green · the app signs in against the real API as every seeded role | ⬜ | |
 
 ---
@@ -318,7 +318,15 @@ what broke, why it was invisible, and what now prevents it.
 | Roles and permissions reads are gated on the literal SUPER_ADMIN role | An ADMIN the access map says can read roles still gets 403 | ✅ |
 | Jest resolves `.env.local` before `.env.test`, and `cleanDatabase()` truncates every table | A test run can truncate the dev database — or worse, whatever `.env` points at | ✅ |
 | The tracked `.env` points `DATABASE_URL` at a production host | `npm run start:dev` with no `.env.local` connects to production; only the seeds are guarded | ✅ |
-| `DEATH_CERTIFICATE_*` in the permission enum but not in the seed | The whole module is 403 for every role but SUPER_ADMIN, unfixable through the API | ⬜ |
+| `DEATH_CERTIFICATE_*` in the permission enum but not in the seed | The whole module is 403 for every role but SUPER_ADMIN, unfixable through the API | ✅ |
+| `@Throttle` read `process.env` in a decorator argument | Decorators evaluate before `ConfigModule` loads any .env, so the login limit was silently 10/min whatever was configured — worse than no limit, because it looks deliberate | ✅ |
+| The queue board ordered by the priority **string** | Alphabetical, not clinical: "routine" outranked "normal", and with pagination a P1 lands on page two | ✅ |
+| The queue rejected the `p1`–`p5` codes the app sends | Every add-to-queue from a phone was a 400 | ✅ |
+| `laboratory.getStats` counted critical results with no tenant filter | A clinician saw every hospital's unverified criticals as their own | ✅ |
+| The web console posts capitalised `admissionType` | A lowercase-only vocabulary would have 400'd every admission from the web | ✅ |
+| `AdmissionRepository` had no `paginate` override and `Admission` has no `isDeleted` | The first paged admissions request would have thrown | ✅ |
+| The radiology uploader rejected `application/dicom` via `startsWith('image/')` | Blocked the one type the endpoint exists to accept | ✅ |
+| `RadiologyReport.organizationId` is nullable exactly like `LabResult` | The same latent cross-tenant read, one module over | ✅ |
 
 ### Mobile
 
@@ -330,10 +338,39 @@ what broke, why it was invisible, and what now prevents it.
 | A 403 arrives as an ordinary response, not a `DioException` | The 403 branch in the error handler is unreachable; permission errors would read as generic failures | ⬜ |
 | The Android release manifest has no `INTERNET` permission and no cleartext config | A release build cannot reach any API, and fails with a network error nobody can explain | ⬜ |
 | `applicationId` is still `com.example.medihive` | Ships under the template identity | ⬜ |
-| A hard-coded organisation id in the dashboard service | Single-tenant leak in a per-site product | ⬜ |
+| A hard-coded organisation id in the dashboard service | Single-tenant leak in a per-site product | ✅ |
+| `RecentPatient.dateOfBirth` defaulted to `DateTime.now()` | Every patient with no recorded date of birth rendered as a **neonate** on the board, and as registered today | ✅ |
+| `fetchAppointments` asked for 1000 rows against a server cap of 100 | "All appointments" silently meant the first hundred | ✅ |
+| `AuthUser.fromJson` read `department` as a string when the bootstrap sends an object | Would have painted `{id: …, name: …}` into the shell header | ✅ |
+| Five `Crud` entries pointed at multiplexed compat routes with no `/:id` | `byId`/`delete` would 404 on a path that looks right | ✅ |
+| `SortOption.sortValue` sent `1`/`-1` to a server validating `asc`/`desc` | Same class as the `PagedQuery` defect | ✅ |
 | `DashboardStats` has no `totalBeds` | Occupancy undercounts by reserved and blocked beds; the board and the ward screen disagree | ⬜ |
 
 ---
+
+## Toolchain notes
+
+**`./gradlew` fails with the system JDK.** `java` is OpenJDK 25.0.4.1 and Gradle
+8.14's Kotlin DSL cannot parse a four-component version string. Use
+`JAVA_HOME=/opt/android-studio/jbr` (JDK 17) for direct `./gradlew` calls;
+`flutter build` picks that JDK on its own.
+
+**Deep links arrive with the scheme attached.** Flutter 3.38.4 has deep linking
+on by default and passes the whole URI, so `medihive://queue` reaches
+`defaultRouteName` verbatim. `main.dart`'s `_launchRoute` only special-cases
+`''` and `'/'`, so the screenshot harness will land on `unknownRoute` until the
+scheme is stripped.
+
+**`NODE_ENV=test` leaking into a shell** now makes the API load `.env.test`
+alone — port 3001, the 5433 test database. That is the isolation working as
+intended, but start the dev server with an explicit `NODE_ENV=development` if a
+jest run has been through the same shell.
+
+**The e2e fixtures are stale against the real backend.** `world.dart` serves
+`/api/settings` as an array of `{settingKey, settingValue}` documents and
+`/api/auth/me` as a bare user with no `access` block. Both legacy shapes are
+still tolerated, so nothing fails — but the harness is not exercising the real
+contract, and that has to be fixed before the flow tests mean anything.
 
 ## Follow-ups
 
