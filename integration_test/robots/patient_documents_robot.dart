@@ -381,9 +381,17 @@ final class PatientDocumentsRobot extends Robot {
   }
 
   /// Back to the list, from the reading.
+  ///
+  /// Waits for the reading to **go**, not for the list to appear. A route below
+  /// the top of the stack is still built and still findable, so waiting on the
+  /// list's own key returns on the frame the pop starts — and the next tap then
+  /// lands on the screen that is still sliding off, which absorbs it silently.
   Future<void> backToList() async {
     Get.back();
-    await tester.pumpUntilFound(find.byKey(PatientDocumentsKeys.screen));
+    await tester.pumpUntilGone(find.byKey(PatientDocumentsKeys.review));
+    await tester.pumpUntilRouteSettled(
+      expectRoute: PatientDocumentsRoutes.list,
+    );
     await settle();
   }
 }

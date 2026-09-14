@@ -31,13 +31,15 @@
 /// ─────────────────────────────────────────────────────────────────────────────
 library;
 
-import 'dart:convert';
-import 'dart:typed_data';
-
 import 'package:medihive/app/core/app_clock.dart';
+import 'package:medihive/app/data/repositories/patient_documents_repository.dart';
 import 'package:medihive/app/data/services/file_source.dart';
+import 'package:medihive/app/data/services/image_source.dart';
+import 'package:medihive/app/data/services/media_access.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../fakes/fake_api.dart';
+import '../documents/document_bytes.dart';
 
 /// The prescription that was read, and the one every review assertion is about.
 const String kReadableDocumentId = 'doc-1';
@@ -61,6 +63,12 @@ const String kCorrectedMedication = 'Amlodipine 5 mg';
 /// wanted to know whether to take another photograph is told to.
 const String kUnreadableMessage =
     "We couldn't read this document clearly. Please upload a clearer image.";
+
+/// §5's sentence, verbatim from `pipeline/messages.ts`: what to do, not what
+/// went wrong.
+const String kTooSmallMessage =
+    'This image is too small to read. Please take the photo again, holding the '
+    'camera closer so the page fills the frame.';
 
 /// §21's sentence, verbatim.
 const String kDuplicateMessage =
@@ -151,6 +159,21 @@ void installPatientDocumentsFixtures(FakeApi api, {bool withDocuments = false}) 
     }
 
     byFile[filename] = id;
+
+    if (filename == TooSmallImageSource.filename) {
+      // §5. The quality check runs before OCR, so a thumbnail never reaches the
+      // recogniser at all — and what comes back is a sentence about holding the
+      // camera closer rather than a confidence score about the wrong
+      // characters.
+      held[id] = _row(
+        id: id,
+        status: 'rejected_quality',
+        message: kTooSmallMessage,
+        sessionId: request.formFields['sessionId'],
+      );
+      return FakeResponse.ok(held[id]);
+    }
+
     // The pipeline is instant here. The server's own `uploaded` → `processing`
     // → `needs_review` walk is reproduced by the poll fixture below, which a
     // flow installs over this one when it wants to see the waiting screen.
@@ -421,22 +444,63 @@ const Map<String, Object?> _extraction = {
   'verificationStatus': 'unverified',
 };
 
+/// The photo library, answering with the prescription from the backend's own
+/// fixtures.
+///
+/// **Not** `StubImageSource`, whose one-pixel PNG is sixty-nine bytes: the
+/// server's quality check refuses an image that small with a written sentence
+/// about holding the camera closer, so the placeholder could only ever
+/// exercise the refusal — and an upload of sixty-nine bytes produces no
+/// progress bar anybody can watch.
+///
+/// The filename is fixed, which is the point for §21: a second pick answers
+/// with the same bytes under the same name, which is what the duplicate check
+/// on the server is looking at.
+class StubGalleryImageSource implements ImageSource {
+  const StubGalleryImageSource();
+
+  static const String filename = 'prescription.png';
+
+  @override
+  Future<PickedImage?> pick(ImageOrigin origin) async => PickedImage(
+        bytes: kPrescriptionPng,
+        filename: filename,
+        mimeType: 'image/png',
+      );
+}
+
+/// A page photographed from too far away.
+///
+/// §5's case, and the reason the quality check runs **before** OCR rather than
+/// after: a recogniser handed a thumbnail comes back at plausible confidence
+/// about the wrong characters, and no number downstream can separate that from
+/// a good read.
+class TooSmallImageSource implements ImageSource {
+  const TooSmallImageSource();
+
+  static const String filename = 'too-small.png';
+
+  @override
+  Future<PickedImage?> pick(ImageOrigin origin) async => PickedImage(
+        bytes: kTooSmallPng,
+        filename: filename,
+        mimeType: 'image/png',
+      );
+}
+
 /// A PDF, for the third way in.
 ///
 /// `StubFileSource` answers with a CSV, which is right for the analyser import
-/// it was written for and is exactly what this route refuses. Real bytes with a
-/// real header, because the point of driving the seam at all is that everything
-/// downstream of the picker runs.
+/// it was written for and is exactly what this route refuses. This is the same
+/// prescription as a PDF, out of the backend's own fixtures.
 class StubPdfFileSource implements FileSource {
   const StubPdfFileSource();
 
-  static const String filename = 'discharge-summary.pdf';
+  static const String filename = 'prescription.pdf';
 
   @override
   Future<PickedFile?> pick() async => PickedFile(
-        bytes: Uint8List.fromList(
-          utf8.encode('%PDF-1.4\n% a discharge summary\n%%EOF\n'),
-        ),
+        bytes: kPrescriptionPdf,
         filename: filename,
         mimeType: 'application/pdf',
       );
@@ -453,4 +517,33 @@ class CancelledFileSource implements FileSource {
 
   @override
   Future<PickedFile?> pick() async => null;
+}
+
+/// The device saying yes, without a system dialog nothing in a test can tap.
+///
+/// A permission prompt is drawn **outside** the Flutter tree, so a device test
+/// that reaches one does not fail — it hangs, with nothing on screen naming the
+/// cause, until the twelve-minute timeout. This is the seam that keeps the
+/// prompt in the app and out of the run.
+class GrantedMediaPermissions implements MediaPermissionGate {
+  const GrantedMediaPermissions();
+
+  @override
+  Future<void> require(MediaPermission which) async {}
+}
+
+/// The device saying no, in the words the patient actually reads.
+///
+/// `MediaRefusal` is the one exception to "never show an exception to a user":
+/// it is not a raw error, it is finished copy that happens to travel on the
+/// error channel because `Future<T?>` leaves no other one free.
+class RefusedMediaPermissions implements MediaPermissionGate {
+  const RefusedMediaPermissions();
+
+  @override
+  Future<void> require(MediaPermission which) async {
+    throw MediaRefusal(
+      MediaAccess.refusalFor(which, PermissionStatus.denied)?.message ?? '',
+    );
+  }
 }

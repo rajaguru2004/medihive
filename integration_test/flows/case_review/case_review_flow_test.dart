@@ -161,9 +161,11 @@ void registerCaseReviewFlows() {
       await review.openFromDashboard();
 
       await review.submit();
-      await review.seeSent();
+      // The toast first: it is on a three-second timer, and the scrolling the
+      // assertions below do takes longer than that on a device.
       review.seeToast(containing: 'sent');
       await review.letToastsExpire();
+      await review.seeSent();
 
       // Every write on this screen is a 409 now, so the screen stops offering
       // them rather than offering them to be refused.

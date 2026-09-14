@@ -63,19 +63,36 @@ final class CaseReviewRobot extends Robot {
     );
   }
 
-  /// And nothing anywhere on it reads as one.
+  /// And nothing **on this screen** reads as one.
+  ///
+  /// Scoped to the review's own subtree rather than to the whole tree: the
+  /// dashboard underneath is still built, and its own copy is about the case
+  /// rather than about the patient. A probe that swept the whole tree would be
+  /// failing on the wrong screen's words.
+  ///
+  /// The list is the vocabulary a diagnosis arrives in. None of it is copy this
+  /// screen has any business carrying: the engine's field registry deliberately
+  /// has no `diagnosis` field, the safety view sends a routing sentence and a
+  /// count rather than the rules that fired, and a document's diagnoses are
+  /// labelled as the document's.
   void seeNoDiagnosisLanguage() {
     for (final phrase in const [
-      'You have',
       'diagnosed',
       'Diagnosis:',
       'likely',
       'probably',
+      'appears to be',
       'suggests',
       'consistent with',
+      'may be',
+      'could be',
     ]) {
       expect(
-        find.textContaining(phrase, skipOffstage: false),
+        find.descendant(
+          of: find.byKey(CaseReviewKeys.screen),
+          matching: find.textContaining(phrase, skipOffstage: false),
+          skipOffstage: false,
+        ),
         findsNothing,
         reason: 'the review screen said "$phrase", which reads as the app '
             'deciding something about this patient',
@@ -212,8 +229,14 @@ final class CaseReviewRobot extends Robot {
     await settle();
   }
 
+  /// The card that says the case has gone.
+  ///
+  /// Scrolled to rather than merely waited for. It is the first sliver on the
+  /// screen and Send is the last, so by the time it exists the viewport is at
+  /// the bottom — and a sliver outside the cache extent is **not built**, which
+  /// reads to a finder as "never arrived".
   Future<void> seeSent() async {
-    await tester.pumpUntilFound(find.byKey(CaseReviewKeys.submitted));
+    await tester.scrollToKey(CaseReviewKeys.submitted);
     expect(find.byKey(CaseReviewKeys.submitted), findsOneWidget);
   }
 

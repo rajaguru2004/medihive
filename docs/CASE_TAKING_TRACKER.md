@@ -42,8 +42,8 @@ Legend: ✅ done · 🔄 in progress · ⬜ not started · ⛔ blocked · ⏭ de
 | [P5](#p5--flutter-foundations) | Media seams, conversation kit, permissions, language seam | L | ✅ |
 | [P6](#p6--patient-shell-and-entry) | Patient shell, claim/activate, language, consent | M | ✅ |
 | [P7](#p7--the-interview) | Adaptive interview by voice, text and touch | XL | ✅ |
-| [P8](#p8--documents-on-the-phone) | Capture, upload, review extraction, correct | L | ⬜ |
-| [P9](#p9--review-submit-handoff) | Verification, submission, doctor handoff | L | ⬜ |
+| [P8](#p8--documents-on-the-phone) | Capture, upload, review extraction, correct | L | ✅ |
+| [P9](#p9--review-submit-handoff) | Verification, submission, doctor handoff | L | 🔄 screenshots |
 | [P10](#p10--languages) | Tamil and Hindi — **deliberately last** | M | ⬜ |
 
 Sizes: S ≤ ½ day · M 1 day · L 2–3 days · XL 4+ days.
@@ -54,8 +54,8 @@ Sizes: S ≤ ½ day · M 1 day · L 2–3 days · XL 4+ days.
 |---|---|
 | Backend | **764** unit tests green, 47 suites · lint and build clean |
 | Live contract | **178 checks** against the running API, local Postgres, real PP-OCR and a real `gemma3:4b` — 39 auth · 68 case-taking · 71 documents |
-| Mobile | **431** unit tests · analyze zero · 4 unkeyed (baseline 4) |
-| Device | **20 flows green** — 9 portal, 11 interview |
+| Mobile | **436** unit tests · analyze zero · 4 unkeyed (baseline 4) |
+| Device | **231 flows green** in one `smoke_suite` run — 9 portal, 11 interview, 12 documents, 7 review, and the rest of the app |
 | Database | 7 new tables applied and verified in `hms_v2_dev` |
 | Models | `gemma3:4b` serving · faster-whisper, Piper and PP-OCRv5 all answering |
 | Routes | case-taking, patient-documents and patient-auth all mounted and guarded |
@@ -235,11 +235,12 @@ patient-scoped was enforceable.
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 8.1 | Capture or pick → quality check → upload with progress | ⬜ | reuses `CrudRepository.upload` verbatim |
-| 8.2 | Size pre-check with a written refusal | ⬜ | the integrations controller is the precedent |
-| 8.3 | Review extracted information | ⬜ | confirm / correct / not sure |
-| 8.4 | Source and confidence on every value | ⬜ | unconfirmed never styled like confirmed |
-| 8.5 | Original one tap away | ⬜ | needs P4.2 |
+| 8.1 | Capture or pick → quality check → upload with progress | ✅ | `CrudRepository.upload` verbatim; three ways in, each with its own refusal copy. The **quality check is the server's** and arrives as a written sentence |
+| 8.2 | Size pre-check with a written refusal | ✅ | refused before the send — the route answers an overrun by dropping the connection, so a client that does not check shows a network error for a photo that is merely too big |
+| 8.3 | Review extracted information | ✅ | confirm / correct / not sure per value, and the document-level confirm is withheld while anything is marked wrong |
+| 8.4 | Source and confidence on every value | ✅ | `SourceChip` + `ConfidenceMark`; the two measured confidences are two figures under two names and never blend |
+| 8.5 | Original one tap away | ✅ | signed URL fetched on the tap, shown inline. **Images only** — this build ships no PDF renderer, and the row says so rather than opening nothing |
+| 8.6 | The device seams, registered for real | ✅ | first module to register `ImagePickerImageSource` / `FilePickerFileSource` rather than the stubs; `MediaPermissionGate` added so a device tier can drive both endings without a system dialog |
 
 ---
 
@@ -247,12 +248,13 @@ patient-scoped was enforceable.
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 9.1 | "Here is what we understood about you" | ⬜ | section by section, each item correctable |
-| 9.2 | Read aloud via the sidecar | ⬜ | |
-| 9.3 | Contradictions surfaced, never resolved automatically | ⬜ | |
-| 9.4 | Submit → structured case on the patient record | ⬜ | mirrors `POST /pre-triage/:id/convert` |
-| 9.5 | Doctor sees provenance per item | ⬜ | patient-stated, document-extracted, unverified, corrected |
-| 9.6 | Screenshot round, light and dark, again at 1.3× | ⬜ | |
+| 9.1 | "Here is what we understood about you" | ✅ | section by section; a line with a value gets confirm / change / not sure, and a line without one gets `UnknownAnswerRow`'s four equal tiles |
+| 9.2 | Read aloud via the sidecar | ⏭ | `narrative=true` is wired in the repository and off by default — it costs a model call. The audio half belongs with P7's voice work |
+| 9.3 | Contradictions surfaced, never resolved automatically | ✅ | read off the patient's documents, both sides shown, and **no control in the card** — the app cannot decide which is right |
+| 9.4 | Submit → structured case on the patient record | ✅ | a second submit is a 409 with a sentence, so the screen stops offering it rather than offering it to be refused |
+| 9.5 | Doctor sees provenance per item | ✅ | app side: seven engine sources through the kit's four chips, and a correction re-labels the line. The clinician's own view of it is a backend surface |
+| 9.6 | Screenshot round, light and dark, again at 1.3× | ⬜ | not run |
+| 9.7 | §39 — the dashboard reflects the case | ✅ | needed `PatientCaseService`: `sessions/current` finds *open* sessions, so it answers a submitted case with the same null it answers a patient who never started |
 
 ---
 
@@ -317,12 +319,19 @@ patient-scoped was enforceable.
 | 24 | **`asRefObject` silently ate the interview question.** It is written for a populated relation and returns null unless the map carries an `_id`; a `currentQuestion` is an embedded object with no identity | Every question parsed as absent, so **the screen rendered empty — no exception, no error banner, nothing to debug from**. The quietest possible failure | ✅ `CaseQuestion.maybeFrom` takes a plain map, with the reason in the comment |
 | 25 | `onClose` runs *after* the route's dependencies are disposed, so `Get.find<AudioSource>()` there throws while the tree is being finalised | The error names the framework rather than the controller, so it reads as a Flutter bug | ✅ the recorder is held on first use and only cancelled if one was ever built — which also means a patient who types every answer never opens a platform audio session |
 | 26 | **A patient-scoped route may never take a bare `:id`.** `PatientSelfGuard` resolves the caller's patient from `patientId` **or `id`** and overwrites both, so a document id was replaced by a patient id before the controller saw it | `GET /patient-documents/:id`, `/:id/original` and `/verify` all returned **404 to the document's own owner**. Every patient-facing read in the module was dead, and the unit tier structurally could not see it — it calls the service, and the damage happens in the guard above | ✅ renamed `:documentId`; `patient-scoped-routes.spec.ts` now reads the controller sources and fails on a bare `:id`. Confirmed non-vacuous by reintroducing the defect |
-| 27 | Two parallel Flutter streams: one added a `GET /api/patient-documents` call on a shared path without a fixture in the shared world | `AppHarness` fails any test touching an unfixtured endpoint, so **all 11 case-taking flows went red for a reason that had nothing to do with case taking** | 🔄 shared routes belong in `world.dart`, not in a module's fixtures; a module fixture only overrides |
+| 27 | Two parallel Flutter streams: one added a `GET /api/patient-documents` call on a shared path without a fixture in the shared world | `AppHarness` fails any test touching an unfixtured endpoint, so **all 11 case-taking flows went red for a reason that had nothing to do with case taking** | ✅ `installPatientDocumentsFixtures` and `installCaseReviewFixtures` are in `World.install`, answering the ordinary case — a patient with nothing uploaded — and the documents flow overrides with its own rows |
 | 28 | A PDF of a page is not detected as a text-duplicate of its PNG — 0.52 against a measured 0.88 threshold | The sidecar renders PDFs at a different DPI and PP-OCR collapses word spacing (`Tab.METFORMIN500mg`), changing the content signature wholesale. Outside what §21's second signal claims, which is the re-*photographed* page | ⏭ left alone rather than loosening a threshold `duplicates.ts` argues at length was measured. Matters if PDF re-uploads are common in the field |
 | 29 | **A 65-point overflow that only appears on the red-flag screen.** Panel heights were budgeted from `MediaQuery.sizeOf(context).height` | That counts height the app bar and safe areas have already taken. It shows only when all three pinned bands are up at once — which is precisely the screen a deteriorating patient sees | ✅ budgeted from a `LayoutBuilder`'s own `maxHeight`, both capped bands holding their own scroll |
 | 30 | The phone auto-locked with a PIN mid-run, then was unplugged | `MainActivity` pauses, no frames are produced, and the harness sits at `+0` until it times out — it reads as a hang, not a lock. `wm dismiss-keyguard`, swipes and `cmd statusbar collapse` all fail against a secure credential | ⏭ finished on `emulator-5554`; screen timeout raised to 30 min for next time |
 | 31 | **Piper has no Tamil voice.** The repository ships `hi`, `ml`, `te`, `mr`, `bn` and `ur` — there is no `ta` at all | Tamil is the spec's **first** priority language (§5). Whisper understands Tamil, so a Tamil patient can be heard; Piper cannot speak to them. A patient who cannot read is the one this affects | ⛔ P10.6 — either a second TTS engine for Tamil (§8 already names IndicF5) or Tamil ships read-on-screen with voice input only. Not a decision to make quietly |
 | 32 | Hindi round-trips, but weaker than English | TTS is clean; Whisper returns 0.76 against English's 0.84, and turned *तकलीफ* (trouble) into *तत्लीप* — a medical word, in the question that opens every interview | ✅ measured, not assumed. Argues for showing the transcript back for confirmation rather than acting on it |
+
+
+| 33 | **The review document carries no fact ids.** `RenderedItem` has `fieldPath`, `label`, `presence`, `display`, `source`, `confidence`, `verification` and `documentId` — and no `id` | `PATCH /sessions/:sessionId/facts/:factId` is the route written for a correction, and a screen that has only ever loaded the review cannot address it | 🔄 the app routes a first correction through `POST /turns` with `modality: correction` — the same `recordFact` supersession, through the other door — and uses the PATCH once a turn has told it an id. **Worth closing server-side**: one `id` on `RenderedItem` removes the hop |
+| 34 | **There is no route that corrects one value inside a document's extraction.** Upload, read, signed link, whole-document verify, and nothing between | A patient who spots a misread medicine has nowhere to put the right one. The app keeps the correction for the review pass, re-labels the value as theirs, and **withholds `verify`** — which is honest, and still loses the correction when they leave | 🔄 needs `PATCH /patient-documents/:documentId/extraction`, or the corrected values filed as case facts against the session the document is attached to |
+| 35 | A permission prompt is drawn **outside** the Flutter tree, so a device test that reaches one does not fail — it hangs, with nothing on screen naming the cause | Cost a full device run. The camera row sat on `Permission.camera.request()` until the ten-second `pumpUntil` gave up, and the failure read as "the review screen never opened" | ✅ `MediaPermissionGate`, one indirection in front of `MediaAccess` — which stays the only thing in the app that talks to `permission_handler` |
+| 36 | **A route below the top of the stack is still built and still findable.** A robot that waited for the screen it was popping *back to* returned on the frame the pop started | The next tap lands on the screen still sliding off, which absorbs it silently — and the failure surfaces two assertions later as something unrelated | ✅ wait for the popped screen to **go**, not for the one underneath to appear |
+| 37 | The emulator has no lens, and `StubImageSource` is a **69-byte** 1×1 PNG | A camera flow either hangs on a capture surface nothing can service or passes because a stub swallowed it; and 69 bytes is below the server's own quality floor, so the placeholder could only ever exercise the refusal | ✅ the device tier drives the photo library and the file picker with the documents out of `hms_v2/test/fixtures/`; the camera *branch* is a unit test over the controller, where it needs no hardware |
 
 ---
 

@@ -10,6 +10,7 @@ import '../services/file_picker_file_source.dart';
 import '../services/file_source.dart';
 import '../services/image_picker_image_source.dart';
 import '../services/image_source.dart';
+import '../services/media_access.dart';
 import '../utils/api_envelope.dart';
 import 'crud_repository.dart';
 
@@ -130,7 +131,33 @@ class PatientDocumentsRepository extends CrudRepository<PatientDocument> {
       action(Endpoints.patientDocumentVerify(documentId));
 }
 
-/// The repository and the two picker seams, registered once.
+/// Asking the device for the camera or the photo library.
+///
+/// A seam for the same reason `ImageSource` and `FileSource` are seams: the
+/// answer arrives over a platform channel, and a platform channel in a test is
+/// a stub either way. It is narrower than those two, though, and the difference
+/// matters — this one wraps a **system dialog**, which is drawn outside the
+/// Flutter tree, so a device test that reaches it does not fail. It hangs, with
+/// nothing on screen naming the cause, until the twelve-minute timeout.
+///
+/// `MediaAccess` stays the only thing in the app that talks to
+/// `permission_handler`. This is one indirection in front of it, so that a test
+/// can say "granted" or "refused" and drive both endings.
+abstract interface class MediaPermissionGate {
+  /// Throws a [MediaRefusal] — which carries finished copy in the patient's own
+  /// register — unless [which] is granted.
+  Future<void> require(MediaPermission which);
+}
+
+/// The implementation the app ships: the real prompt, through the one call site.
+class DeviceMediaPermissions implements MediaPermissionGate {
+  const DeviceMediaPermissions();
+
+  @override
+  Future<void> require(MediaPermission which) => MediaAccess.require(which);
+}
+
+/// The repository and the three device seams, registered once.
 ///
 /// The **real** pickers, not the stubs — this is the first module in the app
 /// where a person is actually expected to photograph something, and a seam
@@ -152,6 +179,12 @@ abstract final class PatientDocumentsRepositories {
     }
     if (!Get.isRegistered<FileSource>()) {
       Get.put<FileSource>(const FilePickerFileSource(), permanent: true);
+    }
+    if (!Get.isRegistered<MediaPermissionGate>()) {
+      Get.put<MediaPermissionGate>(
+        const DeviceMediaPermissions(),
+        permanent: true,
+      );
     }
   }
 }

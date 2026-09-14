@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:medihive/app/data/repositories/patient_documents_repository.dart';
 import 'package:medihive/app/data/services/file_source.dart';
 import 'package:medihive/app/data/services/image_source.dart';
 import 'package:medihive/app/theme/theme.dart';
@@ -19,31 +20,46 @@ void main() {
   registerPatientDocumentsFlows();
 }
 
-/// P8 — a patient photographs the papers they brought with them, and then
-/// checks what was read out of them.
+/// P8 — a patient hands over the papers they brought with them, and then checks
+/// what was read out of them.
 ///
-/// The happy path is one test here and the other seven are the ways this screen
-/// can be quietly wrong. Each of those has a spec section behind it and a
-/// real-world consequence, and the assertions are named after the consequence:
-/// a fabricated denial is the one that gets somebody prescribed the drug that
-/// kills them, a leaked engine message is the one that tells somebody in a
-/// corridor that a Python service is down, and a duplicate silently swallowed
-/// is the one that leaves a patient pressing a button that appears to do
-/// nothing.
+/// ## Why nothing here taps "Take a photo"
+///
+/// The device tier runs on an emulator, which has no lens. Tapping the camera
+/// opens a capture surface nothing can service, so the test either hangs
+/// waiting for frames or "passes" because a stub swallowed the tap — and a test
+/// that passes for that reason is worse than no test at all. The camera stays
+/// in the UI, because a patient holding a prescription needs it and §4 lists it
+/// first; what the automated tier drives is the photo library and the file
+/// picker, which reach exactly the same code from [DocumentOrigin.gallery]
+/// onwards. The camera *branch* — that it asks for the camera, that a
+/// backed-out picker is not a failure, that a refusal is a sentence — is
+/// covered in `test/unit/modules/document_list_controller_test.dart`, where it
+/// costs nothing and needs no hardware.
+///
+/// The happy path is one test here and the rest are the ways this screen can be
+/// quietly wrong. Each has a spec section behind it and a real consequence, and
+/// the assertions are named after the consequence: a fabricated denial is the
+/// one that gets somebody prescribed the drug that kills them, a leaked engine
+/// message is the one that tells somebody in a corridor that a Python service
+/// is down, and a duplicate silently swallowed leaves a patient pressing a
+/// button that appears to do nothing.
 void registerPatientDocumentsFlows() {
   group('patient documents', () {
-    /// Boots the portal with two documents already held and a picker that
-    /// answers.
+    /// Boots the portal with two documents already held and pickers that
+    /// answer with the backend's own fixture documents.
     ///
-    /// The pickers are registered **before** the screen opens, so the
-    /// repository's own `register()` — which installs the real `image_picker`
-    /// and `file_picker` implementations — finds them already there and leaves
-    /// them alone. That is the same `isRegistered` guard radiology and the
-    /// profile screen have always relied on, pointed at a test rather than at
-    /// a build with no plugin in it.
+    /// The three device seams are registered **before** the screen opens, so
+    /// the repository's own `register()` — which installs the real
+    /// `image_picker`, `file_picker` and permission prompt — finds them already
+    /// there and leaves them alone. That is the same `isRegistered` guard
+    /// radiology and the profile screen have always relied on, pointed at a
+    /// test rather than at a build with no plugin in it.
     Future<PatientDocumentsRobot> openPortal(
       WidgetTester tester, {
+      ImageSource images = const StubGalleryImageSource(),
       FileSource files = const StubPdfFileSource(),
+      MediaPermissionGate permissions = const GrantedMediaPermissions(),
       void Function(FakeApi api)? extra,
     }) async {
       final harness = await AppHarness.bootSignedIn(
@@ -55,11 +71,13 @@ void registerPatientDocumentsFlows() {
         },
       );
 
-      Get.put<ImageSource>(const StubImageSource(), permanent: true);
+      Get.put<ImageSource>(images, permanent: true);
       Get.put<FileSource>(files, permanent: true);
+      Get.put<MediaPermissionGate>(permissions, permanent: true);
       addTearDown(() {
         Get.delete<ImageSource>(force: true);
         Get.delete<FileSource>(force: true);
+        Get.delete<MediaPermissionGate>(force: true);
       });
 
       return PatientDocumentsRobot(harness);
@@ -210,20 +228,58 @@ void registerPatientDocumentsFlows() {
 
       await documents.openFromDashboard();
 
-      // The first photograph. `StubImageSource` answers with the same bytes
-      // under the same name every time, which is exactly the case §21 is
-      // about: an upload that looked like it stalled, and a second tap.
-      await documents.addFromCamera();
+      // The photo library answers with the same prescription under the same
+      // name every time, which is exactly the case §21 is about: an upload that
+      // looked like it stalled, and a second tap.
+      await documents.addFromGallery();
       await documents.assertOnReview();
       await documents.backToList();
 
-      await documents.addFromCamera();
+      await documents.addFromGallery();
       await documents.assertOnReview();
 
       // Told, not refused, and not silently swallowed either. A patient who
       // pressed the button twice needs to know which of those happened.
       await documents.seeReportedAsDuplicate();
       documents.seeNoTechnicalDetail();
+    });
+
+    testWidgets('a page photographed from too far away is told to be retaken',
+        (tester) async {
+      final documents = await openPortal(
+        tester,
+        images: const TooSmallImageSource(),
+      );
+
+      await documents.openFromDashboard();
+      await documents.addFromGallery();
+      await documents.assertOnReview();
+
+      // §5. The quality check runs before OCR, so what comes back is an
+      // instruction rather than a confidence score about the wrong characters.
+      await documents.seeMessage(containing: 'too small to read');
+      await documents.seeMessage(containing: 'holding the camera closer');
+      documents.seeNoTechnicalDetail();
+    });
+
+    testWidgets('a PDF goes up as a PDF', (tester) async {
+      final documents = await openPortal(tester);
+
+      await documents.openFromDashboard();
+      await documents.addPdf();
+      await documents.assertOnReview();
+
+      // The field name and the media type are the two things this route judges
+      // an upload on, and both are stated rather than inferred: `FileInterceptor
+      // ('file')` reads that name and nothing else, and Dio types a part it was
+      // given no type for as `application/octet-stream`, which the route
+      // refuses with a sentence about the file not being a photograph.
+      final upload = documents.api.requireCall(
+        'POST',
+        '/api/patient-documents',
+      );
+      expect(upload.formFiles.keys, contains('file'));
+      expect(upload.formFiles['file'], StubPdfFileSource.filename);
     });
 
     testWidgets('the original the reading came from is one tap away',
@@ -268,6 +324,23 @@ void registerPatientDocumentsFlows() {
       documents.seeNoUploadRefusal();
       documents.api.requireNoCall('POST', '/api/patient-documents');
       documents.seeNoToast();
+    });
+
+    testWidgets('a device that says no says what to do instead',
+        (tester) async {
+      final documents = await openPortal(
+        tester,
+        permissions: const RefusedMediaPermissions(),
+      );
+
+      await documents.openFromDashboard();
+      await documents.addFromGallery();
+
+      // A refusal is **never** a null. The sentence is written for the patient
+      // and names the way forward rather than the problem — which is the whole
+      // reason `MediaAccess` throws instead of answering with nothing.
+      await documents.seeUploadRefusal(containing: 'take a new photo instead');
+      documents.api.requireNoCall('POST', '/api/patient-documents');
     });
 
     testWidgets('a document still being read says so, and then stops saying it',

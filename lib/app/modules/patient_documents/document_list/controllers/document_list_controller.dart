@@ -136,12 +136,13 @@ class DocumentListController extends GetxController with LoadStateMixin {
   Future<DocumentUpload?> _pick(DocumentOrigin origin) async {
     switch (origin) {
       case DocumentOrigin.camera:
-        await MediaAccess.require(MediaPermission.camera);
+        await Get.find<MediaPermissionGate>().require(MediaPermission.camera);
         final image = await Get.find<ImageSource>().pick(ImageOrigin.camera);
         return image == null ? null : _fromImage(image);
 
       case DocumentOrigin.gallery:
-        await MediaAccess.require(MediaPermission.photoLibrary);
+        await Get.find<MediaPermissionGate>()
+            .require(MediaPermission.photoLibrary);
         final image = await Get.find<ImageSource>().pick(ImageOrigin.gallery);
         return image == null ? null : _fromImage(image);
 
