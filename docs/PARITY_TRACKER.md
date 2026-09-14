@@ -25,7 +25,7 @@ Backend gates: `npm run lint`, `npm run build`, `npm test`, `npm run verify:mobi
 | Phase | Scope | Size | Status |
 |---|---|---|---|
 | [P0](#p0--foundation-and-local-stack) | Foundation, local stack, backend contract, RBAC plumbing | L | 🔄 nearly done — test infra + drafts remain |
-| [P1](#p1--shell-navigation-and-design-contract) | Role-shaped shell, More hub, tablet rail | M | 🔄 shell + guard done; rail and screenshots next |
+| [P1](#p1--shell-navigation-and-design-contract) | Role-shaped shell, More hub, tablet rail | M | 🔄 shell, guard, hub and two screenshot rounds done; tablet rail left |
 | [P2](#p2--patients) | Registry, search, form, patient hub | L | ⬜ |
 | [P3](#p3--clinical-parity) | Appointments, consultations, queue/triage/inpatient gating | L | ⬜ |
 | [P4](#p4--diagnostics) | Laboratory, radiology | XL | ⬜ |
@@ -107,7 +107,7 @@ layer stops sending a vocabulary the backend rejects.
 | 0.37 | `PagedQuery` re-targeted to this backend's query vocabulary | ✅ | current keys are a 400 under `forbidNonWhitelisted` |
 | 0.38 | `CrudRepository`: paged + bare lists, `listAll` follows `hasMore`, honours `updateVerb`, accepts 204, `action()`, `upload()` | ✅ | |
 | 0.39 | `asJsonList()` for JSON-string fields; `PatientRef` replaces the three patient copies; `QueueServiceCount` rename; `DashboardData`/`OrganizationData` unwrapped | ✅ | |
-| 0.40 | Write drafts per entity + `write_contract_test.dart` pinning each key set | ⬜ | |
+| 0.40 | Write drafts per entity + `write_contract_test.dart` pinning each key set | ✅ | |
 | 0.41 | `status_registry.dart` + unit test forbidding red for non-clinical states | ✅ | RULES §0 rule 1 |
 | 0.42 | 21 inline `/api/...` paths moved into `Endpoints`; hard-coded org id removed | ✅ | |
 
@@ -127,10 +127,10 @@ layer stops sending a vocabulary the backend rejects.
 |---|---|---|---|
 | 0.48 | Android: INTERNET, debug cleartext config, `com.medihive.app`, label, `medihive://` deep-link filter | ✅ | **a release build cannot reach any API today** |
 | 0.49 | iOS: bundle id, display name, debug ATS exception | ✅ | not verifiable on this machine |
-| 0.50 | `WorldRole` + fake JWT + `api.forbid` + `bootSignedIn(role:)` | ⬜ | |
-| 0.51 | `DeviceClass` wired into the harness; role-parameterised screenshot suite; `NEX_HIVE_TEXT_SCALE` | ⬜ | defined but never applied today |
+| 0.50 | `WorldRole` + fake JWT + `api.forbid` + `bootSignedIn(role:)` | ✅ | |
+| 0.51 | `DeviceClass` wired into the harness; role-parameterised screenshot suite; `NEX_HIVE_TEXT_SCALE` | ✅ | defined but never applied today |
 | 0.52 | Live tier skeleton `test/contract/live/` + `tool/live.env.example` | ⬜ | |
-| 0.53 | Unit tests: access map, both metas, `PagedQuery`, write contracts, status registry | ⬜ | |
+| 0.53 | Unit tests: access map, both metas, `PagedQuery`, write contracts, status registry | ✅ | |
 | 0.54 | Backend `seed-mobile-demo.ts` + `verify:mobile` green for all roles | ✅ | |
 | 0.55 | **P0 gate**: analyze clean · unit green · the existing 12 flows green · the app signs in against the real API as every seeded role | ⬜ | |
 
@@ -145,10 +145,10 @@ layer stops sending a vocabulary the backend rejects.
 | 1.3 | `ShellLayout.resolve` + table-driven per-tab registration | ✅ | a nurse must never construct a billing controller |
 | 1.4 | More hub (grouped like the web IA) + account entry | ✅ | |
 | 1.5 | `no_access` module + `AuthMiddleware(module:, verb:)` route guard | ✅ | |
-| 1.6 | Global patient search entry in the shell bar | ⬜ | screen lands in P2 |
+| 1.6 | Global patient search entry in the shell bar | ✅ | screen lands in P2 |
 | 1.7 | Tablet `ShellRail` at ≥600 dp | ⬜ | |
-| 1.8 | Access flows (super admin, nurse, receptionist, 403-safe write) + `ShellLayout` unit test for all roles | ⬜ | |
-| 1.9 | Screenshot round → fix → confirm (4 roles × light/dark × phone/tablet) | ⬜ | |
+| 1.8 | Access flows (super admin, nurse, receptionist, 403-safe write) + `ShellLayout` unit test for all roles | ✅ | |
+| 1.9 | Screenshot round → fix → confirm (4 roles × light/dark × phone/tablet) | ✅ | |
 
 ---
 
@@ -332,6 +332,11 @@ what broke, why it was invisible, and what now prevents it.
 
 | Bug | Why it matters | Status |
 |---|---|---|
+| Triage and Consults had no controller registration, but their views are `GetView` | Crashed the moment the access map promoted either to a bar tab — which it does for a nurse, the app's heaviest user | ✅ |
+| A lab technician's dashboard offered four controls that all routed to the no-access screen | Teaches a clinician that the app's own shortcuts cannot be trusted | ✅ |
+| `RecentPatient.dateOfBirth` defaulted to now | Every patient with no recorded date of birth rendered as a **neonate** | ✅ |
+| The role was printed raw as `NURSE` | The same defect class as `Checked_in` and `icu`, which shipped once already | ✅ |
+| The e2e fixtures served login, `/auth/me` and `/settings` in shapes the API does not return | Every new parsing path was dead in the harness, and the *legacy* branch was the one under test | ✅ |
 | Domain services are never registered in production — only the test harness puts them | `Get.find<HomeService>()` throws outside tests; the initial binding was never wired into `GetMaterialApp` | ⬜ |
 | `PagedQuery` emits the reference CRM's query vocabulary | Every paged list would 400 against this backend | ⬜ |
 | `CrudRepository.delete` treats a 204 as a failure; `update` always PATCHes | Deletes would report failure; PUT-only routes would 404 | ⬜ |
