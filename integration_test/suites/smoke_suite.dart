@@ -1,10 +1,17 @@
 import 'package:integration_test/integration_test.dart';
 
 import '../flows/auth/login_flow_test.dart';
+import '../flows/billing/billing_flow_test.dart';
+import '../flows/clinical/appointment_flow_test.dart';
+import '../flows/clinical/consultation_flow_test.dart';
 import '../flows/home/shell_flow_test.dart';
 import '../flows/inpatient/beds_flow_test.dart';
+import '../flows/laboratory/laboratory_flow_test.dart';
+import '../flows/patients/patients_flow_test.dart';
+import '../flows/pharmacy/pharmacy_flow_test.dart';
 import '../flows/pre_triage/screening_flow_test.dart';
 import '../flows/queue/queue_flow_test.dart';
+import '../flows/radiology/radiology_flow_test.dart';
 
 /// Every behavioural flow, in one run.
 ///
@@ -24,4 +31,11 @@ void main() {
   registerQueueFlows();
   registerInpatientFlows();
   registerPreTriageFlows();
+  registerPatientsFlows();
+  registerAppointmentFlows();
+  registerConsultationFlows();
+  registerLaboratoryFlows();
+  registerRadiologyFlows();
+  registerPharmacyFlows();
+  registerBillingFlows();
 }

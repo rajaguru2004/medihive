@@ -13,10 +13,9 @@ abstract final class LaboratoryKeys {
 
   static const screen = Key('laboratory_screen');
   static const stats = Key('laboratory_stats');
-  static const criticalFigure = Key('laboratory_stat_critical');
   static const search = Key('laboratory_search');
-  static const filterButton = Key('laboratory_filter');
-  static const sortButton = Key('laboratory_sort');
+  static const statusFilters = Key('laboratory_status_filters');
+  static const priorityFilters = Key('laboratory_priority_filters');
   static const list = Key('laboratory_list');
   static const empty = Key('laboratory_empty');
   static const createOrder = Key('laboratory_create_order');
@@ -24,14 +23,11 @@ abstract final class LaboratoryKeys {
   static const listPane = Key('laboratory_list_pane');
   static const detailPane = Key('laboratory_detail_pane');
   static const paneOpen = Key('laboratory_pane_open');
-  static const filterApply = Key('laboratory_filter_apply');
-  static const filterReset = Key('laboratory_filter_reset');
   static const clearFilters = Key('laboratory_clear_filters');
 
   static Key row(String id) => Key('laboratory_row_$id');
   static Key filterOption(String field, String value) =>
       Key('laboratory_filter_${field}_$value');
-  static Key sortOption(String field) => Key('laboratory_sort_$field');
 
   // ── A new order ───────────────────────────────────────────────────────────
 

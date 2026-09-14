@@ -30,6 +30,11 @@ abstract final class InvoiceFormKeys {
   static Key lineTotal(int index) => Key('invoice_form_line_total_$index');
 
   static const Key discountMode = Key('invoice_form_discount_mode');
+
+  /// One segment of the amount-or-percentage control, by the mode's own name.
+  static Key discountModeOption(String mode) =>
+      Key('invoice_form_discount_$mode');
+
   static const Key discountAmount = Key('invoice_form_discount_amount');
   static const Key discountPercentage = Key('invoice_form_discount_percent');
 

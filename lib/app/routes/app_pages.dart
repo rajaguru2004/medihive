@@ -8,6 +8,7 @@ import '../modules/admit_patient/bindings/admit_patient_binding.dart';
 import '../modules/admit_patient/views/admit_patient_view.dart';
 import '../modules/appointments/bindings/appointments_binding.dart';
 import '../modules/appointments/views/appointments_view.dart';
+import '../modules/billing/billing_routes.dart';
 import '../modules/consultations/bindings/consultations_binding.dart';
 import '../modules/consultations/views/consultations_view.dart';
 import '../modules/dashboard/bindings/dashboard_binding.dart';
@@ -32,6 +33,7 @@ import '../modules/inpatient_overview/bindings/inpatient_overview_binding.dart';
 import '../modules/inpatient_overview/views/inpatient_overview_view.dart';
 import '../modules/inpatient_wards/bindings/inpatient_wards_binding.dart';
 import '../modules/inpatient_wards/views/inpatient_wards_view.dart';
+import '../modules/laboratory/laboratory_routes.dart';
 import '../modules/login/bindings/login_binding.dart';
 import '../modules/login/views/login_view.dart';
 import '../modules/more/views/more_view.dart';
@@ -40,6 +42,16 @@ import '../modules/new_screening_step1/views/new_screening_step1_view.dart';
 import '../modules/new_screening_step2/bindings/new_screening_step2_binding.dart';
 import '../modules/new_screening_step2/views/new_screening_step2_view.dart';
 import '../modules/no_access/views/no_access_view.dart';
+import '../modules/patient_form/bindings/patient_form_binding.dart';
+import '../modules/patient_form/views/patient_form_view.dart';
+import '../modules/patient_hub/bindings/patient_hub_binding.dart';
+import '../modules/patient_hub/views/patient_hub_view.dart';
+import '../modules/patient_search/bindings/patient_search_binding.dart';
+import '../modules/patient_search/views/patient_search_view.dart';
+import '../modules/patients/bindings/patients_binding.dart';
+import '../modules/patients/patient_routes.dart';
+import '../modules/patients/views/patients_view.dart';
+import '../modules/pharmacy/pharmacy_routes.dart';
 import '../modules/placeholders/views/placeholder_view.dart';
 import '../modules/pre_triage/bindings/pre_triage_binding.dart';
 import '../modules/pre_triage/views/pre_triage_view.dart';
@@ -47,6 +59,7 @@ import '../modules/pre_triage_details/bindings/pre_triage_details_binding.dart';
 import '../modules/pre_triage_details/views/pre_triage_details_view.dart';
 import '../modules/queue/bindings/queue_binding.dart';
 import '../modules/queue/views/queue_view.dart';
+import '../modules/radiology/radiology_routes.dart';
 import '../modules/roles/bindings/roles_binding.dart';
 import '../modules/roles/views/roles_view.dart';
 import '../modules/settings/bindings/settings_binding.dart';
@@ -333,72 +346,60 @@ class AppPages {
       transition: _push,
     ),
 
+    // ── Records ───────────────────────────────────────────────────────────
+    //
+    // `/patients/record` rather than `/patients/:id`: a parameter registered at
+    // that position also matches `search` and `edit`, so the hub would swallow
+    // both siblings and open on a record whose id is the word "search". The id
+    // travels in `Get.arguments` instead — `PatientRoutes.idFrom` reads either
+    // the map a push sends or the bare string half the call sites use.
+    GetPage(
+      name: PatientRoutes.registry,
+      page: () => const PatientsView(embedded: false),
+      binding: PatientsBinding(),
+      middlewares: _gate(Modules.patients, 'The patient register'),
+      transition: _push,
+    ),
+    GetPage(
+      name: PatientRoutes.search,
+      page: () => const PatientSearchView(),
+      binding: PatientSearchBinding(),
+      middlewares: _gate(Modules.patients, 'Patient search'),
+      transition: _push,
+    ),
+    GetPage(
+      name: PatientRoutes.form,
+      page: () => const PatientFormView(),
+      binding: PatientFormBinding(),
+      middlewares: _gate(Modules.patients, 'The patient register'),
+      transition: _push,
+    ),
+    GetPage(
+      name: PatientRoutes.hub,
+      page: () => const PatientHubView(),
+      binding: PatientHubBinding(),
+      middlewares: _gate(Modules.patients, 'The patient record'),
+      transition: _push,
+    ),
+
+    // ── Modules that carry their own tables ───────────────────────────────
+    //
+    // Each list is spliced whole. Registration order inside one of them is
+    // load-bearing — GetX answers with the first pattern that matches, so a
+    // literal path listed after its `:id` sibling opens as a record whose id
+    // is the word "new" — and each module's own file is where that order is
+    // documented. Sorting them here would undo it silently.
+    ...LabPages.routes,
+    ...RadiologyPages.pages,
+    ...PharmacyPages.pages,
+    ...BillingPages.pages,
+
     // ── Routed, not yet built ─────────────────────────────────────────────
     //
     // Reachable rather than absent: a nav entry or a deep link that lands on
     // one of these gets a screen that says what the module is for and where
     // the work happens today. The alternative is an unknown-route page, which
     // reads as a broken app rather than as an unfinished one.
-    GetPage(
-      name: _Paths.PATIENTS,
-      page: () => const PlaceholderView(
-        module: 'patients',
-        title: 'Patients',
-        icon: Icons.people_outline_rounded,
-        message: 'The patient register is managed in the admin console. '
-            'Patients registered there are searchable from every picker in '
-            'this app.',
-      ),
-      middlewares: _gate(Modules.patients, 'The patient register'),
-      transition: _push,
-    ),
-    GetPage(
-      name: _Paths.PHARMACY,
-      page: () => const PlaceholderView(
-        module: 'pharmacy',
-        title: 'Pharmacy',
-        icon: Icons.medication_outlined,
-        message: 'Dispensing is not switched on for this site yet. Pending '
-            'prescription counts still appear on today’s board.',
-      ),
-      middlewares: _gate(Modules.pharmacy, 'Pharmacy'),
-      transition: _push,
-    ),
-    GetPage(
-      name: _Paths.LABORATORY,
-      page: () => const PlaceholderView(
-        module: 'laboratory',
-        title: 'Laboratory',
-        icon: Icons.science_outlined,
-        message: 'Lab ordering and results are not switched on for this site '
-            'yet. Pending order counts still appear on today’s board.',
-      ),
-      middlewares: _gate(Modules.laboratory, 'Laboratory'),
-      transition: _push,
-    ),
-    GetPage(
-      name: _Paths.RADIOLOGY,
-      page: () => const PlaceholderView(
-        module: 'radiology',
-        title: 'Radiology',
-        icon: Icons.monitor_heart_outlined,
-        message: 'Imaging requests are not switched on for this site yet.',
-      ),
-      middlewares: _gate(Modules.radiology, 'Radiology'),
-      transition: _push,
-    ),
-    GetPage(
-      name: _Paths.BILLING,
-      page: () => const PlaceholderView(
-        module: 'billing',
-        title: 'Billing',
-        icon: Icons.receipt_long_outlined,
-        message: 'Charges and payments are handled in the admin console for '
-            'this site.',
-      ),
-      middlewares: _gate(Modules.billing, 'Billing'),
-      transition: _push,
-    ),
     GetPage(
       name: _Paths.USERS_STAFF,
       page: () => const PlaceholderView(

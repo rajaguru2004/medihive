@@ -2,22 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../data/models/access_map.dart';
+import '../../../data/repositories/radiology_repository.dart';
 import '../../../data/services/access_service.dart';
 import '../../../data/services/session_manager.dart';
 import '../../../routes/app_pages.dart';
 import '../../appointments/controllers/appointments_controller.dart';
 import '../../appointments/views/appointments_view.dart';
+import '../../billing/controllers/billing_controller.dart';
+import '../../billing/views/billing_view.dart';
 import '../../consultations/controllers/consultations_controller.dart';
 import '../../consultations/views/consultations_view.dart';
 import '../../dashboard/controllers/dashboard_controller.dart';
 import '../../dashboard/views/dashboard_view.dart';
 import '../../inpatient/controllers/inpatient_controller.dart';
 import '../../inpatient/views/inpatient_view.dart';
+import '../../laboratory/controllers/laboratory_controller.dart';
+import '../../laboratory/views/laboratory_view.dart';
+import '../../patients/controllers/patients_controller.dart';
+import '../../patients/views/patients_view.dart';
+import '../../pharmacy/controllers/pharmacy_controller.dart';
+import '../../pharmacy/views/pharmacy_view.dart';
 import '../../placeholders/views/placeholder_view.dart';
 import '../../pre_triage/controllers/pre_triage_controller.dart';
 import '../../pre_triage/views/pre_triage_view.dart';
 import '../../queue/controllers/queue_controller.dart';
 import '../../queue/views/queue_view.dart';
+import '../../radiology/controllers/radiology_controller.dart';
+import '../../radiology/views/radiology_view.dart';
 import '../../settings/controllers/settings_hub_controller.dart';
 import '../../settings/views/settings_hub_view.dart';
 import '../controllers/home_controller.dart';
@@ -193,13 +204,12 @@ class HomeBinding extends Bindings {
           group: ShellGroup.diagnostics,
           module: Modules.laboratory,
           rank: 5,
-          body: () => const PlaceholderView(
-            module: 'laboratory',
-            title: 'Laboratory',
-            icon: Icons.science_outlined,
-            message: 'Orders and results are handled in the web console for '
-                'now. Pending order counts still appear on today’s board.',
-          ),
+          body: LaboratoryView.new,
+          register: () {
+            Get.put<LaboratoryController>(LaboratoryController(),
+                permanent: true);
+            SessionManager.to.registerScoped<LaboratoryController>();
+          },
         ),
         ShellDestination(
           route: Routes.RADIOLOGY,
@@ -210,13 +220,16 @@ class HomeBinding extends Bindings {
           group: ShellGroup.diagnostics,
           module: Modules.radiology,
           rank: 6,
-          body: () => const PlaceholderView(
-            module: 'radiology',
-            title: 'Radiology',
-            icon: Icons.monitor_heart_outlined,
-            message: 'Imaging requests and reports are handled in the web '
-                'console for now.',
-          ),
+          body: RadiologyView.new,
+          register: () {
+            // Before the controller: it reads a repository in its own
+            // initialiser list, so a tab built before `RadiologyBinding` ever
+            // runs would look one up that nothing had registered.
+            RadiologyRepositories.register();
+            Get.put<RadiologyController>(RadiologyController(),
+                permanent: true);
+            SessionManager.to.registerScoped<RadiologyController>();
+          },
         ),
 
         // ── Records ───────────────────────────────────────────────────────
@@ -229,13 +242,11 @@ class HomeBinding extends Bindings {
           group: ShellGroup.records,
           module: Modules.patients,
           rank: 9,
-          body: () => const PlaceholderView(
-            module: 'patients',
-            title: 'Patients',
-            icon: Icons.badge_outlined,
-            message: 'The register is maintained in the web console for now. '
-                'Screenings taken here become patient records.',
-          ),
+          body: PatientsView.new,
+          register: () {
+            Get.put<PatientsController>(PatientsController(), permanent: true);
+            SessionManager.to.registerScoped<PatientsController>();
+          },
         ),
 
         // ── Operations ────────────────────────────────────────────────────
@@ -248,13 +259,11 @@ class HomeBinding extends Bindings {
           group: ShellGroup.operations,
           module: Modules.pharmacy,
           rank: 7,
-          body: () => const PlaceholderView(
-            module: 'pharmacy',
-            title: 'Pharmacy',
-            icon: Icons.medication_outlined,
-            message: 'Dispensing is handled in the web console for now. '
-                'Pending prescription counts still appear on today’s board.',
-          ),
+          body: PharmacyView.new,
+          register: () {
+            Get.put<PharmacyController>(PharmacyController(), permanent: true);
+            SessionManager.to.registerScoped<PharmacyController>();
+          },
         ),
         ShellDestination(
           route: Routes.BILLING,
@@ -265,13 +274,11 @@ class HomeBinding extends Bindings {
           group: ShellGroup.operations,
           module: Modules.billing,
           rank: 8,
-          body: () => const PlaceholderView(
-            module: 'billing',
-            title: 'Billing',
-            icon: Icons.receipt_long_outlined,
-            message: 'Invoices and payments are handled in the web console '
-                'for now.',
-          ),
+          body: BillingView.new,
+          register: () {
+            Get.put<BillingController>(BillingController(), permanent: true);
+            SessionManager.to.registerScoped<BillingController>();
+          },
         ),
 
         // ── Administration ────────────────────────────────────────────────

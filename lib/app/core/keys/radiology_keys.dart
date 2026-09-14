@@ -60,6 +60,11 @@ abstract final class RadiologyKeys {
 
   // ── Order detail ──────────────────────────────────────────────────────────
   static const orderDetail = Key('radiology_order_detail_screen');
+
+  /// The detail's own critical banner. A key of its own rather than sharing
+  /// the worklist's: on a two-pane window both screens are mounted at once,
+  /// and one key on two widgets makes every `findsOneWidget` about it fail.
+  static const orderCritical = Key('radiology_order_critical_banner');
   static const orderDetailError = Key('radiology_order_detail_error');
   static const orderDetailLocked = Key('radiology_order_detail_locked');
   static const orderTimeline = Key('radiology_order_timeline');

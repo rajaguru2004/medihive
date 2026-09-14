@@ -11,7 +11,6 @@ abstract final class PatientsKeys {
   static const search = Key('patients_search');
   static const sortButton = Key('patients_sort_button');
   static const empty = Key('patients_empty');
-  static const error = Key('patients_error');
 
   /// Absent, not disabled, for an account without `patients.create`.
   static const registerButton = Key('patients_register_button');
@@ -22,9 +21,6 @@ abstract final class PatientsKeys {
   /// a test asserting "Register is here" against a key that matches twice
   /// fails on the one screen where the assertion matters most.
   static const registerFromEmpty = Key('patients_register_from_empty');
-
-  /// Opens the global lookup.
-  static const searchButton = Key('patients_search_button');
 
   /// The two halves of the tablet layout, so a flow can say which pane it
   /// means when the same row key exists in both.

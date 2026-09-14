@@ -2,6 +2,11 @@ import 'package:medihive/app/core/app_clock.dart';
 
 import '../fakes/fake_api.dart';
 import 'fake_jwt.dart';
+import 'modules/billing_fixtures.dart';
+import 'modules/laboratory_fixtures.dart';
+import 'modules/patients_fixtures.dart';
+import 'modules/pharmacy_fixtures.dart';
+import 'modules/radiology_fixtures.dart';
 import 'world_roles.dart';
 
 part 'world_bootstrap.dart';
@@ -39,6 +44,21 @@ abstract final class World {
     _preTriage(api);
     _consultations(api);
     _lookups(api);
+
+    // ── The modules, in the order their routes overlap ──────────────────
+    //
+    // The register goes first because it re-registers six list routes it does
+    // not own — `/api/appointments`, `/api/consultations`, lab and imaging
+    // orders, prescriptions and invoices — so the hub's tabs can ask for one
+    // patient's rows. Later registrations win, so each module reclaims its own
+    // worklist below, and every one of those honours `patientId` itself. Swap
+    // the order and a lab technician's worklist shows the twelve rows the
+    // patient fixture happens to carry.
+    installPatientsFixtures(api);
+    installLaboratoryFixtures(api);
+    installRadiologyFixtures(api);
+    installPharmacyFixtures(api);
+    installBillingFixtures(api);
   }
 
   /// The refresh token every session in this world holds.

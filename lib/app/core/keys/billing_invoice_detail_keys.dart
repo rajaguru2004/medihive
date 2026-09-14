@@ -28,9 +28,15 @@ abstract final class InvoiceDetailKeys {
   static const Key markSent = Key('invoice_detail_mark_sent');
   static const Key cancel = Key('invoice_detail_cancel');
 
-  /// The reason field inside the cancel sheet, and its confirm.
+  /// The reason field inside the cancel sheet, and the button that closes it.
   static const Key cancelReason = Key('invoice_detail_cancel_reason');
   static const Key cancelConfirm = Key('invoice_detail_cancel_confirm');
+
+  /// The `ConfirmDialog` behind the sheet. Its own key because the sheet's
+  /// button and the dialog's are two taps, and a flow that confounded them
+  /// would cancel nothing and still pass.
+  static const Key cancelDialogConfirm = Key('invoice_detail_cancel_yes');
+  static const Key cancelDialogDismiss = Key('invoice_detail_cancel_no');
 
   static const Key noAccess = Key('invoice_detail_no_access');
 }

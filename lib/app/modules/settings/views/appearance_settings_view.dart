@@ -156,6 +156,7 @@ class _PresetSwatch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
+      key: SettingsKeys.preset('${palette.id}-tap'),
       onTap: onTap,
       borderRadius: BorderRadius.circular(BentoRadius.control),
       child: Container(
