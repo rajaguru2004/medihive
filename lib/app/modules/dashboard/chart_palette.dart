@@ -95,7 +95,7 @@ abstract final class ShiftChartPalette {
       return spans.last[1];
     }
 
-    return [
+    final walked = [
       for (var i = 0; i < _count; i++)
         // Half a step in, so no series sits exactly on the seam where the arc
         // was cut and none of them is the guard's own boundary colour.
@@ -105,6 +105,17 @@ abstract final class ShiftChartPalette {
           _saturation,
           _lightness,
         ).toColor(),
+    ];
+
+    // Interleaved, not walked in order. Six hues spread evenly around an arc
+    // put *adjacent* series next to each other on the wheel, and a legend
+    // reading olive / mid-green / green is three entries a reader cannot tell
+    // apart — which is the whole job of a series colour. Taking every other
+    // one puts half the arc between neighbours.
+    final half = (_count / 2).ceil();
+    return [
+      for (var i = 0; i < _count; i++)
+        walked[i.isEven ? i ~/ 2 : half + (i ~/ 2)],
     ];
   }
 }
