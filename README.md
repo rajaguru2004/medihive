@@ -13,15 +13,33 @@ com.medihive.app · "MediHive"
 ## Run it
 
 The app talks to the MediHive backend. Point it at yours with a
-`--dart-define` (the default is `10.0.2.2:8000`, which is the host machine
-from an Android emulator):
+`--dart-define` (`10.0.2.2` is the host machine as seen from an Android
+emulator):
 
 ```sh
 flutter pub get
-flutter run \
-  --dart-define=MEDIHIVE_API=http://10.0.2.2:8000/ \
-  --dart-define=MEDIHIVE_FILES=http://10.0.2.2:8000/
+flutter run -d emulator-5554 \
+  --dart-define=MEDIHIVE_API=http://10.0.2.2:3000/
 ```
+
+### Against the local backend
+
+```sh
+cd ../hms_v2
+docker compose -f docker-compose.local.yml up -d postgres redis
+npx prisma migrate deploy && npx prisma generate
+npm run db:seed && npm run db:seed:catalog && npm run db:seed:mobile
+docker exec hms_v2_redis_local redis-cli FLUSHDB   # the demo seed writes past the API's cache
+npm run start:dev                                   # confirm the Prisma log says localhost:5432/hms_v2_dev
+```
+
+Seeded sign-ins: `admin@hms.local` / `Admin@HMS2024!`, `doctor@hms.local` /
+`Doctor@HMS2024!`, `nurse@hms.local` / `Nurse@HMS2024!`, and the demo's own
+`triage-nurse@hms.local` / `ward-clerk@hms.local` on `Demo@HMS2024!`.
+
+`npm run verify:mobile` in `hms_v2` asserts the whole contract this app is
+written against — 153 checks across ten roles, every one against a running
+API.
 
 Sign-in is one step: work email and password. Accounts are issued by an
 administrator in the web console — there is no self-registration and no
@@ -36,16 +54,29 @@ Four tiers. The first two need no device.
 ```sh
 flutter analyze                      # must be clean — the baseline is zero
 flutter test test/                   # pure logic; no device
+dart run tool/check_keys.dart        # key hygiene; the unkeyed count only goes down
 
 # every behavioural flow against a fake server, on a real device
-flutter test integration_test/suites/smoke_suite.dart -d <device>
+flutter test integration_test/suites/smoke_suite.dart -d emulator-5554
 
 # screenshots for a design pass, written to .review/
 flutter drive \
   --driver=test_driver/screenshot_driver.dart \
   --target=integration_test/screenshots/review_screenshots_test.dart \
-  -d <device>
+  -d emulator-5554
+
+# the same sheet at the text size a ward tablet is usually left at
+flutter drive ... -d emulator-5554 --dart-define=NEX_HIVE_TEXT_SCALE=1.3
 ```
+
+**One device is the gate: the Pixel 6 Pro** (`emulator-5554`). A tablet run is
+a deliberate one-off for the rail and the list-detail panes, not part of the
+loop.
+
+The suite opens with `flows/routes/every_route_builds_test.dart`, which walks
+the whole route table and fails on any screen that throws or renders with no
+`Material` above it. It is the cheapest test here and it catches what a module
+flow cannot: a screen nobody wrote a flow for.
 
 The screenshot suite captures every screen in both themes, from the same
 fixtures the flow suite uses — so a screenshot is a picture of the app under

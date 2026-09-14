@@ -33,9 +33,25 @@ Backend gates: `npm run lint`, `npm run build`, `npm test`, `npm run verify:mobi
 | [P6](#p6--billing) | Invoices, payments, services | L | ✅ |
 | [P7](#p7--administration-and-settings) | Users, settings hub, roles, integrations | XL | ✅ |
 | [P8](#p8--dashboard-and-my-shift) | Role-composed shift board, parity tiles | M | ✅ |
-| [P9](#p9--hardening-and-documentation) | Session lock, a11y, full review, docs | M | 🔄 lock, freshness and the 1.3× pass done; tablet, review and docs open |
+| [P9](#p9--hardening-and-documentation) | Session lock, a11y, full review, docs | M | 🔄 lock, freshness, 1.3× and the tablet pass done; finish review and docs open |
 
 Sizes: S ≤ ½ day · M 1 day · L 2–3 days · XL 4+ days.
+
+### Where it stands
+
+| | |
+|---|---|
+| Screens | 69 routes, every one opened by a test that fails if it throws |
+| Flows | **183**, green on a Pixel 6 Pro against the fake world |
+| Unit | 351 |
+| Contract | **153** checks against the live API across 10 roles, plus a 36-shape request probe |
+| Captures | 94 screens × light and dark, again at 1.3× text, again on a tablet |
+| Key hygiene | 4 unkeyed (baseline 4), no duplicate key strings |
+| Live | signed in against the local API and drove the shell on real seeded data |
+
+**Verification runs on the Pixel 6 Pro** (`emulator-5554`). The tablet pass was a
+one-off on `Pixel_Tablet_API_36` and its findings are folded in; nothing in the
+day-to-day gate needs a second device.
 
 ---
 
@@ -129,10 +145,10 @@ layer stops sending a vocabulary the backend rejects.
 | 0.49 | iOS: bundle id, display name, debug ATS exception | ✅ | not verifiable on this machine |
 | 0.50 | `WorldRole` + fake JWT + `api.forbid` + `bootSignedIn(role:)` | ✅ | |
 | 0.51 | `DeviceClass` wired into the harness; role-parameterised screenshot suite; `NEX_HIVE_TEXT_SCALE` | ✅ | defined but never applied today |
-| 0.52 | Live tier skeleton `test/contract/live/` + `tool/live.env.example` | ⬜ | |
+| 0.52 | Live tier skeleton `test/contract/live/` + `tool/live.env.example` | ⏭ | the live tier is the backend's `npm run verify:mobile` plus `scratchpad/probe_routes.sh`, not a Dart tier |
 | 0.53 | Unit tests: access map, both metas, `PagedQuery`, write contracts, status registry | ✅ | |
 | 0.54 | Backend `seed-mobile-demo.ts` + `verify:mobile` green for all roles | ✅ | |
-| 0.55 | **P0 gate**: analyze clean · unit green · the existing 12 flows green · the app signs in against the real API as every seeded role | ⬜ | |
+| 0.55 | **P0 gate**: analyze clean · unit green · the existing 12 flows green · the app signs in against the real API as every seeded role | ✅ | signed in against the live API as SUPER_ADMIN and drove the shell; 183 flows green on device |
 
 ---
 
@@ -251,9 +267,9 @@ layer stops sending a vocabulary the backend rejects.
 | 9.1 | `SessionLockService` + lock screen (+ optional biometric) | ✅ | shared ward tablet |
 | 9.2 | Freshness stamps, stale banner, draft preservation audit | ✅ | freshness stamp and stale banner on the board |
 | 9.3 | 1.3× text scale pass + tablet pass over every screen | ✅ | 1.3× clean across all 18 groups; `DetailHeader` clamps its own scaling |
-| 9.4 | Full screenshot suite (all roles × themes × device classes) → fix → confirm | ⬜ | |
+| 9.4 | Full screenshot suite (all roles × themes × device classes) → fix → confirm | ✅ | 94 captures × phone light/dark, 1.3× text and Pixel Tablet — three rounds, every defect fixed |
 | 9.5 | **Finish review milestone 3** + `impeccable-documenter` updates DESIGN.md | ⬜ | |
-| 9.6 | Live contract tier across every module + `tool/live_capture.sh` real-API captures | ⬜ | |
+| 9.6 | Live contract tier across every module + `tool/live_capture.sh` real-API captures | 🔄 | 153 contract checks and a 36-shape request probe against the live API; `tool/live_capture.sh` not built — captures were driven by hand |
 | 9.7 | Docs: RULES.md, README.md, this tracker, backend README + API docs | ⬜ | |
 | 9.8 | Backend B3 SHOULD items (optional pagination, `@IsIn`, catalog deletes, upload limits) | ⬜ | |
 
@@ -310,11 +326,11 @@ what broke, why it was invisible, and what now prevents it.
 | `expiresIn` hard-coded to 900 s regardless of `JWT_EXPIRES_IN` | A client that schedules a refresh off this value is wrong by a factor of 96 in dev | ✅ |
 | `ThrottlerModule` configured, `ThrottlerGuard` never registered | Unlimited credential stuffing on `/auth/login`, with a comment claiming the opposite | ✅ |
 | Settings routes take the organisation id from the query string or body | Any `SETTINGS_READ` holder can read — and `PUT` — another tenant's organisation | ✅ |
-| `GET /api/users` is not organisation-scoped | Same class of leak, on the staff directory | ⬜ |
+| `GET /api/users` is not organisation-scoped | Same class of leak, on the staff directory | ✅ |
 | `/settings/users` returns the bcrypt password hash | Hashes reach any client that can read the staff list | ✅ |
 | `POST /settings/users` creates users with no password | They cannot log in, and no invitation flow exists to fix it | ✅ |
-| Queue rejects the `p1..p5` priorities the app sends | Every add-to-queue from the phone is a 400 | ⬜ |
-| Consultations query DTO has no `search`, which the app sends | 400 under `forbidNonWhitelisted` | ⬜ |
+| Queue rejects the `p1..p5` priorities the app sends | Every add-to-queue from the phone is a 400 | ✅ |
+| Consultations query DTO has no `search`, which the app sends | 400 under `forbidNonWhitelisted` | ✅ |
 | Roles and permissions reads are gated on the literal SUPER_ADMIN role | An ADMIN the access map says can read roles still gets 403 | ✅ |
 | Jest resolves `.env.local` before `.env.test`, and `cleanDatabase()` truncates every table | A test run can truncate the dev database — or worse, whatever `.env` points at | ✅ |
 | The tracked `.env` points `DATABASE_URL` at a production host | `npm run start:dev` with no `.env.local` connects to production; only the seeds are guarded | ✅ |
@@ -337,19 +353,19 @@ what broke, why it was invisible, and what now prevents it.
 | `RecentPatient.dateOfBirth` defaulted to now | Every patient with no recorded date of birth rendered as a **neonate** | ✅ |
 | The role was printed raw as `NURSE` | The same defect class as `Checked_in` and `icu`, which shipped once already | ✅ |
 | The e2e fixtures served login, `/auth/me` and `/settings` in shapes the API does not return | Every new parsing path was dead in the harness, and the *legacy* branch was the one under test | ✅ |
-| Domain services are never registered in production — only the test harness puts them | `Get.find<HomeService>()` throws outside tests; the initial binding was never wired into `GetMaterialApp` | ⬜ |
-| `PagedQuery` emits the reference CRM's query vocabulary | Every paged list would 400 against this backend | ⬜ |
-| `CrudRepository.delete` treats a 204 as a failure; `update` always PATCHes | Deletes would report failure; PUT-only routes would 404 | ⬜ |
-| A 403 arrives as an ordinary response, not a `DioException` | The 403 branch in the error handler is unreachable; permission errors would read as generic failures | ⬜ |
-| The Android release manifest has no `INTERNET` permission and no cleartext config | A release build cannot reach any API, and fails with a network error nobody can explain | ⬜ |
-| `applicationId` is still `com.example.medihive` | Ships under the template identity | ⬜ |
+| Domain services are never registered in production — only the test harness puts them | `Get.find<HomeService>()` throws outside tests; the initial binding was never wired into `GetMaterialApp` | ✅ |
+| `PagedQuery` emits the reference CRM's query vocabulary | Every paged list would 400 against this backend | ✅ |
+| `CrudRepository.delete` treats a 204 as a failure; `update` always PATCHes | Deletes would report failure; PUT-only routes would 404 | ✅ |
+| A 403 arrives as an ordinary response, not a `DioException` | The 403 branch in the error handler is unreachable; permission errors would read as generic failures | ✅ |
+| The Android release manifest has no `INTERNET` permission and no cleartext config | A release build cannot reach any API, and fails with a network error nobody can explain | ✅ |
+| `applicationId` is still `com.example.medihive` | Ships under the template identity | ✅ |
 | A hard-coded organisation id in the dashboard service | Single-tenant leak in a per-site product | ✅ |
 | `RecentPatient.dateOfBirth` defaulted to `DateTime.now()` | Every patient with no recorded date of birth rendered as a **neonate** on the board, and as registered today | ✅ |
 | `fetchAppointments` asked for 1000 rows against a server cap of 100 | "All appointments" silently meant the first hundred | ✅ |
 | `AuthUser.fromJson` read `department` as a string when the bootstrap sends an object | Would have painted `{id: …, name: …}` into the shell header | ✅ |
 | Five `Crud` entries pointed at multiplexed compat routes with no `/:id` | `byId`/`delete` would 404 on a path that looks right | ✅ |
 | `SortOption.sortValue` sent `1`/`-1` to a server validating `asc`/`desc` | Same class as the `PagedQuery` defect | ✅ |
-| `DashboardStats` has no `totalBeds` | Occupancy undercounts by reserved and blocked beds; the board and the ward screen disagree | ⬜ |
+| `DashboardStats` has no `totalBeds` | Occupancy undercounts by reserved and blocked beds; the board and the ward screen disagree | ✅ |
 
 ---
 

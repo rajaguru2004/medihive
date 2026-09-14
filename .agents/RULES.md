@@ -51,6 +51,59 @@ colour is one the third screen misleads.
 
 ---
 
+## 0.1 Access, in the app
+
+The server owns authorisation; the app's job is never to offer a clinician a
+door that is going to be shut in their face.
+
+1. **Navigation is derived from the access map, never from the role name.**
+   `GET /api/auth/me` returns `access.modules`, and `ShellLayout.resolve` reads
+   it. Roles are customisable in this product — a hospital can define
+   `TRIAGE_NURSE` with patient-creation rights — so a shell that switches on
+   `role == 'NURSE'` breaks the first time somebody uses that feature.
+
+2. **Controls are absent, not disabled.** A greyed button is a question the
+   person holding the tablet cannot answer; an absent one teaches them the
+   shape of their job. `AccessService.to.can(module, verb)` decides.
+
+3. **Every gated write still handles a 403.** The server caches its access map
+   for five minutes, so the map in hand can be older than the role it
+   describes. A 403 on a write is a toast and an `AccessService.load()`, never
+   the end of the session.
+
+4. **A module the site switched off takes its figures with it.** A tab that
+   disappears while the board underneath still counts occupied beds is a
+   switch that only half worked. `modulesEnabled` with an **absent key means
+   on** — the backend's own default has `inpatient: false`, and reading a
+   missing key as off would hide the ward board from every site that never
+   opened the settings screen.
+
+5. **A 403 arrives as an ordinary response**, not a `DioException`:
+   `DioClient.validateStatus` passes everything below 500 except 401. Detect it
+   by status inside `ApiEnvelope`; `orThrow()` raises `ApiForbiddenException`
+   and `runGuarded` turns that into `rxNoAccess`.
+
+---
+
+## 0.2 Writing to this backend
+
+`main.ts` runs `whitelist` **and** `forbidNonWhitelisted`, so **one key the DTO
+does not declare is a 400 for the whole request**.
+
+- Writes go through a `XxxDraft` in `lib/app/data/models/drafts/`, whose
+  `toCreateJson()`/`toUpdateJson()` emit only the keys that DTO accepts.
+  **Never spread a model's `toJson()` into a write.**
+- `test/unit/data/write_contract_test.dart` pins each key set, so drift fails
+  in the unit tier rather than as a 400 on a ward.
+- Several routes bind individual `@Query('x')` parameters rather than a DTO;
+  those ignore extras rather than refusing them. `CrudRepository.listUnpaged`
+  exists for the collections that page nothing — asking them for `page` and
+  `orderBy` is noise at best.
+- `PUT /api/settings/organization` is a **partial deep merge**. Send only what
+  changed, or you stamp defaults over keys another screen owns.
+
+---
+
 ## 1. Project Stack
 
 | Layer | Package |
@@ -347,6 +400,17 @@ the top bar opens.
 | Analyze | `flutter analyze` | Must be clean |
 | Flows (device) | `flutter test integration_test/` | The real app against a fake server |
 | Screenshots | `flutter drive --driver=test_driver/screenshot_driver.dart --target=integration_test/screenshots/review_screenshots_test.dart` | Every screen, both themes, into `.review/` |
+| Keys | `dart run tool/check_keys.dart` | Unkeyed count may only go down; no key string declared twice; no `pumpAndSettle`; no `find.*` in a flow |
+
+Run every tier on the **Pixel 6 Pro** (`emulator-5554`). One device is the
+gate; a tablet pass is a deliberate one-off, not part of the loop.
+
+`integration_test/flows/routes/every_route_builds_test.dart` runs first in the
+suite. It walks `AppPages.routes`, opens each one, and fails on any exception
+or on a screen with no `Material` above it. It is the cheapest test in the
+suite and it catches the two failures a module flow cannot see: a screen nobody
+wrote a flow for, and a screen that renders but renders wrongly for a
+structural reason.
 
 ### 7.1 Widget keys
 
@@ -365,7 +429,18 @@ patient's name appears on the row and again on the detail it opens.
 - ✅ Every request needs a fixture. `AppHarness.dispose` fails the test on an
   unstubbed call, with the full list.
 - ✅ Fixtures live in one coherent `World`. A flow that needs one endpoint
-  different **overrides that one endpoint**; later registrations win.
+  different **overrides that one endpoint**; later registrations win — which is
+  why `World.install` orders its module fixtures deliberately: the patient
+  register re-registers six list routes it does not own so the hub's tabs can
+  ask for one patient's rows, and every module below it reclaims its own
+  worklist.
+- ✅ A sliver below the fold is **not built**, so an assertion that only looks
+  reports what is there as missing. Scroll first: `tester.scrollToKey`, or
+  `scrollToKeyInStrip` for a row of chips that scrolls sideways.
+- ✅ `enterTextByKey` drops focus, types, and checks what landed. A field is
+  allowed to refuse what it was given — a dispense quantity capped at the shelf
+  answers 999 with 60 — but a field that silently keeps its old text is a form
+  that cannot be saved for no visible reason.
 
 ---
 
@@ -395,4 +470,11 @@ AppBar    → shell = tab title + global actions; sub-screen = DetailHeader
 Tests     → robots only, no find.*, no pumpAndSettle, close your sheets
 Blur      → zero. There are no BackdropFilters in this app.
 Red       → acuityCritical and error only. Never anything else.
+Access    → AccessService.to.can(module, verb)      absent, not disabled
+Shell     → ShellLayout.resolve(access, modulesEnabled)  never the role name
+Writes    → XxxDraft.toCreateJson()                 never a model's toJson()
+Unpaged   → CrudRepository.listUnpaged()            routes that page nothing
+Obx       → must read an observable or it **throws**; branch outside it
+Pushed    → `embedded: false`, or the screen has no Material and every
+            label on it is drawn with a yellow underline through it
 ```
