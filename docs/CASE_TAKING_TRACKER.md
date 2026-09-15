@@ -43,8 +43,8 @@ Legend: ✅ done · 🔄 in progress · ⬜ not started · ⛔ blocked · ⏭ de
 | [P6](#p6--patient-shell-and-entry) | Patient shell, claim/activate, language, consent | M | ✅ |
 | [P7](#p7--the-interview) | Adaptive interview by voice, text and touch | XL | ✅ |
 | [P8](#p8--documents-on-the-phone) | Capture, upload, review extraction, correct | L | ✅ |
-| [P9](#p9--review-submit-handoff) | Verification, submission, doctor handoff | L | 🔄 screenshots |
-| [P10](#p10--languages) | Tamil and Hindi — **deliberately last** | M | ⬜ |
+| [P9](#p9--review-submit-handoff) | Verification, submission, doctor handoff | L | ✅ |
+| [P10](#p10--languages) | Tamil and Hindi | M | ⏭ **not shipping in this delivery** |
 
 Sizes: S ≤ ½ day · M 1 day · L 2–3 days · XL 4+ days.
 
@@ -52,15 +52,15 @@ Sizes: S ≤ ½ day · M 1 day · L 2–3 days · XL 4+ days.
 
 | | |
 |---|---|
-| Backend | **764** unit tests green, 47 suites · lint and build clean |
-| Live contract | **178 checks** against the running API, local Postgres, real PP-OCR and a real `gemma3:4b` — 39 auth · 68 case-taking · 71 documents |
+| Backend | **802** unit tests green, 48 suites · lint and build clean |
+| Live contract | **209 checks** against the running API, local Postgres, real PP-OCR and a real `gemma3:4b` — 39 auth · 68 case-taking · 102 documents |
 | Mobile | **436** unit tests · analyze zero · 4 unkeyed (baseline 4) |
-| Device | **231 flows green** in one `smoke_suite` run — 9 portal, 11 interview, 12 documents, 7 review, and the rest of the app |
-| Database | 7 new tables applied and verified in `hms_v2_dev` |
+| Device | **231 flows** in one `smoke_suite` run, plus **22 capture tests** and 108 screenshots |
+| Database | 8 new tables/columns applied and verified in `hms_v2_dev` |
 | Models | `gemma3:4b` serving · faster-whisper, Piper and PP-OCRv5 all answering |
 | Routes | case-taking, patient-documents and patient-auth all mounted and guarded |
 | Measured | `POST /turns` **15 ms median**; OCR read a real prescription at **0.9859** |
-| Commits | 8 on `hms_v2/main`, 9 on `medihive/main` |
+| Commits | 9 on `hms_v2/main`, 13 on `medihive/main` |
 
 ---
 
@@ -80,7 +80,7 @@ Nothing downstream can be verified until the models actually answer.
 | 0.8 | Backend running against local Postgres | ✅ | startup log confirmed `localhost:5432/hms_v2_dev` before anything destructive ran |
 | 0.9 | Containers — postgres, redis, minio | ✅ | already up |
 | 0.10 | A device for the device tier | ✅ | **a physical vivo I2219 on Android 16 (`10BF3E014J007KU`)**, not an emulator. The user's own phone, and it costs the host no RAM — which matters on a box whose IDE alone holds 3.4 GB. `Pixel_6_Pro_API_36` remains available but is no longer the gate |
-| 0.11 | Tamil/Hindi Piper voices | 🔄 | Hindi downloaded and round-tripped. **Tamil does not exist in Piper** — see ledger 31, it is a decision rather than a download |
+| 0.11 | Tamil/Hindi Piper voices | ⏭ | Hindi downloaded and round-tripped; **Tamil does not exist in Piper** (ledger 31). Deferred with P10 — it is a decision, not a download |
 
 ### Measured on this box, 2026-09-14
 
@@ -253,14 +253,32 @@ patient-scoped was enforceable.
 | 9.3 | Contradictions surfaced, never resolved automatically | ✅ | read off the patient's documents, both sides shown, and **no control in the card** — the app cannot decide which is right |
 | 9.4 | Submit → structured case on the patient record | ✅ | a second submit is a 409 with a sentence, so the screen stops offering it rather than offering it to be refused |
 | 9.5 | Doctor sees provenance per item | ✅ | app side: seven engine sources through the kit's four chips, and a correction re-labels the line. The clinician's own view of it is a backend surface |
-| 9.6 | Screenshot round, light and dark, again at 1.3× | ⬜ | not run |
+| 9.6 | Screenshot round, light and dark | ✅ | **108 captures, 22/22 tests, and it earned its place immediately.** The interview was rendering with a blank half-screen where the question should be and the answer tiles sliced through their own glyphs — on the first question, in both themes, with eleven flow tests passing on it. A finder does not care where a widget is drawn. See ledger 33 |
 | 9.7 | §39 — the dashboard reflects the case | ✅ | needed `PatientCaseService`: `sessions/current` finds *open* sessions, so it answers a submitted case with the same null it answers a patient who never started |
 
 ---
 
 ## P10 · Languages
 
-**Deliberately last.** Started only once P0–P9 are green.
+**Deferred out of this delivery.** The feature ships in English.
+
+Three reasons, and the first is the one that decides it:
+
+1. **Piper has no Tamil voice** (ledger 31). Tamil is the specification's first
+   priority language, and the chosen engine cannot speak it at all. Closing that
+   means adding a second TTS engine — §8 names IndicF5 — and benchmarking it.
+   That is a phase of work, not a download, and it needs a product decision
+   about whether a Tamil-speaking patient who cannot read is served at all.
+2. **Hindi works but is measurably weaker** (ledger 32): Whisper returns 0.76
+   against English's 0.84 and mis-hears *तकलीफ* — a medical word, in the
+   question that opens every interview. Shipping it without the confirmation
+   step designed around that would be worse than not shipping it.
+3. **The seams are built, so this stays cheap.** `PatientText` is one accessor,
+   the session carries `language` end to end and has since P6, and every prompt
+   takes the language as a parameter. Turning a language on is a value change,
+   not a rewrite — which is exactly why it was sequenced last.
+
+The rows below are the plan for that phase, kept rather than deleted.
 
 | # | Task | Status | Notes |
 |---|---|---|---|
@@ -325,6 +343,8 @@ patient-scoped was enforceable.
 | 30 | The phone auto-locked with a PIN mid-run, then was unplugged | `MainActivity` pauses, no frames are produced, and the harness sits at `+0` until it times out — it reads as a hang, not a lock. `wm dismiss-keyguard`, swipes and `cmd statusbar collapse` all fail against a secure credential | ⏭ finished on `emulator-5554`; screen timeout raised to 30 min for next time |
 | 31 | **Piper has no Tamil voice.** The repository ships `hi`, `ml`, `te`, `mr`, `bn` and `ur` — there is no `ta` at all | Tamil is the spec's **first** priority language (§5). Whisper understands Tamil, so a Tamil patient can be heard; Piper cannot speak to them. A patient who cannot read is the one this affects | ⛔ P10.6 — either a second TTS engine for Tamil (§8 already names IndicF5) or Tamil ships read-on-screen with voice input only. Not a decision to make quietly |
 | 32 | Hindi round-trips, but weaker than English | TTS is clean; Whisper returns 0.76 against English's 0.84, and turned *तकलीफ* (trouble) into *तत्लीप* — a medical word, in the question that opens every interview | ✅ measured, not assumed. Argues for showing the transcript back for confirmation rather than acting on it |
+| 33 | **The interview screen was broken and eleven flow tests passed on it.** A blank half-screen where the question belonged, answer tiles sliced through their own glyphs, on the first question, in both themes | Three faults stacked: `reverse: true` pinned the panel's *bottom* so the question scrolled out of sight; the transcript is a greedy `ListView` that filled its slot with **zero** turns; and the shared height cap cannot be one number — 0.72 overflows the red-flag screen, 0.52 starves the first question, 0.86 starves the transcript | ✅ `livePanelHeightFraction` names the three cases. **The dangerous one**: a `ListView.builder` given no room builds *no items*, so the answer just given was neither on screen nor in the tree — a silent total failure that looks like a layout preference |
+| 34 | A finder does not care where a widget is drawn, or whether it is drawn | Which is why the flow tier cannot replace the contact sheet, and why 9.6 is a gate row rather than a nicety | ✅ recorded |
 
 
 | 33 | **The review document carries no fact ids.** `RenderedItem` has `fieldPath`, `label`, `presence`, `display`, `source`, `confidence`, `verification` and `documentId` — and no `id` | `PATCH /sessions/:sessionId/facts/:factId` is the route written for a correction, and a screen that has only ever loaded the review cannot address it | 🔄 the app routes a first correction through `POST /turns` with `modality: correction` — the same `recordFact` supersession, through the other door — and uses the PATCH once a turn has told it an id. **Worth closing server-side**: one `id` on `RenderedItem` removes the hop |

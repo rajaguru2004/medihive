@@ -14,4 +14,9 @@ abstract final class LoginKeys {
   /// things and a test that cannot tell them apart is a test that passes on
   /// the wrong one.
   static const sessionNotice = Key('login_session_notice');
+
+  /// The one-tap seeded sign-ins. Debug builds only — see `demo_accounts.dart`.
+  static const demoPanel = Key('login_demo_panel');
+
+  static Key demoAccount(String email) => Key('login_demo_$email');
 }

@@ -7,6 +7,7 @@ import '../../../data/services/session_manager.dart';
 import '../../../data/services/settings_service.dart';
 import '../../../data/utils/error_handler.dart';
 import '../../patient_portal/patient_shell.dart';
+import '../demo_accounts.dart';
 
 class LoginController extends GetxController {
   final emailController = TextEditingController();
@@ -55,6 +56,19 @@ class LoginController extends GetxController {
   String? validatePassword(String? value) {
     if ((value ?? '').isEmpty) return 'Enter your password';
     return null;
+  }
+
+  /// Signs in as one of the seeded accounts, debug builds only.
+  ///
+  /// It fills the form and takes the ordinary path — same request, same access
+  /// map, same shell decision, same failure handling. Nothing is bypassed; what
+  /// is removed is typing an email and a password on a phone in front of an
+  /// audience, which is the part that goes wrong.
+  Future<void> signInAsDemo(DemoAccount account) async {
+    if (!DemoAccounts.enabled || isSubmitting.value) return;
+    emailController.text = account.email;
+    passwordController.text = DemoAccounts.password;
+    await submit();
   }
 
   Future<void> submit() async {

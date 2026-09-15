@@ -6,6 +6,7 @@ import '../../../core/keys/app_keys.dart';
 import '../../../theme/theme.dart';
 import '../../patient_portal/patient_portal_navigation.dart';
 import '../controllers/login_controller.dart';
+import '../demo_accounts.dart';
 
 /// Sign in.
 ///
@@ -144,6 +145,11 @@ class LoginView extends GetView<LoginController> {
                               : AppTextStyles.lightFootnote(),
                         ),
 
+                        if (DemoAccounts.enabled) ...[
+                          const SizedBox(height: BentoSpace.section),
+                          _DemoSignIn(controller),
+                        ],
+
                         // ── The other person who opens this app ──────────
                         //
                         // A patient with a hospital card and no password has
@@ -235,6 +241,68 @@ class _Wordmark extends StatelessWidget {
           style: AppTextStyles.overline(Theme.of(context).brightness),
         ),
       ],
+    );
+  }
+}
+
+/// One tap per seeded account, on debug builds only.
+///
+/// Compiled out of release entirely — `DemoAccounts.enabled` is `kDebugMode`,
+/// and a shipped app that lists working hospital logins on its first screen has
+/// no authentication at all.
+///
+/// It signs in the ordinary way: the form is filled and `submit()` runs, so the
+/// request, the access map and the shell decision are the same ones a typed
+/// password produces. What it removes is the typing, which is the part that
+/// goes wrong on a phone in front of an audience.
+class _DemoSignIn extends StatelessWidget {
+  const _DemoSignIn(this.controller);
+
+  final LoginController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return BentoCard(
+      key: LoginKeys.demoPanel,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Demo sign-in',
+            style: AppTextStyles.overline(Theme.of(context).brightness),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Debug builds only. Signs in normally with the seeded password.',
+            style: Theme.of(context).brightness == Brightness.dark
+                ? AppTextStyles.darkFootnote()
+                : AppTextStyles.lightFootnote(),
+          ),
+          const SizedBox(height: BentoSpace.action),
+          Obx(() {
+            final busy = controller.isSubmitting.value;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final account in DemoAccounts.all)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: BentoRow(
+                      key: LoginKeys.demoAccount(account.email),
+                      title: account.label,
+                      subtitle: account.shows,
+                      subtitleMaxLines: 2,
+                      icon: Icons.login_rounded,
+                      onTap: busy
+                          ? null
+                          : () => controller.signInAsDemo(account),
+                    ),
+                  ),
+              ],
+            );
+          }),
+        ],
+      ),
     );
   }
 }
