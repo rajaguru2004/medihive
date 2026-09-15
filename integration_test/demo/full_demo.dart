@@ -1,12 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:medihive/app/core/keys/app_keys.dart';
 import 'package:medihive/app/modules/home/controllers/home_controller.dart';
 import 'package:medihive/app/routes/app_pages.dart';
 
 import '../fixtures/modules/case_taking_fixtures.dart';
 import '../fixtures/world_roles.dart';
 import '../robots/case_taking_robot.dart';
+import '../robots/home_robot.dart';
 import '../robots/patient_portal_robot.dart';
 import '../support/app_harness.dart';
 import '../support/pump.dart';
@@ -162,7 +162,7 @@ void main() {
     testWidgets('the doctor', (tester) async {
       final harness = await openAs(tester, WorldRole.doctor);
 
-      await tester.pumpUntilFound(find.byKey(HomeKeys.dashboard));
+      await HomeRobot(harness).assertVisible();
       await tester.pumpSeconds(3);
 
       await show(tester, harness, Routes.APPOINTMENTS);
@@ -173,7 +173,7 @@ void main() {
     testWidgets('the nurse', (tester) async {
       final harness = await openAs(tester, WorldRole.nurse);
 
-      await tester.pumpUntilFound(find.byKey(HomeKeys.dashboard));
+      await HomeRobot(harness).assertVisible();
       await tester.pumpSeconds(3);
 
       // The board this app was originally built for: acuity first, then
@@ -186,7 +186,7 @@ void main() {
     testWidgets('the receptionist', (tester) async {
       final harness = await openAs(tester, WorldRole.receptionist);
 
-      await tester.pumpUntilFound(find.byKey(HomeKeys.dashboard));
+      await HomeRobot(harness).assertVisible();
       await tester.pumpSeconds(3);
 
       await show(tester, harness, Routes.APPOINTMENTS);
@@ -195,33 +195,33 @@ void main() {
 
     testWidgets('the pharmacist', (tester) async {
       final harness = await openAs(tester, WorldRole.pharmacist);
-      await tester.pumpUntilFound(find.byKey(HomeKeys.dashboard));
+      await HomeRobot(harness).assertVisible();
       await tester.pumpSeconds(3);
       await show(tester, harness, Routes.PHARMACY);
     });
 
     testWidgets('the laboratory', (tester) async {
-      await openAs(tester, WorldRole.labTechnician);
-      await tester.pumpUntilFound(find.byKey(HomeKeys.dashboard));
+      final harness = await openAs(tester, WorldRole.labTechnician);
+      await HomeRobot(harness).assertVisible();
       await tester.pumpSeconds(4);
     });
 
     testWidgets('the radiologist', (tester) async {
-      await openAs(tester, WorldRole.radiologist);
-      await tester.pumpUntilFound(find.byKey(HomeKeys.dashboard));
+      final harness = await openAs(tester, WorldRole.radiologist);
+      await HomeRobot(harness).assertVisible();
       await tester.pumpSeconds(4);
     });
 
     testWidgets('billing', (tester) async {
-      await openAs(tester, WorldRole.billingStaff);
-      await tester.pumpUntilFound(find.byKey(HomeKeys.dashboard));
+      final harness = await openAs(tester, WorldRole.billingStaff);
+      await HomeRobot(harness).assertVisible();
       await tester.pumpSeconds(4);
     });
 
     testWidgets('the administrator', (tester) async {
       final harness = await openAs(tester, WorldRole.admin);
 
-      await tester.pumpUntilFound(find.byKey(HomeKeys.dashboard));
+      await HomeRobot(harness).assertVisible();
       await tester.pumpSeconds(3);
 
       // The hub is where a scoped account's navigation actually lives — the
