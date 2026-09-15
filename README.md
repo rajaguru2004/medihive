@@ -22,6 +22,35 @@ flutter run -d emulator-5554 \
   --dart-define=MEDIHIVE_API=http://10.0.2.2:3000/
 ```
 
+### On a physical handset
+
+**`10.0.2.2` does not exist on a real phone.** It is the *emulator's* alias for
+the host machine, and it is also `Endpoints.baseUrl`'s default — so a debug
+build installed on a handset with no `--dart-define` talks to nothing. Every
+call hangs until it times out, and the app reads as "the hospital is down". It
+says so in the debug log on the first frame (`main()` prints the warning
+whenever `Endpoints.isLoopback`), which is the line to look for before
+suspecting the screen.
+
+Either tunnel the host's port over USB:
+
+```sh
+adb reverse tcp:3000 tcp:3000
+flutter run -d <device-id> \
+  --dart-define=MEDIHIVE_API=http://localhost:3000/
+```
+
+…or point it at the machine's LAN address — same wifi, and the backend must be
+listening on `0.0.0.0` rather than only on loopback:
+
+```sh
+flutter run -d <device-id> \
+  --dart-define=MEDIHIVE_API=http://192.168.1.x:3000/
+```
+
+Android debug builds permit cleartext to these hosts; a release build does not,
+and should never be pointed at one.
+
 ### Against the local backend
 
 ```sh

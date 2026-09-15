@@ -357,7 +357,6 @@ class _LivePanel extends StatelessWidget {
             c.rxStatus.value == CaseInterviewStatus.awaitingExtraction;
         final sending = c.rxSending.value;
         final turnError = c.rxTurnError.value;
-        final loading = c.rxLoading.value;
 
         if (finished) return _Finished(c);
 
@@ -377,6 +376,25 @@ class _LivePanel extends StatelessWidget {
               NoticeBanner(
                 message: PatientText.almostThere,
                 icon: Icons.edit_note_rounded,
+              )
+            else if (sending)
+              // The gap between one question and the next, said out loud.
+              //
+              // `_submit` moves the question into the conversation and clears
+              // `rxQuestion` *before* the round trip, which is right — the
+              // answer belongs under the question it answered. What that leaves
+              // is a panel with nothing on it, and the design justified that on
+              // the round trip being milliseconds. It is milliseconds only when
+              // the hospital answers: on a dropped connection it is the thirty
+              // second connect timeout, and for all of it the screen was a
+              // question bubble with a blank half-page under it and no word of
+              // explanation. This is that word. Not a spinner — see
+              // `_StillReading` for why nothing on this surface may schedule
+              // frames forever.
+              NoticeBanner(
+                key: CaseTakingKeys.sending,
+                message: PatientText.sendingYourAnswer,
+                icon: Icons.schedule_send_rounded,
               ),
             if (turnError != null) ...[
               const SizedBox(height: BentoSpace.action),
@@ -388,7 +406,23 @@ class _LivePanel extends StatelessWidget {
                 margin: EdgeInsets.zero,
               ),
             ],
-            if (question != null && !loading) ...[
+            // Gated on the question and on nothing else. **Not on
+            // `rxLoading`.** It was, and that is the one state this screen is
+            // forbidden to be in: a patient whose connection dropped gets the
+            // question back off the phone's own snapshot, presses "Try again",
+            // and the retry turns `rxLoading` true for as long as the request
+            // takes — up to the thirty second connect timeout on a network
+            // that is not there. For all of it the tiles, the keyboard and the
+            // microphone were gone, the error banner had been cleared by the
+            // retry that hid them, and what was left was a question with
+            // nothing to answer it with and nothing saying why.
+            //
+            // A question already on screen does not become unanswerable
+            // because a refresh is in flight. The only in-flight state that may
+            // touch these controls is `sending`, which is one answer's round
+            // trip and is passed down to disable the send button rather than to
+            // remove anything.
+            if (question != null) ...[
               const SizedBox(height: BentoSpace.section),
               _Answers(c, question: question, sending: sending),
             ],

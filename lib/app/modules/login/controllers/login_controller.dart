@@ -67,7 +67,7 @@ class LoginController extends GetxController {
   Future<void> signInAsDemo(DemoAccount account) async {
     if (!DemoAccounts.enabled || isSubmitting.value) return;
     emailController.text = account.email;
-    passwordController.text = DemoAccounts.password;
+    passwordController.text = account.password;
     await submit();
   }
 

@@ -40,6 +40,14 @@ abstract final class CaseTakingKeys {
   /// The whole answer area: tiles, keyboard and microphone.
   static const Key answers = Key('case_taking_answers');
 
+  /// Where the panel says an answer is on its way.
+  ///
+  /// Keyed because its job is to be *present*: between the question moving into
+  /// the conversation and the next one arriving, this is the only thing on the
+  /// answer panel, and on a dropped connection that gap is the connect timeout
+  /// rather than the milliseconds the happy path measures.
+  static const Key sending = Key('case_taking_sending');
+
   // ── Answering by touch ────────────────────────────────────────────────────
 
   /// One tile, by the token it sends.

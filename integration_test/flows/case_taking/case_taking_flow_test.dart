@@ -352,5 +352,99 @@ void registerCaseTakingFlows() {
       // patient looking at an empty screen with nothing to press.
       interview.seeErrorBanner();
     });
+
+    testWidgets('a question on screen stays answerable while the hospital is '
+        'being tried again', (tester) async {
+      // The screen a dropped connection actually produces, photographed on a
+      // ward: the hospital is unreachable, the phone puts back where the
+      // interview had got to, and the patient presses the retry.
+      //
+      // Every flow above this one runs against a server that answers, so none
+      // of them has ever been on the screen *during* a request — and that is
+      // where this screen was unusable. `_Answers` was gated on `!rxLoading`,
+      // and the retry sets `rxLoading` true for as long as the request takes:
+      // on a network that is not there, that is the thirty second connect
+      // timeout. The tiles, the keyboard and the microphone went away, the
+      // error banner had been cleared by the very tap that hid them, and what
+      // the patient was left holding was a question with nothing to answer it
+      // with and nothing on screen saying why.
+      const sessionRoute = '/api/case-taking/sessions';
+
+      final harness = await AppHarness.bootSignedIn(
+        tester,
+        role: WorldRole.patient,
+        overrides: (api) => api.failWith(
+          'POST',
+          sessionRoute,
+          500,
+          message: 'The hospital did not answer.',
+        ),
+      );
+      final interview = CaseTakingRobot(harness);
+
+      await interview.savePositionOnThePhone(
+        sessionId: kCaseSessionId,
+        fieldPath: kCaseScript.first.fieldPath,
+        prompt: kCaseScript.first.prompt,
+      );
+
+      await interview.open();
+      await interview.assertVisible();
+
+      // The degraded screen the design promises, and it is a good one: the
+      // question back off the phone, the reason it is not live, and the retry.
+      await interview.waitForQuestion('bothering you the most');
+      interview.seeProgress(1, 8);
+      await interview.seeAllThreeWaysToAnswer();
+      interview.seeErrorBanner();
+
+      // Now the retry, against a hospital that is still not answering. Held
+      // long enough that the in-flight window is a window and not a race.
+      harness.api.delay('POST', sessionRoute, const Duration(seconds: 3));
+      await interview.tapRetryWithoutWaiting();
+
+      // The retry has taken its own banner off the screen — which is correct,
+      // it is trying — so the controls are now the only thing standing between
+      // the patient and a question they can do nothing with.
+      interview.seeNoErrorBanner();
+      interview.seeQuestion('bothering you the most');
+      await interview.seeAllThreeWaysToAnswer();
+
+      // And when it fails again it says so again, with the retry back.
+      await interview.waitForErrorBanner();
+    });
+
+    testWidgets('an answer that is still travelling says so', (tester) async {
+      final harness = await AppHarness.bootSignedIn(
+        tester,
+        role: WorldRole.patient,
+      );
+      final interview = CaseTakingRobot(harness);
+
+      await interview.open();
+      await interview.assertVisible();
+
+      // The other half of the same rule. `_submit` moves the question into the
+      // conversation before the round trip, because the answer belongs under
+      // the question it answered — so between the tap and the reply there is
+      // nothing on the answer panel at all. That was justified on the turn
+      // route answering in milliseconds, and it does when the hospital answers:
+      // when it does not, the same gap is the connect timeout, and the screen
+      // is a question bubble with a blank half-page under it.
+      harness.api.delay(
+        'POST',
+        '/api/case-taking/sessions/:sessionId/turns',
+        const Duration(seconds: 3),
+      );
+      await interview.tapAnswerWithoutWaiting('skip');
+
+      await interview.seeAnswerOnItsWay();
+      // Still a mark rather than a blocker — nothing here schedules frames
+      // forever, which is what hangs this suite with no message.
+      interview.seeNothingSpinning();
+
+      // And the interview carries on when the answer lands.
+      await interview.waitForQuestion('How long have you had this');
+    });
   });
 }

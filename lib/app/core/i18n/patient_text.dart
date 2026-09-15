@@ -208,6 +208,19 @@ abstract final class PatientText {
   /// so this is a state nobody should have time to read twice.
   static String get sending => _of('interview.sending', 'Sending');
 
+  /// The same moment, said as a sentence rather than as a button label.
+  ///
+  /// The turn route answers in milliseconds *when the hospital answers at all*.
+  /// On a dropped connection it is the connect timeout instead — thirty
+  /// seconds during which the question has already moved into the conversation
+  /// and there is nothing left on the answer panel. This is what goes there, so
+  /// the patient is never looking at a question with no controls under it and
+  /// nothing on screen saying why.
+  static String get sendingYourAnswer => _of(
+        'interview.sending.long',
+        'Sending your answer to the hospital…',
+      );
+
   /// Under an answer the app has taken but has not finished reading.
   ///
   /// **Not a spinner and not a blocker.** Understanding a long answer costs the

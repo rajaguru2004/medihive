@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:medihive/app/core/i18n/patient_text.dart';
 import 'package:medihive/app/core/keys/app_keys.dart';
+import 'package:medihive/app/data/models/case_session.dart';
 import 'package:medihive/app/data/services/audio_source.dart';
 import 'package:medihive/app/data/services/media_access.dart';
 import 'package:medihive/app/modules/case_taking/case_taking_cache.dart';
@@ -166,6 +167,31 @@ final class CaseTakingRobot extends Robot {
     await tester.scrollToKey(CaseTakingKeys.answer(token));
     await tester.tapKeyWithoutKeyboard(CaseTakingKeys.answer(token));
     await settle();
+  }
+
+  /// Taps a tile and leaves the answer in flight.
+  ///
+  /// The counterpart to [tapAnswer] for the one assertion that has to be made
+  /// *before* the hospital replies: the question has already moved into the
+  /// conversation by then, and what is on the answer panel in that gap is the
+  /// whole question.
+  Future<void> tapAnswerWithoutWaiting(String token) async {
+    await tester.scrollToKey(CaseTakingKeys.answer(token));
+    await tester.tapKeyWithoutKeyboard(CaseTakingKeys.answer(token));
+    await tester.pump();
+  }
+
+  /// The panel says the answer is on its way.
+  Future<void> seeAnswerOnItsWay() async {
+    await tester.pumpUntilFound(find.byKey(CaseTakingKeys.sending));
+  }
+
+  /// The interview's own error banner, once it arrives.
+  ///
+  /// Keyed rather than by type: `CaseTakingKeys.answerError` is the same widget
+  /// on the same screen, and the two can be up at once.
+  Future<void> waitForErrorBanner() async {
+    await tester.pumpUntilFound(find.byKey(CaseTakingKeys.error));
   }
 
   Future<void> skipQuestion() async {
@@ -377,6 +403,52 @@ final class CaseTakingRobot extends Robot {
       ),
       findsNothing,
     );
+  }
+
+  /// Puts a saved position on the phone, the way a dropped connection leaves
+  /// one behind.
+  ///
+  /// Written through the same class the app reads with, so a flow that needs
+  /// the offline screen does not have to fake a server failure *and* then
+  /// arrange for a successful run to have happened first. What it reproduces is
+  /// the state `PRODUCT.md` says is normal on hospital wifi: a phone that knows
+  /// where the interview had got to, and a hospital it cannot reach.
+  Future<void> savePositionOnThePhone({
+    required String sessionId,
+    required String fieldPath,
+    required String prompt,
+    List<String> choices = const [],
+    int step = 1,
+    int total = 8,
+  }) async {
+    await const CaseTakingCache().save(
+      CaseInterviewSnapshot(
+        sessionId: sessionId,
+        savedAt: DateTime.now(),
+        progress: CaseProgress(expected: total, addressed: step - 1),
+        question: CaseQuestion(
+          fieldPath: fieldPath,
+          section: fieldPath.split('.').first,
+          label: fieldPath,
+          kind: choices.isEmpty
+              ? CaseQuestionKind.text
+              : CaseQuestionKind.choice,
+          prompt: prompt,
+          choices: choices,
+        ),
+      ),
+    );
+  }
+
+  /// Presses the retry on the error banner and **does not wait for it.**
+  ///
+  /// The base [Robot.tapRetry] settles, which is right for a retry that is
+  /// expected to succeed and wrong for the only assertion that can catch a
+  /// screen misbehaving *while a request is in flight*. A settle here would
+  /// step straight over the window this exists to look at.
+  Future<void> tapRetryWithoutWaiting() async {
+    await tester.tap(find.text('Try again'));
+    await tester.pump();
   }
 
   /// The phone has written down where the interview stands.
