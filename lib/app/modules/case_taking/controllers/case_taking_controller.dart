@@ -11,6 +11,7 @@ import '../../../data/repositories/case_taking_repository.dart';
 import '../../../data/services/audio_source.dart';
 import '../../../data/services/media_access.dart';
 import '../../../data/services/session_lock_service.dart';
+import '../../../data/services/speech_player.dart';
 import '../../../data/utils/error_handler.dart';
 import '../../../data/utils/load_state.dart';
 import '../../../theme/theme.dart';
@@ -183,6 +184,20 @@ class CaseTakingController extends GetxController with LoadStateMixin {
   /// What the app thinks it heard, waiting to be confirmed.
   final Rxn<CaseTranscript> rxDraft = Rxn<CaseTranscript>();
 
+  // ── Asking out loud ───────────────────────────────────────────────────────
+
+  /// Whether each new question is read to the patient.
+  ///
+  /// On by default, because the patient this helps most is the one least able
+  /// to discover a setting: somebody who cannot comfortably read the screen.
+  /// A patient who does not want it turns it off once and hears nothing more —
+  /// and `toggleReadAloud` silences the sentence already in the air, since a
+  /// waiting room is the usual place to realise you would rather it stopped.
+  ///
+  /// Not persisted. A shared ward device should not carry one patient's choice
+  /// into the next patient's interview.
+  final RxBool rxReadAloud = true.obs;
+
   // ── The keyboard ──────────────────────────────────────────────────────────
 
   final TextEditingController typed = TextEditingController();
@@ -207,7 +222,58 @@ class CaseTakingController extends GetxController with LoadStateMixin {
 
   AudioSource get _audio => _recorder ??= Get.find<AudioSource>();
 
+  /// Built on first use and remembered, for the reasons above [_recorder].
+  SpeechPlayer? _player;
+
+  SpeechPlayer get _speech => _player ??= Get.find<SpeechPlayer>();
+
   String get _sessionId => rxSession.value?.id ?? '';
+
+  /// The session's one language tag, and the floor under both halves below.
+  ///
+  /// **The session's language wins.** The server decides what language an
+  /// interview is being conducted in, and the two can differ once a session is
+  /// resumed on a different device or on a different day from the one the entry
+  /// screen was answered on. The entry's own answer is the floor for the moment
+  /// before the session lands, and for the case where it never does.
+  String get _languageCode => rxSession.value?.language ?? entry.language.code;
+
+  /// The tag `/stt` is told — **what the patient speaks**, which is the only
+  /// thing the language screen now chooses.
+  ///
+  /// The raw string rather than [spokenLanguage.code], deliberately: a tag this
+  /// build has no row for still has to reach the sidecar, which may well have a
+  /// model for it. Narrowing it to a known language here would quietly
+  /// transcribe somebody's answer as English.
+  ///
+  /// Falls back through [_languageCode] rather than to a constant, so a
+  /// deployment whose sessions carry one tag behaves exactly as it did before
+  /// the split existed.
+  String get _inputLanguageCode =>
+      rxSession.value?.inputLanguage ?? _languageCode;
+
+  /// The tag `/tts` is told — **the language the question on screen is written
+  /// in**, which the server settles and which is English under the current
+  /// rule.
+  ///
+  /// Read-aloud speaks the prompt the server sent, so the only correct voice is
+  /// the one that matches that text. That is the server's fact, not the
+  /// patient's choice, which is why this reads the session and never the entry
+  /// screen — and why the fallback is [_languageCode] rather than `en`: a
+  /// server still phrasing questions in one language would otherwise be read
+  /// aloud in an English voice.
+  String get _outputLanguageCode =>
+      rxSession.value?.outputLanguage ?? _languageCode;
+
+  /// What the patient speaks, as this build knows it — the capability question
+  /// behind the microphone. A tag with no row here lands on English.
+  PatientLanguage get spokenLanguage =>
+      PatientLanguage.fromCode(_inputLanguageCode);
+
+  /// What the patient is read to in, as this build knows it — the capability
+  /// question behind the read-aloud switch.
+  PatientLanguage get readAloudLanguage =>
+      PatientLanguage.fromCode(_outputLanguageCode);
 
   /// True while the questions have run out but an answer is still being read.
   /// Deliberately not the same as finished.
@@ -232,6 +298,10 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     // the recorder seam on a shared device — and only if one was ever built,
     // because a patient who typed every answer has nothing to clear.
     unawaited(_recorder?.cancel());
+    // A question still being read aloud after the patient has left the screen
+    // is audible to whoever picks the device up next, which on a shared ward
+    // tablet is a disclosure rather than an annoyance.
+    unawaited(_player?.stop());
     typed.dispose();
     typedFocus.dispose();
     super.onClose();
@@ -259,6 +329,12 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     // showing it first would put a stale question in front of somebody whose
     // wifi was fine.
     if (hasLoadError) await _restoreSnapshot();
+
+    // Again here for the path `_adopt` never reached: the session call failed
+    // and the language in force is the one the patient chose on the entry
+    // screen. A restored snapshot has a question on it and therefore controls
+    // under it, so the microphone has to be right on this path too.
+    _applyLanguageVoiceRule();
   }
 
   Future<void> _adopt(CaseSession session) async {
@@ -284,6 +360,16 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     rxStatus.value = current.interviewStatus;
     rxQuestion.value = current.currentQuestion;
     rxFromSnapshot.value = false;
+    // Before the awaits below, because the question is already on screen and a
+    // question on screen has an answer panel under it. A resumed interview
+    // waits on the snapshot read, and a microphone drawn for the length of that
+    // read is a microphone somebody can press.
+    _applyLanguageVoiceRule();
+    // The first question of the sitting, or the one a resumed interview came
+    // back to. Read here as well as in `_apply`, because a patient who needs
+    // the questions read to them needs the first one most — it is the one that
+    // tells them the screen talks.
+    _readAloud(current.currentQuestion);
 
     // A resumed interview has a history the server does not send back — its
     // session view carries state, not a transcript. The phone's own snapshot
@@ -449,6 +535,27 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     // seconds a spoken answer takes, which is why this is here too.
     _touchLock();
 
+    // The patient has answered. Whatever the microphone was doing belongs to
+    // the question on screen *now*, and this one is about to leave it.
+    //
+    // Both lines are here for the same defect, and it is the one
+    // `case_taking_drafts.dart` calls worse than a missing answer: an unspoken
+    // draft used to survive a tapped or typed answer, reappear under the *next*
+    // question, and file its stale text against that question's `fieldPath` —
+    // an answer to a question nobody asked, reading as a finding. Stopping the
+    // recorder is the other half: left running, it kept listening across the
+    // boundary and produced audio spanning two questions.
+    rxDraft.value = null;
+    if (rxMic.value == MicState.listening) {
+      rxMic.value = MicState.idle;
+      unawaited(_level?.cancel());
+      _level = null;
+      // `cancel`, not `stop` - a recording the patient abandoned by answering
+      // another way is not evidence, and on a shared device it should not
+      // outlive the question it belonged to.
+      unawaited(_audio.cancel());
+    }
+
     _unsent = draft;
     _unsentTurn = turn;
     rxTurnError.value = null;
@@ -487,6 +594,7 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     rxProgress.value = result.progress;
     rxStatus.value = result.interviewStatus;
     rxQuestion.value = result.nextQuestion;
+    _readAloud(result.nextQuestion);
 
     // The answer went to the model to be read properly. The mark goes under
     // that bubble and the next question is already on screen — see the note on
@@ -518,6 +626,96 @@ class CaseTakingController extends GetxController with LoadStateMixin {
       rxTurns[i] = rxTurns[i].settled();
       break;
     }
+  }
+
+  // ── Asking out loud ───────────────────────────────────────────────────────
+
+  /// Reads [question] to the patient, if this device can and they want it.
+  ///
+  /// Deliberately **not** awaited by any caller, and the ordering is the whole
+  /// design: `_apply` puts the question on screen first and calls this after,
+  /// so the text never waits on the audio. Synthesis costs a second or two on
+  /// the sidecar's CPU Piper, and a patient watching a blank panel for that
+  /// long — every turn — would be a slower interview bought with a
+  /// convenience.
+  ///
+  /// So the question is readable immediately and becomes audible shortly
+  /// after. If the audio never arrives, nothing on screen changes and the
+  /// patient loses nothing they can see — the same posture the server already
+  /// takes: "We cannot read this aloud right now. The question is on screen."
+  void _readAloud(CaseQuestion? question) {
+    final text = question?.prompt.trim() ?? '';
+    if (text.isEmpty) return;
+    if (!rxReadAloud.value || !canReadAloud) return;
+    final asked = question!.fieldPath;
+
+    unawaited(() async {
+      try {
+        final wav = await _repository.speak(
+          text,
+          language: _outputLanguageCode,
+        );
+        // The interview can move on while synthesis is in flight, and a
+        // patient who has already answered must not then hear the question
+        // they just answered. After the await is the only point where this can
+        // have changed.
+        if (rxQuestion.value?.fieldPath != asked) return;
+        await _speech.play(wav);
+      } catch (error, stack) {
+        // Not shown, and not disabled. Read-aloud assists a question that is
+        // already on screen, so a toast about audio on top of a clinical
+        // question is noise at the worst moment. Unlike the microphone, one
+        // failure costs the patient nothing, so the next question is free to
+        // try again rather than the control disappearing for good.
+        AppLog.error('CaseTakingController',
+            'a question could not be read aloud', error, stack);
+      }
+    }());
+  }
+
+  /// Whether this device can read a question aloud at all.
+  ///
+  /// False on a platform with no audio implementation, false once a player has
+  /// failed in a way it will not retry, and false in a language the synthesiser
+  /// has no voice for. The switch is hidden rather than disabled when this is
+  /// false — a control that plainly is not there beats one that takes a tap and
+  /// does nothing.
+  ///
+  /// **The language it asks about is [readAloudLanguage], not what the patient
+  /// picked.** The questions are asked in English however the patient answers,
+  /// so this is available to all twelve — including Odia, whose missing half is
+  /// the microphone and not the voice. Gating it on the patient's own language
+  /// would take the audio away from the one patient it was built for: somebody
+  /// who cannot comfortably read the screen and now cannot hear it either.
+  ///
+  /// Kept as a capability question rather than collapsed to `_speech
+  /// .isAvailable`, because the tag the server sends is what decides which
+  /// voice speaks: an interview whose output moved off English would need this
+  /// to answer for that language.
+  ///
+  /// Touching this builds the player, which is why it is read from the switch
+  /// and not from the interview: a patient who never sees the control never
+  /// causes an `AudioPlayer` to exist.
+  bool get canReadAloud => readAloudLanguage.canHear && _speech.isAvailable;
+
+  /// Turns read-aloud off, and silences anything mid-sentence.
+  ///
+  /// The off switch matters more than the on switch. An interview asks a
+  /// patient about their own body, often in a waiting room, and a question
+  /// read out loud is audible to everyone in it. Somebody who realises that
+  /// halfway through needs it to stop on the first tap, not at the end of the
+  /// current sentence.
+  void toggleReadAloud() {
+    _touchLock();
+    final next = !rxReadAloud.value;
+    rxReadAloud.value = next;
+    if (!next) {
+      unawaited(_speech.stop());
+      return;
+    }
+    // Turning it back on reads the question on the table, rather than leaving
+    // the patient to wait for the next one to learn whether it worked.
+    _readAloud(rxQuestion.value);
   }
 
   // ── Answering out loud ────────────────────────────────────────────────────
@@ -589,7 +787,7 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     try {
       final transcript = await _repository.transcribe(
         recording,
-        language: rxSession.value?.language ?? entry.language.code,
+        language: _inputLanguageCode,
       );
       if (transcript.isEmpty) {
         showBentoToast(PatientText.didNotHearAnything, tone: ToastTone.info);
@@ -634,6 +832,51 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     unawaited(_recorder?.cancel());
   }
 
+  /// Set when the microphone was put away because of the language rather than
+  /// because of a fault, so [_applyLanguageVoiceRule] can take that decision
+  /// back and a refused permission's cannot.
+  bool _voiceWithdrawnByLanguage = false;
+
+  /// Takes the microphone away where the language the patient speaks cannot be
+  /// transcribed.
+  ///
+  /// Still the right gate after the questions moved to English: what the
+  /// picker chooses is now *only* the language answers are given in, so it
+  /// governs exactly one control, and this is it.
+  ///
+  /// `faster-whisper` publishes no Odia checkpoint. A microphone offered there
+  /// records an answer that comes back empty, and an empty transcript reads
+  /// downstream as *the patient said nothing* — which is a clinical statement
+  /// nobody made, and the same failure `_finishRecording` refuses a thumb-brush
+  /// recording over. So the control is absent rather than present-and-broken,
+  /// which is `.agents/RULES.md` §0.1's rule pointed at a patient.
+  ///
+  /// It goes through [_withdrawVoice] rather than around it because everything
+  /// that has to be true afterwards — no half-recorded draft, no live level
+  /// subscription, no buffer sitting in a recorder on a shared tablet — is
+  /// already written there, and a second path that set only `rxVoiceAvailable`
+  /// would be the one that forgot.
+  ///
+  /// Reversible, unlike every other caller, and that is the reason for the
+  /// flag. The entry screen's answer is what is in force until the session
+  /// lands, and a patient who chose Odia on a phone that then resumed an
+  /// English interview must get their microphone back. A refused permission is
+  /// not reversible and is not touched here.
+  void _applyLanguageVoiceRule() {
+    if (!spokenLanguage.canSpeak) {
+      _voiceWithdrawnByLanguage = true;
+      _withdrawVoice(
+        PatientText.cannotAnswerOutLoudIn(spokenLanguage.nativeName),
+      );
+      return;
+    }
+
+    if (!_voiceWithdrawnByLanguage) return;
+    _voiceWithdrawnByLanguage = false;
+    rxVoiceAvailable.value = true;
+    rxVoiceNotice.value = null;
+  }
+
   // ── Leaving ───────────────────────────────────────────────────────────────
 
   /// Back to the patient's own screen.
@@ -658,7 +901,7 @@ class CaseTakingController extends GetxController with LoadStateMixin {
         CaseInterviewSnapshot(
           sessionId: _sessionId,
           savedAt: DateTime.now(),
-          language: rxSession.value?.language ?? entry.language.code,
+          language: _languageCode,
           progress: rxProgress.value,
           question: rxQuestion.value,
           turns: rxTurns.toList(),

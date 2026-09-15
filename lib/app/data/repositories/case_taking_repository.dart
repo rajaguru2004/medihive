@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 // `FormData` and `MultipartFile` are declared by both packages, and GetX's
 // belong to its own HTTP client. Hidden here the way the two other multipart
@@ -129,6 +131,23 @@ class CaseTakingRepository {
 
   // ── Voice ─────────────────────────────────────────────────────────────────
 
+  /// Which languages this hospital can take an interview in.
+  ///
+  /// Throws like any other read, and the caller is expected to let it: the
+  /// language screen ships its own catalogue and this only refines it, so a
+  /// refusal here costs a patient nothing they can see. That is the opposite
+  /// posture from [startOrResume], and deliberately — a list that cannot be
+  /// fetched is a list the app already has, while a session that cannot be
+  /// started is an interview that cannot happen.
+  Future<List<CaseLanguage>> languages() async {
+    final response = await _client.get(Endpoints.caseLanguages);
+    return ApiEnvelope.of(response)
+        .orThrow()
+        .listOf(CaseLanguage.fromJson)
+        .where((language) => !language.isEmpty)
+        .toList();
+  }
+
   /// Transcribes a recorded answer.
   ///
   /// Multipart under the field name `file`, which is what `FileInterceptor`
@@ -163,5 +182,44 @@ class CaseTakingRepository {
       options: Options(contentType: 'multipart/form-data'),
     );
     return CaseTranscript.fromJson(ApiEnvelope.of(response).orThrow().object);
+  }
+
+  /// A question, read aloud.
+  ///
+  /// The mirror of [transcribe], and the reason it exists is the same one: a
+  /// patient who is frightened, in pain, or holding a phone in one hand speaks
+  /// better than they type — and a patient with long sight, low literacy, or a
+  /// language they speak but do not read cannot use a question that only
+  /// exists on the screen.
+  ///
+  /// Returns the WAV bytes. **Not an envelope** — this route answers
+  /// `audio/wav` directly, which is why `ApiEnvelope` is not involved and
+  /// `ResponseType.bytes` is set; the default JSON transform would take a
+  /// binary body and hand back mojibake rather than fail, which is the worst
+  /// of the available outcomes.
+  ///
+  /// Throws like any other read. The caller's job is to treat a refusal as
+  /// "this question cannot be read aloud right now" and carry on — the
+  /// question is already on screen before this is ever called, so there is
+  /// nothing here worth interrupting an interview for.
+  Future<Uint8List> speak(String text, {String? language}) async {
+    final response = await _client.post(
+      Endpoints.caseTts,
+      data: {
+        'text': text,
+        if (language != null && language.isNotEmpty) 'language': language,
+      },
+      options: Options(responseType: ResponseType.bytes),
+    );
+
+    final data = response.data;
+    if (data is Uint8List) return data;
+    if (data is List<int>) return Uint8List.fromList(data);
+
+    // A body that is neither is a route that has stopped answering audio —
+    // most likely an HTML error page from something between here and the API.
+    // Empty bytes read downstream as "nothing to play", which is the same
+    // quiet degradation as a missing voice.
+    return Uint8List(0);
   }
 }

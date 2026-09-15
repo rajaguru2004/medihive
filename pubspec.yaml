@@ -62,6 +62,20 @@ dependencies:
   # with it.
   record: ^6.2.1
 
+  # The other direction: a question read back to a patient who cannot read the
+  # screen. `record` is capture-only, so without this the app had no way to play
+  # the WAV that `POST /api/case-taking/tts` has been able to return all along —
+  # the server half of read-aloud was built and had no client.
+  #
+  # `audioplayers` rather than `just_audio` for one reason that decided it: it
+  # resolves against `win32 5.15.0`, which `flutter_secure_storage 9.2.4` pins
+  # and which `file_picker` above is held at 11.x to protect. A player that
+  # forced `win32 ^6` would break the sign-in to gain a convenience.
+  #
+  # Used only behind `data/services/speech_player.dart`, so the plugin is not
+  # reachable from a widget test.
+  audioplayers: ^6.5.1
+
   # The runtime grant the three above need, and the only permission_handler
   # call site in the app is `data/services/media_permissions.dart` — so the
   # sentence a patient reads when they say no is written once.

@@ -9,13 +9,22 @@
 /// else in the product, because this is the only surface where a badly worded
 /// line produces a *wrong clinical answer* rather than a confused user.
 ///
-/// **This build ships English and only English.** Translation is the last
-/// phase of this project, deliberately: a vocabulary that is still moving is
-/// one that gets translated twice. What this file is for is making that phase
-/// cheap — every patient-facing line already has a stable key, already flows
-/// through one function, and already carries its placeholders as `{name}`
-/// rather than as Dart interpolation. The later phase installs a lookup with
-/// [useLookup] and **not one call site changes**.
+/// **Every line in this file is still English and only English.** Translation
+/// is the last phase of this project, deliberately: a vocabulary that is still
+/// moving is one that gets translated twice. What this file is for is making
+/// that phase cheap — every patient-facing line already has a stable key,
+/// already flows through one function, and already carries its placeholders as
+/// `{name}` rather than as Dart interpolation. The later phase installs a
+/// lookup with [useLookup] and **not one call site changes**.
+///
+/// The patient now *chooses* a language, and that is not the same thing and
+/// must not be read as it. What the choice moves is one thing: **the language
+/// the patient answers in.** `/stt` is told which language to listen for and
+/// the server turns what it hears into English. Everything in the other
+/// direction — the questions, the read-aloud voice, and every sentence in this
+/// file — is English. So a patient who picks Tamil speaks Tamil and reads
+/// English, which is worth knowing before somebody reads this header as a
+/// claim that nothing is translated.
 ///
 /// That is the whole seam. There is no `Translations` subclass here, no
 /// `flutter_localizations`, and nothing touching the staff screens — adding
@@ -90,7 +99,76 @@ abstract final class PatientText {
   /// worse than a wrong one because nobody knows it is wrong.
   static String get change => _of('answer.change', 'Change');
 
+  // ── Before anything is asked ──────────────────────────────────────────────
+  //
+  // The language screen, and it is the one block in this file whose English is
+  // **not** the fallback a lookup improves on. A patient who reads only Tamil
+  // meets this screen before anything has been translated for them, which is
+  // why the rows themselves are native names out of `PatientLanguage` rather
+  // than strings from here: a heading nobody on the screen can read is
+  // survivable when the twelve things under it are each written in their own
+  // script, and is not survivable otherwise.
+
+  static String get beforeWeStart => _of('entry.title', 'Before we start');
+
+  static String get chooseYourLanguage =>
+      _of('language.heading', 'Choose your language');
+
+  /// Under the heading, and the one sentence that makes this screen honest.
+  ///
+  /// The choice governs **only what the patient says**: the recogniser is told
+  /// which language to listen for, and what comes back is turned into English
+  /// before anybody reads it. Everything in the other direction stays English —
+  /// on the screen and in the voice that reads it out.
+  ///
+  /// So the sentence has to do two things in a row a patient can hold at once:
+  /// name what they are picking *for*, and say plainly what they will get back.
+  /// The line it replaced — "The questions will be asked in the language you
+  /// pick" — was true of a different build, and a patient who picks Tamil and
+  /// then meets an English question would have been told wrong by the app
+  /// rather than let down by it.
+  ///
+  /// It still promises nothing about changing the choice later: the language is
+  /// recorded on the case session when it is created, and this screen is not
+  /// the thing that can move it.
+  static String get chooseYourLanguageDetail => _of(
+        'language.detail',
+        'Pick the language you will speak. The questions will be in English, '
+            'on screen and read aloud.',
+      );
+
+  static String get languageContinue => _of('language.continue', 'Continue');
+
+  /// Where the patient's own language cannot be spoken back to the app,
+  /// because the transcriber has no model for it — Odia, today.
+  ///
+  /// Said twice and in one wording: once on the picker, under the row they just
+  /// tapped, and again in the interview where the microphone would have been.
+  /// It names the language, because "answering out loud does not work" with no
+  /// subject reads as a broken app rather than as a fact about one of twelve
+  /// choices — and it ends on the two ways forward, which is the half a patient
+  /// holding the tablet actually needs.
+  ///
+  /// It no longer offers "the questions can still be read to you" as the
+  /// consolation. That read as a promise of Odia, and read-aloud is English for
+  /// every patient now — so it is neither this line's news nor this language's
+  /// exception, and a sentence about a missing microphone is the wrong place to
+  /// discover it.
+  static String cannotAnswerOutLoudIn(String language) => _of(
+        'language.voice.unsupported',
+        'Answering out loud does not work in {language} yet. You can type your '
+            'answer or tap one of the choices.',
+        {'language': language},
+      );
+
   // ── Asking, and answering out loud ────────────────────────────────────────
+
+  /// The switch under the question. Both say what a tap will *do*, because a
+  /// label next to a speaker icon that states the current state instead leaves
+  /// somebody guessing which of the two they are looking at.
+  static String get readAloud => _of('speak.on', 'Read the questions to me');
+  static String get stopReadingAloud =>
+      _of('speak.off', 'Stop reading out loud');
 
   static String get speakYourAnswer =>
       _of('mic.idle', 'Answer out loud instead');

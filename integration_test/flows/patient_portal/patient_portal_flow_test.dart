@@ -122,10 +122,20 @@ void registerPatientPortalFlows() {
       await portal.startCaseTaking();
 
       await portal.assertOnLanguage();
-      // One selectable language and a sentence saying more are coming, rather
-      // than two options that cannot be chosen.
-      portal.seeOnlyLanguage('en');
+      // Twelve rows, each one real. The three checked by hand are the three
+      // that carry a different property: English is what ships and must not
+      // regress, Tamil is a script with no glyph in any bundled face, and Odia
+      // is the one the transcriber cannot hear.
+      portal.seeLanguages(const ['en', 'ta', 'or']);
+
+      // Choosing it says so, on the screen where it is chosen. Then choosing
+      // one that works takes the warning away again — a notice that stuck would
+      // withdraw the microphone from an interview that could have used it.
+      await portal.chooseLanguage('or');
+      portal.seeLanguageCannotBeSpoken();
       await portal.chooseLanguage('en');
+      portal.seeLanguageCanBeSpoken();
+
       await portal.continueFromLanguage();
 
       await portal.assertOnConsent();

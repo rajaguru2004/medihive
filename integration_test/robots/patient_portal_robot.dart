@@ -108,11 +108,35 @@ final class PatientPortalRobot extends Robot {
     expect(Get.currentRoute, PatientPortalRoutes.language);
   }
 
-  /// The screen says more languages are coming rather than showing options
-  /// that cannot be chosen.
-  void seeOnlyLanguage(String code) {
-    expect(find.byKey(PatientPortalKeys.languageOption(code)), findsOneWidget);
-    expect(find.byKey(PatientPortalKeys.languageMore), findsOneWidget);
+  /// Every one of [codes] is a row somebody can tap.
+  ///
+  /// By code rather than by the native name, and the reason is the thing this
+  /// screen exists for: `find.text('தமிழ்')` passes on a build that renders
+  /// every glyph as a box, because the string is in the tree either way.
+  /// Whether the script *draws* is a screenshot's job, not a flow's, and a flow
+  /// that pretended to check it would be the reason nobody took the screenshot.
+  void seeLanguages(List<String> codes) {
+    for (final code in codes) {
+      expect(
+        find.byKey(PatientPortalKeys.languageOption(code)),
+        findsOneWidget,
+        reason: 'the picker offers no row for "$code"',
+      );
+    }
+  }
+
+  /// The chosen language cannot be answered out loud, and the screen says so
+  /// where it is chosen rather than six screens later.
+  void seeLanguageCannotBeSpoken() {
+    expect(
+      find.byKey(PatientPortalKeys.languageVoiceNotice),
+      findsOneWidget,
+      reason: 'a language with no transcriber was offered with no warning',
+    );
+  }
+
+  void seeLanguageCanBeSpoken() {
+    expect(find.byKey(PatientPortalKeys.languageVoiceNotice), findsNothing);
   }
 
   Future<void> chooseLanguage(String code) async {

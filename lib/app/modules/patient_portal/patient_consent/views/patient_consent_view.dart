@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../../core/i18n/patient_text.dart';
 import '../../../../core/keys/app_keys.dart';
 import '../../../../theme/theme.dart';
 import '../controllers/patient_consent_controller.dart';
@@ -35,7 +36,10 @@ class PatientConsentView extends GetView<PatientConsentController> {
 
     return Scaffold(
       key: PatientPortalKeys.consent,
-      appBar: const DetailHeader(title: 'Before we start'),
+      // The same header as the language screen, and read from the same key:
+      // the two are one sequence, and a title translated on one of them and
+      // not the other is the drift `patient_text.dart` exists to stop.
+      appBar: DetailHeader(title: PatientText.beforeWeStart),
       body: BentoGround(
         child: SafeArea(
           child: Column(

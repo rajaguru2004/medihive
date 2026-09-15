@@ -49,7 +49,7 @@ abstract class Endpoints {
   /// ```
   static const String baseUrl = String.fromEnvironment(
     'MEDIHIVE_API',
-    defaultValue: 'https://unguessable-sunshine-transpolar.ngrok-free.dev/',
+    defaultValue: 'https://convincedly-photometric-ariella.ngrok-free.dev/',
   );
 
   /// Where uploaded files live. The API returns storage-relative paths, which
@@ -65,7 +65,7 @@ abstract class Endpoints {
   /// all the free plan gives.
   static const String fileBaseUrl = String.fromEnvironment(
     'MEDIHIVE_FILES',
-    defaultValue: 'https://unguessable-sunshine-transpolar.ngrok-free.dev/',
+    defaultValue: 'https://convincedly-photometric-ariella.ngrok-free.dev/',
   );
 
   /// Whether this build is pointed somewhere only a developer can reach.
@@ -200,6 +200,24 @@ abstract class Endpoints {
 
   /// A question read aloud. Answers `audio/wav`, outside the envelope.
   static const String caseTts = '/api/case-taking/tts';
+
+  /// GET: which languages an interview can be taken in here, and which of them
+  /// [caseStt] and [caseTts] can currently handle.
+  ///
+  /// `data` is the array itself — `[{code, canSpeak, canHear}, …]` — like every
+  /// other collection in this file, and not an object wrapping one. It carries
+  /// no names; `CaseLanguage` says why the app holds those.
+  ///
+  /// **The one route here that is allowed to 404.** The rule at the top of this
+  /// file is that a constant for a route the server does not mount reads as
+  /// verified and lands its 404 on a screen, and this one is landing ahead of
+  /// its handler. What makes it safe is that nothing waits on it: the language
+  /// screen renders its own catalogue first and this only refines the two
+  /// capability flags, so a 404, a timeout and a waiting-room tablet with no
+  /// signal are one behaviour — the picker the app shipped with. Which models
+  /// the sidecar has loaded is genuinely server state and changes without a
+  /// release, which is why the call exists at all.
+  static const String caseLanguages = '/api/case-taking/languages';
 
   // ── The patient's own documents ───────────────────────────────────────────
   //

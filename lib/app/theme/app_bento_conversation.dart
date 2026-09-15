@@ -85,6 +85,22 @@ TextStyle _choiceStyle(BuildContext context) =>
         ? AppTextStyles.darkHeadline()
         : AppTextStyles.lightHeadline();
 
+/// The quieter half of a two-line choice.
+///
+/// **The same size as the line above it**, stepped down by weight and by a
+/// label token rather than by size. That is not symmetry for its own sake: the
+/// case this exists for is the language picker, where the top line is a native
+/// name in a script the reader may not know and the second line is the only
+/// thing left for them to go on. Shrinking the fallback to a caption would make
+/// the least legible thing on the row the one somebody is reading it for — and
+/// the patient register this file sets out puts a floor of 17 under anything a
+/// patient reads anyway.
+TextStyle _choiceDetailStyle(BuildContext context) =>
+    (Theme.of(context).brightness == Brightness.dark
+            ? AppTextStyles.darkBody()
+            : AppTextStyles.lightBody())
+        .copyWith(color: secondaryLabelColor(context));
+
 /// A choice, and the microphone.
 ///
 /// Both deliberately well past [AppTheme.minTapTarget]. 48 is the floor for a
@@ -496,6 +512,7 @@ class AnswerChoiceRow<T> extends StatelessWidget {
     required this.labelOf,
     required this.onSelected,
     this.selected,
+    this.detailOf,
     this.iconOf,
     this.keyOf,
     this.columns = 2,
@@ -508,6 +525,17 @@ class AnswerChoiceRow<T> extends StatelessWidget {
   /// Null until the patient has answered. Not a default: a pre-selected answer
   /// on a clinical question is an answer the app supplied.
   final T? selected;
+
+  /// A second line under [labelOf], for a choice whose own name is not enough
+  /// on its own.
+  ///
+  /// Null on every clinical question, and that is the rule rather than a
+  /// coincidence: "Yes — you are reporting this symptom" is the screen
+  /// explaining an answer to the person giving it, which is one step from
+  /// leading them. What it is for is a choice whose label is in a *script*
+  /// rather than in a language — a language picker, where the row says தமிழ்
+  /// and the line under it says Tamil.
+  final String? Function(T)? detailOf;
 
   final IconData? Function(T)? iconOf;
   final Key? Function(T)? keyOf;
@@ -537,6 +565,7 @@ class AnswerChoiceRow<T> extends StatelessWidget {
                       ? _ChoiceTile(
                           key: keyOf?.call(slice[i]),
                           label: labelOf(slice[i]),
+                          detail: detailOf?.call(slice[i]),
                           icon: iconOf?.call(slice[i]),
                           selected: slice[i] == selected,
                           onTap: () => onSelected(slice[i]),
@@ -571,10 +600,14 @@ class _ChoiceTile extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.detail,
     this.icon,
   });
 
   final String label;
+
+  /// The quieter second line. See `AnswerChoiceRow.detailOf`.
+  final String? detail;
   final bool selected;
   final VoidCallback onTap;
   final IconData? icon;
@@ -624,10 +657,28 @@ class _ChoiceTile extends StatelessWidget {
                       const SizedBox(width: 10),
                     ],
                     Flexible(
-                      child: Text(
-                        label,
-                        textAlign: TextAlign.center,
-                        style: _choiceStyle(context),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            label,
+                            textAlign: TextAlign.center,
+                            style: _choiceStyle(context),
+                          ),
+                          // Never ellipsised and never capped at a line. A
+                          // language's own name is not site data that can run
+                          // long; it is the one string on the row somebody may
+                          // be matching by shape, and `தமிழ…` is not a
+                          // language anybody recognises.
+                          if (detail != null && detail!.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              detail!,
+                              textAlign: TextAlign.center,
+                              style: _choiceDetailStyle(context),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                     if (selected) ...[
@@ -1204,31 +1255,46 @@ class RedFlagNotice extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(PatientText.doNotWaitForTheRest, style: _answerStyle(context)),
-          const SizedBox(height: 12),
-          InsetSurface(
-            radius: BentoRadius.control,
-            padding: const EdgeInsets.all(BentoSpace.listPad),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  PatientText.youSaid.toUpperCase(),
-                  style: AppTextStyles.overline(
-                    isDark ? Brightness.dark : Brightness.light,
+          // Only when there is something to quote.
+          //
+          // The quote is the patient's own words, and on a resumed session
+          // there may be none — the flag is raised from facts already on the
+          // record while `_lastPatientWords()` has nothing to return. Drawn
+          // unconditionally that rendered an empty white box labelled "YOU
+          // SAID" on the one screen in the app that must not look broken. A
+          // patient being told to find a nurse now reads that box for what
+          // they are supposed to have said, and finding it blank invites them
+          // to distrust the rest of the panel.
+          //
+          // The notice above it stands on its own: it names no condition and
+          // needs no quote to say what to do.
+          if (reported.trim().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            InsetSurface(
+              radius: BentoRadius.control,
+              padding: const EdgeInsets.all(BentoSpace.listPad),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    PatientText.youSaid.toUpperCase(),
+                    style: AppTextStyles.overline(
+                      isDark ? Brightness.dark : Brightness.light,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 6),
-                // No `maxLines`, against the usual rule for site-supplied text.
-                // `CLAUDE.md` is explicit that a clinical figure is never
-                // ellipsised, and the same holds harder for the sentence that
-                // triggered the one red notice in the app: "chest pain
-                // spreading to my…" is worse than useless to the person being
-                // shown this screen.
-                Text(reported, style: _answerStyle(context)),
-              ],
+                  const SizedBox(height: 6),
+                  // No `maxLines`, against the usual rule for site-supplied
+                  // text. `CLAUDE.md` is explicit that a clinical figure is
+                  // never ellipsised, and the same holds harder for the
+                  // sentence that triggered the one red notice in the app:
+                  // "chest pain spreading to my…" is worse than useless to the
+                  // person being shown this screen.
+                  Text(reported, style: _answerStyle(context)),
+                ],
+              ),
             ),
-          ),
+          ],
           if (onTellSomeone != null) ...[
             const SizedBox(height: BentoSpace.action),
             PrimaryBar(

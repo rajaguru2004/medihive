@@ -409,6 +409,10 @@ class _LivePanel extends StatelessWidget {
                 message: PatientText.sendingYourAnswer,
                 icon: Icons.schedule_send_rounded,
               ),
+            // Under the question, because it controls the question and not the
+            // answer — and outside the `available` check in `_Voice`, because a
+            // patient whose microphone was refused may still want to be read to.
+            if (question != null) _ReadAloudSwitch(c),
             if (turnError != null) ...[
               const SizedBox(height: BentoSpace.action),
               ErrorRetryBanner(
@@ -603,6 +607,42 @@ class _TypedAnswer extends StatelessWidget {
       ),
     ],
   );
+}
+
+/// The switch that stops the questions being read out loud.
+///
+/// Deliberately a quiet text control rather than a tile: it is not an answer,
+/// and it must never compete with the four that are. It sits under the
+/// question because that is what it governs.
+///
+/// It disappears when the device cannot play audio at all — a control that is
+/// plainly absent is better than one that takes a tap and does nothing, which
+/// is the same rule `_Voice` follows for a refused microphone.
+class _ReadAloudSwitch extends StatelessWidget {
+  const _ReadAloudSwitch(this.c);
+
+  final CaseTakingController c;
+
+  @override
+  Widget build(BuildContext context) => Obx(() {
+    if (!c.canReadAloud) return const SizedBox.shrink();
+    final on = c.rxReadAloud.value;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        key: CaseTakingKeys.readAloud,
+        onPressed: c.toggleReadAloud,
+        icon: Icon(
+          on ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+          size: 20,
+        ),
+        // The label says what a tap will *do*, not what is currently true.
+        // "Reading aloud" next to a speaker icon leaves somebody guessing
+        // whether they are reading a state or pressing a switch.
+        label: Text(on ? PatientText.stopReadingAloud : PatientText.readAloud),
+      ),
+    );
+  });
 }
 
 class _Voice extends StatelessWidget {

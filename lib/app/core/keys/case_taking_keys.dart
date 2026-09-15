@@ -70,6 +70,14 @@ abstract final class CaseTakingKeys {
 
   static const Key mic = Key('case_taking_mic');
 
+  /// The switch that stops the questions being read out loud.
+  ///
+  /// Keyed because the thing worth asserting is that it is *reachable* — a
+  /// patient who realises the waiting room can hear their interview needs to
+  /// find it without reading, and a flow test is the only tier that would
+  /// notice it slipping behind a scroll.
+  static const Key readAloud = Key('case_taking_read_aloud');
+
   /// The bars that move with the patient's voice.
   static const Key listening = Key('case_taking_listening');
 
