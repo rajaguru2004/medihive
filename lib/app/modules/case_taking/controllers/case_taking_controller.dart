@@ -125,27 +125,43 @@ class CaseTakingController extends GetxController with LoadStateMixin {
   bool get hasNotices =>
       rxRedFlagRaised.value || rxFromSnapshot.value || rxLoadError.value != null;
 
-  /// How much of the column the question and its answers may take.
+  /// How the column is divided, as fractions of the height it actually has.
   ///
-  /// Three cases, and each of the numbers was paid for:
+  /// Four states, because three bands compete and which of them is on screen
+  /// changes what the others can have. The rail takes roughly 0.08 on top of
+  /// these, so a pair must leave room for it.
   ///
-  /// * **A notice is up.** All three bands are on screen, so the panel takes
-  ///   the smaller share. `0.34 + 0.52` plus the rail is what fits; raising the
-  ///   panel to `0.72` here overflowed the red-flag screen by 91 points.
-  /// * **Nothing said yet.** The transcript is empty and the notices band is
-  ///   collapsed, so their caps are height nobody can use. Handing it to the
-  ///   panel is the difference between the question being readable and being
-  ///   scrolled off the top of its own scroll view — a contact sheet caught it
-  ///   showing the answer tiles sliced through their own glyphs.
-  /// * **A conversation exists.** The panel yields. The transcript is a
-  ///   `ListView.builder`, which builds only what it has room to show: starve
-  ///   it and it renders *nothing*, so the answer the patient just gave is not
-  ///   on screen and not in the tree. That is a silent failure, and it is why
-  ///   this is not simply "as much as the panel wants".
+  /// Every number here was paid for by a defect:
+  ///
+  /// * **Nothing said, no notice.** The other two bands are collapsed, so their
+  ///   caps are height nobody can use. Give it to the panel: a contact sheet
+  ///   caught the first question rendered with a blank half-screen above it and
+  ///   the answer tiles sliced through their own glyphs.
+  /// * **A conversation, no notice.** The panel yields. The transcript is a
+  ///   `ListView.builder` and builds only what it has room to show — starve it
+  ///   and it renders *nothing*, so the answer just given is neither on screen
+  ///   nor in the tree.
+  /// * **A notice, nothing said.** All three are up but there is no history to
+  ///   show, so the notice and the question take the screen between them.
+  /// * **A notice and a conversation** — the red-flag screen, and the one that
+  ///   is hardest to satisfy. `0.34 + 0.52` fits the column but leaves the
+  ///   transcript about six per cent, which is the starved case above: the
+  ///   patient reads "we could not reach" and "here is the question" and cannot
+  ///   see the answer they just gave. Both caps come down so the history keeps
+  ///   about a fifth. Raising the panel to `0.72` instead overflowed this
+  ///   screen by 91 points, which is how the ceiling was found.
   double get livePanelHeightFraction {
-    if (hasNotices) return 0.52;
-    return rxTurns.isEmpty ? 0.86 : 0.58;
+    if (!hasNotices) return rxTurns.isEmpty ? 0.86 : 0.58;
+    return rxTurns.isEmpty ? 0.52 : 0.44;
   }
+
+  /// The notices band's share, by the same argument.
+  ///
+  /// Smaller once there is a conversation, so the transcript is not squeezed
+  /// out by a banner. The band scrolls inside whatever it is given and never
+  /// ellipsises the patient's quoted words, so a long notice loses nothing —
+  /// it just needs a scroll.
+  double get noticesHeightFraction => rxTurns.isEmpty ? 0.34 : 0.28;
 
   // ── Answering out loud ────────────────────────────────────────────────────
 

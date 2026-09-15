@@ -78,7 +78,7 @@ class CaseTakingView extends GetView<CaseTakingController> {
                       // size.
                       ConstrainedBox(
                         constraints: BoxConstraints(
-                          maxHeight: available * 0.34,
+                          maxHeight: available * c.noticesHeightFraction,
                         ),
                         child: _Notices(c),
                       ),
@@ -235,6 +235,19 @@ class _Conversation extends StatelessWidget {
 
     return ListView.builder(
       key: CaseTakingKeys.transcript,
+      // Newest at the bottom, and on screen without anybody scrolling.
+      //
+      // A `ListView` is lazy: it builds what it has room to show and nothing
+      // else. Anchored at the top, that is the *oldest* turns — so after six
+      // questions the patient's latest answer was neither visible nor in the
+      // tree, and what they saw above the question was how the conversation
+      // started. `reverse` anchors the list at the end instead, which is both
+      // the right reading order for a conversation and the only one where the
+      // answer just given is the one on screen.
+      //
+      // The index is flipped to match: under `reverse`, item 0 sits at the
+      // bottom, so it has to be the last turn.
+      reverse: true,
       padding: const EdgeInsets.fromLTRB(
         BentoSpace.page,
         BentoSpace.section,
@@ -242,7 +255,7 @@ class _Conversation extends StatelessWidget {
         BentoSpace.action,
       ),
       itemCount: turns.length,
-      itemBuilder: (context, index) => _Turn(turns[index]),
+      itemBuilder: (context, index) => _Turn(turns[turns.length - 1 - index]),
     );
   });
 }
