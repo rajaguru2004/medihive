@@ -27,22 +27,45 @@ abstract class Endpoints {
   /// flutter run --dart-define=MEDIHIVE_API=https://api.example.com/
   /// ```
   ///
-  /// The default is the emulator's loopback to the host machine
-  /// (`10.0.2.2` on Android) on **3000**, which is the port the Nest API
-  /// listens on in dev. It was 8000 here for a while, which is nothing at all:
-  /// every request failed to connect and the app read as "no network".
+  /// The default is the **demo tunnel**, so a build with no `--dart-define`
+  /// reaches a real server from a real phone.
+  ///
+  /// It was `http://10.0.2.2:3000/` — the Android *emulator's* loopback to the
+  /// host. That is right for `flutter run` on an emulator and wrong everywhere
+  /// else, and the failure it produces is the worst kind: a physical handset
+  /// cannot resolve `10.0.2.2` at all, so every request hangs to its timeout
+  /// and the app shows "we could not reach the hospital" with nothing to say
+  /// the address was never reachable in the first place. That cost a debugging
+  /// round on a real device.
+  ///
+  /// The tunnel is a **reserved** ngrok domain, so it survives restarts of the
+  /// tunnel and of the stack behind it. What it does not survive is the machine
+  /// hosting it going away — when that happens this default is wrong again, and
+  /// the fix is to change it here or pass `--dart-define=MEDIHIVE_API=...`,
+  /// which still wins.
+  ///
+  /// ```sh
+  /// flutter run --dart-define=MEDIHIVE_API=http://10.0.2.2:3000/   # emulator, local API
+  /// ```
   static const String baseUrl = String.fromEnvironment(
     'MEDIHIVE_API',
-    defaultValue: 'http://10.0.2.2:3000/',
+    defaultValue: 'https://unguessable-sunshine-transpolar.ngrok-free.dev/',
   );
 
   /// Where uploaded files live. The API returns storage-relative paths, which
   /// [fileUrl] joins onto this. When object storage is configured the API
   /// returns absolute URLs instead, and [fileUrl] passes those through
   /// untouched.
+  /// The same origin as [baseUrl], and deliberately so.
+  ///
+  /// Patient documents are served by the API itself
+  /// (`GET /api/patient-documents/:documentId/file`) rather than by a signed
+  /// link into object storage, because a presigned URL names the bucket's own
+  /// host and a phone has no route to it. One origin means one tunnel, which is
+  /// all the free plan gives.
   static const String fileBaseUrl = String.fromEnvironment(
     'MEDIHIVE_FILES',
-    defaultValue: 'http://10.0.2.2:3000/',
+    defaultValue: 'https://unguessable-sunshine-transpolar.ngrok-free.dev/',
   );
 
   /// Whether this build is pointed somewhere only a developer can reach.

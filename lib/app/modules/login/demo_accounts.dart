@@ -47,8 +47,23 @@ class DemoAccount {
 }
 
 abstract final class DemoAccounts {
-  /// Compiled out of release builds. See the class comment.
-  static const bool enabled = kDebugMode;
+  /// On in debug. Off in release **unless a build explicitly asks for it**.
+  ///
+  /// ```sh
+  /// flutter build apk --dart-define=MEDIHIVE_DEMO=true
+  /// ```
+  ///
+  /// The opt-in exists because a release build is the one worth demonstrating —
+  /// it is the fast one — and a demo that begins with somebody typing an email
+  /// address on a phone in front of a room is a demo that begins badly.
+  ///
+  /// It defaults to `kDebugMode` rather than to `true` so that the dangerous
+  /// case is the one you have to ask for: a shipped build that lists working
+  /// hospital logins on its first screen has no authentication at all. Asking
+  /// is a flag in a command somebody typed on purpose; forgetting is not
+  /// enough.
+  static const bool enabled =
+      bool.fromEnvironment('MEDIHIVE_DEMO', defaultValue: kDebugMode);
 
   /// The patient first: this build's new work is the patient's side, and it is
   /// what a demo is most likely to be about.
