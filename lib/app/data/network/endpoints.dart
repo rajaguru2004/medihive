@@ -201,6 +201,24 @@ abstract class Endpoints {
   /// A question read aloud. Answers `audio/wav`, outside the envelope.
   static const String caseTts = '/api/case-taking/tts';
 
+  /// POST: a short-lived pass into a live voice room, and the URL to dial.
+  ///
+  /// Answers `{token, url, roomName, expiresAt}` and **never a key or a
+  /// secret**: the room credential is minted server-side against the patient's
+  /// bearer token, because a credential inside an APK belongs to everybody who
+  /// has the APK and a hospital cannot rotate what is already on a thousand
+  /// phones. `data/services/voice_session.dart` is the parser and says the
+  /// same thing from the other end.
+  ///
+  /// **The second route here that is allowed to 404**, on the same terms as
+  /// [caseLanguages] and for a stronger reason: a live conversation is an
+  /// enhancement over an interview that already works by tap, by keyboard and
+  /// by [caseStt], so a site with no media server configured answers this with
+  /// nothing and the microphone goes on recording and uploading exactly as it
+  /// did before. A 404, a 500, a timeout and a grant with no token in it are
+  /// one behaviour in `CaseTakingController`.
+  static const String caseVoiceToken = '/api/case-taking/voice/token';
+
   /// GET: which languages an interview can be taken in here, and which of them
   /// [caseStt] and [caseTts] can currently handle.
   ///

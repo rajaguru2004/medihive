@@ -12,6 +12,7 @@ import '../../../data/services/audio_source.dart';
 import '../../../data/services/media_access.dart';
 import '../../../data/services/session_lock_service.dart';
 import '../../../data/services/speech_player.dart';
+import '../../../data/services/voice_session.dart';
 import '../../../data/utils/error_handler.dart';
 import '../../../data/utils/load_state.dart';
 import '../../../theme/theme.dart';
@@ -184,6 +185,45 @@ class CaseTakingController extends GetxController with LoadStateMixin {
   /// What the app thinks it heard, waiting to be confirmed.
   final Rxn<CaseTranscript> rxDraft = Rxn<CaseTranscript>();
 
+  // ── Answering out loud, as a conversation ─────────────────────────────────
+  //
+  // A live room is an **enhancement on the same microphone**, never a second
+  // one. The patient taps the control they have always tapped; what changes is
+  // that their words arrive a sentence at a time instead of a recording at a
+  // time, and that a final sentence lands in [rxDraft] on exactly the path
+  // `_finishRecording` puts one on — so `acceptDraft`, `recordAgain` and
+  // `typeInstead` are the same three ways out of it either way.
+  //
+  // Everything here degrades to nothing. A build with no WebRTC, a site with
+  // no media server, a token route that 404s, a dial that times out and a room
+  // that closes halfway are five different causes and one behaviour: the
+  // record-then-upload microphone, which was never conditional on any of it.
+
+  /// Where the live room has got to. [VoiceSessionState.idle] covers both "not
+  /// asked for" and "the patient stopped talking", which are the same thing to
+  /// the screen.
+  final Rx<VoiceSessionState> rxLive = VoiceSessionState.idle.obs;
+
+  /// The words arriving while the patient is still speaking.
+  ///
+  /// **Never filed.** The recogniser revises this several times a sentence;
+  /// what reaches [rxDraft] is the final segment and nothing else. It is here
+  /// so somebody can see they are being heard, which on the recorded path is
+  /// what the level meter is for.
+  final RxnString rxLiveHeard = RxnString();
+
+  /// One dial per interview.
+  ///
+  /// A room that would not open is not going to open on the next question
+  /// either, and a microphone that spends eight seconds trying before every
+  /// spoken answer is a slower interview bought with a convenience. Set before
+  /// the attempt rather than after it, so a second tap during the dial cannot
+  /// start a second one.
+  bool _liveTried = false;
+
+  StreamSubscription<VoiceTranscript>? _heard;
+  StreamSubscription<VoiceSessionState>? _liveState;
+
   // ── Asking out loud ───────────────────────────────────────────────────────
 
   /// Whether each new question is read to the patient.
@@ -226,6 +266,49 @@ class CaseTakingController extends GetxController with LoadStateMixin {
   SpeechPlayer? _player;
 
   SpeechPlayer get _speech => _player ??= Get.find<SpeechPlayer>();
+
+  /// Built on first use and remembered, for the reasons above [_recorder] —
+  /// and one more that is specific to this seam: constructing it is what puts
+  /// a WebRTC stack in the process, so a patient who never presses the
+  /// microphone never causes one to exist.
+  VoiceSession? _voice;
+
+  /// The room seam, or null where there is not one registered.
+  ///
+  /// Guarded rather than assumed, the way `_touchLock` guards
+  /// `SessionLockService` and for a stronger reason. A harness that registers a
+  /// recorder and a player but no room is a harness testing the interview this
+  /// feature is not allowed to require, and a controller that threw looking for
+  /// a seam it can do without would turn "there is no live conversation here"
+  /// into "the microphone crashes" — which is the one outcome §5 of this
+  /// module's brief rules out.
+  VoiceSession? get _room {
+    final found = _voice;
+    if (found != null) return found;
+    if (!Get.isRegistered<VoiceSession>()) return null;
+    return _voice = Get.find<VoiceSession>();
+  }
+
+  /// Opens or closes the published microphone on a room that exists.
+  ///
+  /// Fire-and-forget: nothing the interview does next depends on the platform
+  /// having finished muting, and awaiting it would put a round trip to the
+  /// audio device between a patient's answer and the next question.
+  void _liveMic(bool talking) {
+    final room = _voice;
+    if (room == null) return;
+    unawaited(room.setMicrophoneEnabled(talking));
+  }
+
+  /// Whether a room is up *right now*.
+  ///
+  /// Read from the seam rather than from [rxLive], deliberately. The state
+  /// stream is delivered asynchronously, so for a microtask after a successful
+  /// join the observable still says `connecting` — and the two places that ask
+  /// this question, `_submit` and `_readAloud`, are both on paths where being
+  /// one microtask wrong means a recording spanning two questions or two
+  /// voices reading one question.
+  bool get _isTalkingLive => _voice?.isLive ?? false;
 
   String get _sessionId => rxSession.value?.id ?? '';
 
@@ -294,6 +377,13 @@ class CaseTakingController extends GetxController with LoadStateMixin {
   @override
   void onClose() {
     unawaited(_level?.cancel());
+    unawaited(_heard?.cancel());
+    unawaited(_liveState?.cancel());
+    // A room left open after the patient has walked away is a live microphone
+    // on a shared ward tablet, which is the same disclosure `_player?.stop()`
+    // below is here to prevent and a worse one. `dispose` rather than `leave`:
+    // the screen is going away and there will be no next conversation.
+    unawaited(_voice?.dispose());
     // Bytes, not a file. Cancelling clears the buffer, which is the point of
     // the recorder seam on a shared device — and only if one was ever built,
     // because a patient who typed every answer has nothing to clear.
@@ -546,7 +636,21 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     // recorder is the other half: left running, it kept listening across the
     // boundary and produced audio spanning two questions.
     rxDraft.value = null;
-    if (rxMic.value == MicState.listening) {
+    // The room stays up across a question boundary — that is what makes it a
+    // conversation — but the audio must not. Muted rather than left running,
+    // for the defect above: a live microphone across the boundary publishes a
+    // sentence that spans two questions, and the room would file it against
+    // whichever one is on screen when it finishes.
+    rxLiveHeard.value = null;
+    if (_isTalkingLive) {
+      // Given back on the next question, but **only for an answer the room
+      // itself produced**. Somebody who tapped a tile chose not to speak, and
+      // a microphone that reopened itself in a waiting room on the strength of
+      // that is publishing audio nobody asked it to.
+      _resumeTalking = draft.modality == CaseAnswerModality.voice;
+      rxMic.value = MicState.idle;
+      _liveMic(false);
+    } else if (rxMic.value == MicState.listening) {
       rxMic.value = MicState.idle;
       unawaited(_level?.cancel());
       _level = null;
@@ -590,11 +694,27 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     }
   }
 
+  /// Whether the microphone goes back on when the next question lands. Set by
+  /// `_submit`, which is the only place that knows how the last answer was
+  /// given.
+  bool _resumeTalking = false;
+
   void _apply(CaseTurnResult result, {required String quoting}) {
     rxProgress.value = result.progress;
     rxStatus.value = result.interviewStatus;
     rxQuestion.value = result.nextQuestion;
     _readAloud(result.nextQuestion);
+
+    // After the question is on screen, never before: a room listening to a
+    // patient who has not been asked anything yet records an answer to the
+    // previous question. Only where there is a next question at all — a
+    // finished interview has nothing left to say into.
+    if (_resumeTalking) {
+      _resumeTalking = false;
+      if (result.nextQuestion != null && _isTalkingLive) {
+        _talkLive(true);
+      }
+    }
 
     // The answer went to the model to be read properly. The mark goes under
     // that bubble and the next question is already on screen — see the note on
@@ -647,6 +767,16 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     final text = question?.prompt.trim() ?? '';
     if (text.isEmpty) return;
     if (!rxReadAloud.value || !canReadAloud) return;
+    // The room has a voice of its own and is already speaking. Two voices
+    // reading one clinical question over each other in a waiting room is worse
+    // than either of them alone, and the switch above is not the thing that
+    // can tell them apart.
+    //
+    // Asked as "is the room *speaking*", not "is the room open". A room whose
+    // agent never publishes audio must leave this alone — silencing it there
+    // would take the questions away from the one patient read-aloud exists
+    // for, somebody who cannot comfortably read the screen.
+    if (_voice?.carriesTheVoice ?? false) return;
     final asked = question!.fieldPath;
 
     unawaited(() async {
@@ -720,21 +850,200 @@ class CaseTakingController extends GetxController with LoadStateMixin {
 
   // ── Answering out loud ────────────────────────────────────────────────────
 
-  /// Starts or stops recording.
+  /// Starts or stops the microphone.
+  ///
+  /// One control, two mechanisms underneath it. Where a room is open the taps
+  /// mute and unmute it; everywhere else they start and finish a recording, as
+  /// they always have. The patient is not asked to know which — see the note
+  /// on the live block in `patient_text.dart`.
   Future<void> toggleMicrophone() async {
     if (!rxVoiceAvailable.value || rxSending.value) return;
+    // A tap while the room is being dialled would start a second dial, or end
+    // what the first is still opening.
+    if (rxLive.value == VoiceSessionState.connecting) return;
     _touchLock();
 
     switch (rxMic.value) {
       case MicState.listening:
+        if (_isTalkingLive) {
+          _talkLive(false);
+          return;
+        }
         await _finishRecording();
       case MicState.working:
         // The transcriber has it. A second tap here would start a recording
         // over the top of the one being written down.
         return;
       case MicState.idle:
+        if (_isTalkingLive) {
+          _talkLive(true);
+          return;
+        }
+        // The one dial of the interview, if there is one to make. It takes the
+        // tap either way: a room that failed has already cost the patient
+        // several seconds, and starting a recording they are no longer
+        // expecting would capture whatever the waiting room is saying.
+        if (await _openLiveVoice()) return;
         await _startRecording();
     }
+  }
+
+  /// Opens a live room, once, and says whether it took this tap.
+  ///
+  /// True means "handled" and not "connected" — a failed attempt has been
+  /// reported and the microphone is idle and ready for the next tap. False
+  /// means no attempt was made and the caller should record as usual: this
+  /// build cannot hold a room, one has already been tried, or there is no
+  /// session to open one against.
+  Future<bool> _openLiveVoice() async {
+    // `rxFromSnapshot` is the phone showing what was on screen when the
+    // connection went. A room needs the hospital, and so does the answer it
+    // would produce.
+    if (_liveTried || rxFromSnapshot.value) return false;
+    final sessionId = _sessionId;
+    if (sessionId.isEmpty) return false;
+    // Reading this constructs the seam, which is why it is the last of the
+    // cheap checks rather than the first — and null where a harness never
+    // registered one, which reads as "there is no live conversation here".
+    final room = _room;
+    if (room == null || !room.isSupported) return false;
+
+    _liveTried = true;
+    rxLive.value = VoiceSessionState.connecting;
+
+    try {
+      final grant = await _repository.voiceGrant(
+        CaseVoiceTokenDraft(
+          sessionId: sessionId,
+          inputLanguage: _inputLanguageCode,
+          outputLanguage: _outputLanguageCode,
+        ),
+      );
+
+      // Subscribed before the join, not after it. The room announces `live`
+      // and can deliver its first segment from inside `join`, and a
+      // subscription taken out afterwards would miss both.
+      _heard = room.transcripts.listen(_onHeard);
+      _liveState = room.state.listen(_onLiveState);
+
+      await room.join(
+        grant,
+        inputLanguage: _inputLanguageCode,
+        outputLanguage: _outputLanguageCode,
+      );
+
+      if (room.isLive) {
+        rxMic.value = MicState.listening;
+        return true;
+      }
+
+      // The seam reported `dropped` rather than throwing — an unusable grant,
+      // an unreachable server, a dial past its budget. `_onLiveState` has
+      // already said so.
+      return true;
+    } on MediaRefusal catch (refusal) {
+      // A refusal is never a null — `media_access.dart` is explicit — and the
+      // exception *is* the sentence. Handled here rather than falling through
+      // to the recorder, which would ask for the same microphone and be told
+      // the same thing.
+      _withdrawVoice(refusal.message, needsSettings: refusal.canOpenSettings);
+      rxLive.value = VoiceSessionState.idle;
+      return true;
+    } catch (error, stack) {
+      // A site with no media server configured, which is most of them today.
+      // The route answers 404, this lands, and the interview goes on with the
+      // microphone it already had.
+      AppLog.error(
+          'CaseTakingController', 'no live voice room', error, stack);
+      _endLiveVoice(notice: PatientText.couldNotOpenLiveVoice);
+      return true;
+    }
+  }
+
+  /// Mutes or unmutes an open room, without closing it.
+  void _talkLive(bool talking) {
+    rxMic.value = talking ? MicState.listening : MicState.idle;
+    // Whatever was half-heard belonged to the moment the microphone was open.
+    if (!talking) rxLiveHeard.value = null;
+    _liveMic(talking);
+  }
+
+  void _onHeard(VoiceTranscript heard) {
+    // The agent's own words come down the same stream and are **never** an
+    // answer. Dropped here rather than filtered further down, so there is one
+    // place to read and no path by which the room can put words on a chart
+    // that the patient did not say.
+    if (heard.speaker != VoiceSpeaker.patient || heard.isEmpty) return;
+
+    if (!heard.isFinal) {
+      rxLiveHeard.value = heard.text;
+      return;
+    }
+
+    rxLiveHeard.value = null;
+    // Onto exactly the path a recorded answer takes: the patient is shown what
+    // was heard and confirms it. Nothing a room produces reaches a chart
+    // without that tap.
+    //
+    // No confidence, because the room measured none — and
+    // `AnswerConfidence.fromScore(null)` reads that as "check this", which is
+    // the honest reading of a sentence nothing scored.
+    rxDraft.value = CaseTranscript(
+      text: heard.text,
+      language: heard.language,
+    );
+    // Muted while the draft is on screen. Left open, the next thing said in
+    // the waiting room would arrive as a second final segment and replace a
+    // transcript the patient was in the middle of reading.
+    _liveMic(false);
+    rxMic.value = MicState.idle;
+  }
+
+  void _onLiveState(VoiceSessionState next) {
+    rxLive.value = next;
+    switch (next) {
+      case VoiceSessionState.dropped:
+        _endLiveVoice(
+          // Past tense, and only where a room was actually open: somebody who
+          // watched their words appear and then stop needs to know the app
+          // noticed. A dial that never connected says the other sentence.
+          notice: _liveWasOpen
+              ? PatientText.liveVoiceEnded
+              : PatientText.couldNotOpenLiveVoice,
+        );
+      case VoiceSessionState.live:
+        _liveWasOpen = true;
+      case VoiceSessionState.connecting:
+      case VoiceSessionState.idle:
+        break;
+    }
+  }
+
+  /// Whether a room ever actually opened, which decides which sentence a
+  /// failure gets. Not derived from [rxLive], which by then says `dropped`.
+  bool _liveWasOpen = false;
+
+  /// Closes the room and puts the interview back on the recorder.
+  ///
+  /// **Never withdraws the microphone.** That is the difference between this
+  /// and [_withdrawVoice], and it is the whole promise of this feature: a room
+  /// that failed costs a patient the live transcript and nothing else, because
+  /// the control it was behind still records, still uploads and still answers.
+  void _endLiveVoice({String? notice}) {
+    rxLive.value = VoiceSessionState.idle;
+    rxLiveHeard.value = null;
+    rxMic.value = MicState.idle;
+    unawaited(_heard?.cancel());
+    _heard = null;
+    unawaited(_liveState?.cancel());
+    _liveState = null;
+    unawaited(_voice?.leave());
+
+    // A toast rather than the banner `_withdrawVoice` raises, and deliberately
+    // — §3.3 forbids reporting a *load failure* only through a toast because
+    // it takes the retry with it. There is nothing to retry here: the
+    // microphone is still on screen, still works, and is the retry.
+    if (notice != null) showBentoToast(notice, tone: ToastTone.info);
   }
 
   Future<void> _startRecording() async {
@@ -808,13 +1117,25 @@ class CaseTakingController extends GetxController with LoadStateMixin {
   /// Throws the draft away and listens again.
   Future<void> recordAgain() async {
     rxDraft.value = null;
+    // An open room does not need starting again; it needs the microphone back.
+    // Starting a recorder here would run one alongside the room and post the
+    // same sentence twice.
+    if (_isTalkingLive) {
+      _talkLive(true);
+      return;
+    }
     await _startRecording();
   }
 
   /// The way out for somebody the microphone is never going to hear.
   void typeInstead() {
     rxDraft.value = null;
+    rxLiveHeard.value = null;
     rxMic.value = MicState.idle;
+    // Somebody who has given up on speaking should not still be published into
+    // a room while they type. The room stays open — the next question may go
+    // better — but it stops listening.
+    if (_isTalkingLive) _liveMic(false);
     typedFocus.requestFocus();
   }
 
@@ -830,6 +1151,11 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     unawaited(_level?.cancel());
     _level = null;
     unawaited(_recorder?.cancel());
+    // The microphone is gone, so the room has nothing left to carry. Closed
+    // without a notice: this path has already put a sentence on screen, and a
+    // toast about a live conversation on top of "the microphone is turned off
+    // for MediHive" is the app explaining itself twice.
+    if (_voice != null) _endLiveVoice();
   }
 
   /// Set when the microphone was put away because of the language rather than

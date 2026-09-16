@@ -178,6 +178,55 @@ abstract final class PatientText {
   static String get writingThatDown =>
       _of('mic.working', 'Writing that down');
 
+  // ── Answering out loud, as a conversation ─────────────────────────────────
+  //
+  // The four lines the live room adds, and the register they are written in is
+  // the point of them: **none of them names the feature.** A patient taps the
+  // same microphone they have always tapped; whether their words come back a
+  // sentence at a time or a recording at a time is a fact about the hospital's
+  // servers, and a sentence that made them choose between two kinds of
+  // microphone would be the app asking somebody with chest pain to care about
+  // its architecture.
+  //
+  // So the two failures below say what changed and what still works, and
+  // neither says the word that would invite the question "why don't I have
+  // the other one".
+
+  /// While the room is being dialled. Short, and on screen the moment the
+  /// microphone is tapped: a tap that shows nothing for several seconds is a
+  /// tap somebody makes again, and the second one would end what the first
+  /// started.
+  static String get connectingYourVoice =>
+      _of('live.connecting', 'Connecting you…');
+
+  /// Above the words arriving while the patient is still speaking.
+  ///
+  /// Present tense, and deliberately not [youSaid]. What is under this heading
+  /// is unfinished — the recogniser revises it several times a sentence — and
+  /// a patient who read "You said" over it would correct text that was about
+  /// to correct itself. It is also the honest signal that the microphone is
+  /// working, which is the job `ListeningIndicator` does on the other path.
+  static String get weAreHearing => _of('live.interim', 'We are hearing');
+
+  /// The room would not open. Said once, as a passing note rather than a
+  /// banner: the microphone is still on screen, still works, and the patient
+  /// has lost nothing they knew they had.
+  static String get couldNotOpenLiveVoice => _of(
+        'live.error.open',
+        'We could not listen as you speak just now. You can still answer out '
+            'loud one question at a time, or type your answer.',
+      );
+
+  /// It was working and it stopped. Past tense, because the difference matters
+  /// to somebody who watched their words appear and then stop appearing — it
+  /// tells them the app noticed, which is the part that decides whether they
+  /// trust the next thing it says.
+  static String get liveVoiceEnded => _of(
+        'live.error.dropped',
+        'We have stopped listening as you speak. You can still answer out loud '
+            'one question at a time, or type your answer.',
+      );
+
   /// Above the text the app thinks it heard, before the patient confirms it.
   static String get youSaid => _of('draft.heading', 'You said');
   static String get thatIsRight => _of('draft.accept', "That's right");

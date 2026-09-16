@@ -11,6 +11,27 @@
          only permission `record` asks for on any Android this app supports. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
 
+    <!-- The live voice room, when a site has a media server configured.
+
+         WebRTC puts the device into the communication audio mode and routes
+         capture and playback while a call is up, and Android refuses both
+         without this. It is a *normal* permission — granted at install, no
+         prompt, nothing for a patient to read — so it costs nothing to declare
+         and the feature is silently half-broken without it: the room connects,
+         the transcripts arrive, and the agent's voice comes out of the earpiece
+         at the wrong volume or not at all.
+
+         `flutter_webrtc` declares no permissions of its own, so nothing merges
+         this in. RECORD_AUDIO above is the other half and is already here for
+         `record`.
+
+         Deliberately **not** BLUETOOTH_CONNECT. A headset would route better
+         with it, but on 12 and up it is a runtime permission — a second
+         prompt, through a second call site, for a convenience — and
+         `media_access.dart` being the only place this app asks a patient for
+         anything is worth more than a Bluetooth earpiece. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+
     <!-- Photographing the thing the patient wants looked at: a rash, a
          swelling, the box a medicine came in.
 

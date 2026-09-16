@@ -8,6 +8,7 @@ import 'package:medihive/app/core/keys/app_keys.dart';
 import 'package:medihive/app/data/models/case_session.dart';
 import 'package:medihive/app/data/services/audio_source.dart';
 import 'package:medihive/app/data/services/media_access.dart';
+import 'package:medihive/app/data/services/voice_session.dart';
 import 'package:medihive/app/modules/case_taking/case_taking_cache.dart';
 import 'package:medihive/app/modules/patient_portal/patient_portal_routes.dart';
 
@@ -58,6 +59,20 @@ final class CaseTakingRobot extends Robot {
     if (Get.isRegistered<AudioSource>()) Get.delete<AudioSource>(force: true);
     Get.put<AudioSource>(source, permanent: true);
     addTearDown(() => Get.delete<AudioSource>(force: true));
+    // On the same terms and in the same breath, because the two seams sit
+    // behind one control. [StubVoiceSession] reports itself unsupported, which
+    // is what keeps every flow below on the **record-then-upload** path: no
+    // room is dialled, `POST /voice/token` is never called, and what these
+    // tests prove is the path a site with no media server actually uses.
+    //
+    // That is the deliberate default rather than an omission. A live room is
+    // an enhancement, and the property worth holding still is that the
+    // interview finishes without one.
+    if (Get.isRegistered<VoiceSession>()) {
+      Get.delete<VoiceSession>(force: true);
+    }
+    Get.put<VoiceSession>(const StubVoiceSession(), permanent: true);
+    addTearDown(() => Get.delete<VoiceSession>(force: true));
   }
 
   /// Opens the interview directly, the way the consent screen does.

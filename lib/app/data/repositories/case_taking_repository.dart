@@ -11,6 +11,7 @@ import '../models/drafts/case_taking_drafts.dart';
 import '../network/dio_client.dart';
 import '../network/endpoints.dart';
 import '../services/audio_source.dart';
+import '../services/voice_session.dart';
 import '../utils/api_envelope.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
@@ -146,6 +147,27 @@ class CaseTakingRepository {
         .listOf(CaseLanguage.fromJson)
         .where((language) => !language.isEmpty)
         .toList();
+  }
+
+  /// A short-lived pass into a live voice room, and the URL to dial.
+  ///
+  /// The app is handed a token and never a key: the credential is minted on
+  /// the server against this patient's bearer token, because a secret inside
+  /// an APK belongs to anybody who has the APK. [VoiceGrant] is the whole of
+  /// what comes back, and it has no field that could hold one.
+  ///
+  /// Throws like any other write, and the caller is expected to let it and
+  /// carry on — the posture [languages] takes rather than the one
+  /// [startOrResume] takes. A site with no media server answers this with a
+  /// 404 and a patient there is meant to notice nothing: the microphone still
+  /// records, [transcribe] still answers, and the tiles and the keyboard were
+  /// never conditional on any of it.
+  Future<VoiceGrant> voiceGrant(CaseVoiceTokenDraft draft) async {
+    final response = await _client.post(
+      Endpoints.caseVoiceToken,
+      data: draft.toCreateJson(),
+    );
+    return VoiceGrant.fromJson(ApiEnvelope.of(response).orThrow().object);
   }
 
   /// Transcribes a recorded answer.

@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../../core/i18n/patient_text.dart';
 import '../../../core/keys/app_keys.dart';
 import '../../../data/models/case_session.dart';
+import '../../../data/services/voice_session.dart';
 import '../../../theme/theme.dart';
 import '../controllers/case_taking_controller.dart';
 import '../interview_turn.dart';
@@ -658,6 +659,8 @@ class _Voice extends StatelessWidget {
     final draft = c.rxDraft.value;
     final mic = c.rxMic.value;
     final level = c.rxLevel.value;
+    final live = c.rxLive.value;
+    final heard = c.rxLiveHeard.value;
 
     // Gone, with a sentence in its place. Not a disabled microphone: a
     // control that is plainly not accepting a tap is better than one that
@@ -701,7 +704,24 @@ class _Voice extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (mic == MicState.listening) ...[
+        if (live == VoiceSessionState.connecting) ...[
+          // The tap, acknowledged. Not a spinner — nothing on this surface may
+          // schedule frames forever; see `_StillReading`. The microphone under
+          // it is disabled meanwhile, because a second tap would end what the
+          // first is still opening.
+          NoticeBanner(
+            key: CaseTakingKeys.liveConnecting,
+            message: PatientText.connectingYourVoice,
+            icon: Icons.graphic_eq_rounded,
+          ),
+          const SizedBox(height: BentoSpace.action),
+        ] else if (heard != null) ...[
+          // Where the level meter goes on the recorded path, and it does the
+          // same job better: a patient watching their own words appear needs
+          // no bar to tell them the microphone is working.
+          _LiveHeard(key: CaseTakingKeys.liveTranscript, text: heard),
+          const SizedBox(height: BentoSpace.action),
+        ] else if (mic == MicState.listening) ...[
           KeyedSubtree(
             key: CaseTakingKeys.listening,
             child: ListeningIndicator(level: level),
@@ -711,9 +731,64 @@ class _Voice extends StatelessWidget {
         MicButton(
           key: CaseTakingKeys.mic,
           state: mic,
-          onPressed: mic == MicState.working ? null : c.toggleMicrophone,
+          onPressed: mic == MicState.working ||
+                  live == VoiceSessionState.connecting
+              ? null
+              : c.toggleMicrophone,
         ),
       ],
     );
   });
+}
+
+/// The words arriving while the patient is still speaking.
+///
+/// **Not a [TranscriptDraft], and it must never be mistaken for one.** What is
+/// here is unfinished — the recogniser revises it several times a sentence —
+/// so it carries no "That's right", no confidence mark and no way to file it.
+/// The only thing that reaches a chart is the final segment, which arrives on
+/// `rxDraft` and gets the confirmation card like every recorded answer does.
+///
+/// Never ellipsised, for the reason `TranscriptDraft` is not: half a sentence
+/// a patient is reading back to themselves is half a sentence they stop
+/// correcting.
+class _LiveHeard extends StatelessWidget {
+  const _LiveHeard({super.key, required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return BentoCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            PatientText.weAreHearing.toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.overline(
+              isDark ? Brightness.dark : Brightness.light,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            text,
+            style:
+                (isDark ? AppTextStyles.darkBody() : AppTextStyles.lightBody())
+                    .copyWith(
+                      // Muted with a token rather than with an `Opacity`: live
+                      // text under a wrapper that fades it is a contrast bug,
+                      // and this is text a patient is being asked to read.
+                      color: secondaryLabelColor(context),
+                      height: 1.45,
+                    ),
+          ),
+        ],
+      ),
+    );
+  }
 }

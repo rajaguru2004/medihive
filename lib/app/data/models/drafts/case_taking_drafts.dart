@@ -197,3 +197,47 @@ class CaseFactCorrectionDraft {
         'value': value,
       });
 }
+
+/// Asking for a pass into a live voice room.
+///
+/// DTO: `hms_v2/src/modules/case-taking/dto/case-taking.dto.ts`
+/// (`VoiceTokenDto`) — **being written alongside this**, so the shape here is
+/// the documented one rather than one that has been posted to a running
+/// server. That is worth saying plainly, because `forbidNonWhitelisted` makes
+/// a key the DTO has not declared a 400 for the whole request.
+///
+/// What makes that safe to ship ahead of the route is the same thing that
+/// makes the feature optional: `CaseTakingController` reads a failure here —
+/// a 400, a 404 on a site with no media server, a timeout — as "there is no
+/// live conversation available", and the microphone goes on recording and
+/// uploading through `POST /case-taking/stt` exactly as it did before. The
+/// cost of guessing a field name wrong is a feature that does not appear, not
+/// an interview that does not work.
+///
+/// The session is named because a room belongs to one interview. The two
+/// language tags are sent because the agent has to be told what to listen for
+/// before the patient speaks, and asking it to infer that from the audio is
+/// how an answer given in Tamil comes back transcribed as English.
+class CaseVoiceTokenDraft {
+  const CaseVoiceTokenDraft({
+    required this.sessionId,
+    required this.inputLanguage,
+    required this.outputLanguage,
+  });
+
+  final String sessionId;
+
+  /// What the patient speaks. The only thing the language screen chooses.
+  final String inputLanguage;
+
+  /// What the interview answers in — English, under the current rule. Sent
+  /// rather than assumed: the room should not have to guess what the questions
+  /// it is helping with are written in.
+  final String outputLanguage;
+
+  Map<String, dynamic> toCreateJson() => draftBody({
+        'sessionId': sessionId,
+        'inputLanguage': inputLanguage,
+        'outputLanguage': outputLanguage,
+      });
+}

@@ -81,6 +81,23 @@ abstract final class CaseTakingKeys {
   /// The bars that move with the patient's voice.
   static const Key listening = Key('case_taking_listening');
 
+  /// The words arriving while the patient is still speaking.
+  ///
+  /// Keyed separately from [draft], and the separation is the assertion. A
+  /// live fragment is **not an answer** — the recogniser revises it several
+  /// times a sentence and nothing under this key may ever be filed — while
+  /// everything under [draft] is one tap away from a patient's chart. One key
+  /// covering both would let a flow prove the wrong one of those two.
+  static const Key liveTranscript = Key('case_taking_live_transcript');
+
+  /// Where the microphone says it is dialling a room.
+  ///
+  /// Keyed because its job is to be *present*: between the tap and the room
+  /// answering, this is the only thing on the panel that says the tap landed,
+  /// and the path a flow needs to prove is that a room which never answers
+  /// gives the microphone back rather than leaving this on screen.
+  static const Key liveConnecting = Key('case_taking_live_connecting');
+
   /// What the app thinks it heard, before it is filed.
   static const Key draft = Key('case_taking_transcript_draft');
   static const Key draftAccept = Key('case_taking_draft_accept');

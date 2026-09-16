@@ -89,6 +89,31 @@ dependencies:
   # inside somebody else's package, so the constraint is the fix.
   permission_handler: ^12.0.0
 
+  # The fourth way in, and the only one that is a *conversation* rather than a
+  # turn: a room the patient's microphone is published into, with partial
+  # transcripts coming back as they speak. The question text still arrives on
+  # the existing HTTP turn, which answers in about fifteen milliseconds — this
+  # carries audio and interim text, and nothing clinical depends on it.
+  #
+  # Checked against the pins above before it was added, because three of them
+  # exist to protect `win32 5.15.0` and a fourth is held below its own major
+  # for an unrelated reason. `livekit_client 2.13.0` moves none of them: it
+  # resolves as eighteen *new* packages — `flutter_webrtc`, `dart_webrtc`,
+  # `protobuf`, `connectivity_plus`, `device_info_plus` and their transitives —
+  # and `win32` stays at 5.15.0, `flutter_secure_storage` at 9.2.4,
+  # `file_picker` at 11.0.3, `record` at 6.2.1 and `permission_handler` at
+  # 12.0.3. The one that could have gone wrong is `win32_registry`, which
+  # `device_info_plus` needs: 3.0.3 wants `win32 ^6`, and the solver takes
+  # 2.1.0 instead rather than moving the package the sign-in depends on.
+  #
+  # Reachable from exactly one file — `data/services/livekit_voice_session.dart`
+  # — behind `data/services/voice_session.dart`, so no widget test has to
+  # answer a method channel and a build without it loses nothing but a
+  # convenience. It asks for the microphone through `media_access.dart` like
+  # everything else, so the sentence a patient reads when they say no is still
+  # written once.
+  livekit_client: ^2.13.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
