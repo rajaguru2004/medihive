@@ -82,8 +82,8 @@ TextStyle _detailStyle(BuildContext context) =>
 /// a caption.
 TextStyle _choiceStyle(BuildContext context) =>
     Theme.of(context).brightness == Brightness.dark
-        ? AppTextStyles.darkHeadline()
-        : AppTextStyles.lightHeadline();
+    ? AppTextStyles.darkHeadline()
+    : AppTextStyles.lightHeadline();
 
 /// The quieter half of a two-line choice.
 ///
@@ -168,8 +168,7 @@ enum PatientAnswer {
       'not sure' ||
       'dont know' ||
       'do not know' ||
-      'dk' =>
-        unknown,
+      'dk' => unknown,
       'skip' || 'skipped' || 'declined' || 'refused' || 'not asked' => skipped,
       _ => unknown,
     };
@@ -190,21 +189,21 @@ enum PatientAnswer {
 
   /// The word on the button.
   String get label => switch (this) {
-        PatientAnswer.yes => PatientText.yes,
-        PatientAnswer.no => PatientText.no,
-        PatientAnswer.unknown => PatientText.iDontKnow,
-        PatientAnswer.skipped => PatientText.skip,
-      };
+    PatientAnswer.yes => PatientText.yes,
+    PatientAnswer.no => PatientText.no,
+    PatientAnswer.unknown => PatientText.iDontKnow,
+    PatientAnswer.skipped => PatientText.skip,
+  };
 
   /// The word in the transcript above, where the row of buttons is no longer
   /// on screen to give it context. "Skip" is an instruction; "Skipped" is what
   /// happened.
   String get transcriptLabel => switch (this) {
-        PatientAnswer.yes => PatientText.yes,
-        PatientAnswer.no => PatientText.no,
-        PatientAnswer.unknown => PatientText.notSure,
-        PatientAnswer.skipped => PatientText.skipped,
-      };
+    PatientAnswer.yes => PatientText.yes,
+    PatientAnswer.no => PatientText.no,
+    PatientAnswer.unknown => PatientText.notSure,
+    PatientAnswer.skipped => PatientText.skipped,
+  };
 
   /// The mark beside the word.
   ///
@@ -212,11 +211,11 @@ enum PatientAnswer {
   /// reader who is colour-blind, reading a screenshot, or looking at the
   /// screen from an angle across a waiting room.
   IconData get icon => switch (this) {
-        PatientAnswer.yes => Icons.check_rounded,
-        PatientAnswer.no => Icons.close_rounded,
-        PatientAnswer.unknown => Icons.help_outline_rounded,
-        PatientAnswer.skipped => Icons.skip_next_rounded,
-      };
+    PatientAnswer.yes => Icons.check_rounded,
+    PatientAnswer.no => Icons.close_rounded,
+    PatientAnswer.unknown => Icons.help_outline_rounded,
+    PatientAnswer.skipped => Icons.skip_next_rounded,
+  };
 }
 
 /// How sure the app is that it heard what the patient said.
@@ -250,16 +249,16 @@ enum AnswerConfidence {
   }
 
   String get label => switch (this) {
-        AnswerConfidence.clear => PatientText.heardClearly,
-        AnswerConfidence.unsure => PatientText.pleaseCheckThis,
-        AnswerConfidence.unheard => PatientText.didNotCatchThat,
-      };
+    AnswerConfidence.clear => PatientText.heardClearly,
+    AnswerConfidence.unsure => PatientText.pleaseCheckThis,
+    AnswerConfidence.unheard => PatientText.didNotCatchThat,
+  };
 
   IconData get icon => switch (this) {
-        AnswerConfidence.clear => Icons.check_rounded,
-        AnswerConfidence.unsure => Icons.hearing_rounded,
-        AnswerConfidence.unheard => Icons.hearing_disabled_rounded,
-      };
+    AnswerConfidence.clear => Icons.check_rounded,
+    AnswerConfidence.unsure => Icons.hearing_rounded,
+    AnswerConfidence.unheard => Icons.hearing_disabled_rounded,
+  };
 }
 
 /// How an answer got onto the case.
@@ -277,18 +276,18 @@ enum AnswerSource {
   record;
 
   String get label => switch (this) {
-        AnswerSource.spoken => PatientText.spoken,
-        AnswerSource.typed => PatientText.typed,
-        AnswerSource.chosen => PatientText.chosen,
-        AnswerSource.record => PatientText.fromYourRecord,
-      };
+    AnswerSource.spoken => PatientText.spoken,
+    AnswerSource.typed => PatientText.typed,
+    AnswerSource.chosen => PatientText.chosen,
+    AnswerSource.record => PatientText.fromYourRecord,
+  };
 
   IconData get icon => switch (this) {
-        AnswerSource.spoken => Icons.graphic_eq_rounded,
-        AnswerSource.typed => Icons.keyboard_rounded,
-        AnswerSource.chosen => Icons.check_circle_outline_rounded,
-        AnswerSource.record => Icons.description_outlined,
-      };
+    AnswerSource.spoken => Icons.graphic_eq_rounded,
+    AnswerSource.typed => Icons.keyboard_rounded,
+    AnswerSource.chosen => Icons.check_circle_outline_rounded,
+    AnswerSource.record => Icons.description_outlined,
+  };
 }
 
 // ── The transcript ──────────────────────────────────────────────────────────
@@ -322,8 +321,7 @@ class ConversationTurn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isPatient = speaker == ConversationSpeaker.patient;
-    final side =
-        isPatient ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+    final side = isPatient ? CrossAxisAlignment.end : CrossAxisAlignment.start;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: BentoSpace.header),
@@ -336,14 +334,12 @@ class ConversationTurn extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             ConstrainedBox(
-              constraints:
-                  BoxConstraints(maxWidth: constraints.maxWidth * _bubbleWidth),
+              constraints: BoxConstraints(
+                maxWidth: constraints.maxWidth * _bubbleWidth,
+              ),
               child: child,
             ),
-            if (footnote != null) ...[
-              const SizedBox(height: 7),
-              footnote!,
-            ],
+            if (footnote != null) ...[const SizedBox(height: 7), footnote!],
           ],
         ),
       ),
@@ -451,10 +447,7 @@ class PatientBubble extends StatelessWidget {
       if (source != null) SourceChip(source: source!),
       if (confidence != null) ConfidenceMark(confidence: confidence!),
       if (onChange != null)
-        TextButton(
-          onPressed: onChange,
-          child: Text(PatientText.change),
-        ),
+        TextButton(onPressed: onChange, child: Text(PatientText.change)),
     ];
 
     return ConversationTurn(
@@ -468,17 +461,15 @@ class PatientBubble extends StatelessWidget {
               children: marks,
             ),
       child: DecoratedBox(
-        decoration: bentoCardDecoration(
-          context,
-          fill: brandTonalColor(context),
-        ).copyWith(
-          borderRadius: const BorderRadiusDirectional.only(
-            topStart: Radius.circular(BentoRadius.card),
-            topEnd: Radius.circular(BentoRadius.card),
-            bottomStart: Radius.circular(BentoRadius.card),
-            bottomEnd: Radius.circular(BentoRadius.small),
-          ),
-        ),
+        decoration: bentoCardDecoration(context, fill: brandTonalColor(context))
+            .copyWith(
+              borderRadius: const BorderRadiusDirectional.only(
+                topStart: Radius.circular(BentoRadius.card),
+                topEnd: Radius.circular(BentoRadius.card),
+                bottomStart: Radius.circular(BentoRadius.card),
+                bottomEnd: Radius.circular(BentoRadius.small),
+              ),
+            ),
         child: Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: BentoSpace.cardPad,
@@ -568,6 +559,13 @@ class AnswerChoiceRow<T> extends StatelessWidget {
                           detail: detailOf?.call(slice[i]),
                           icon: iconOf?.call(slice[i]),
                           selected: slice[i] == selected,
+                          // Three across a phone leaves each tile about 100dp,
+                          // and an icon beside the label takes 38 of them with
+                          // the gap. What is left is narrower than the word
+                          // "right", so the text broke mid-word — "That's
+                          // righ / t". Stacking the icon gives the label the
+                          // whole tile width.
+                          stacked: columns >= 3,
                           onTap: () => onSelected(slice[i]),
                         )
                       // Holds the column open so a last row of one is the same
@@ -602,6 +600,7 @@ class _ChoiceTile extends StatelessWidget {
     required this.onTap,
     this.detail,
     this.icon,
+    this.stacked = false,
   });
 
   final String label;
@@ -611,6 +610,11 @@ class _ChoiceTile extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final IconData? icon;
+
+  /// Icon above the label rather than beside it, for tiles too narrow to hold
+  /// both on one line. Set by the grid from its own column count, because that
+  /// is what decides the width — not anything this tile can see.
+  final bool stacked;
 
   @override
   Widget build(BuildContext context) {
@@ -645,16 +649,31 @@ class _ChoiceTile extends StatelessWidget {
             child: InkWell(
               onTap: onTap,
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
+                padding: EdgeInsets.symmetric(
+                  // Narrower side padding when stacked: every dp of it comes
+                  // straight off the label's line width.
+                  horizontal: stacked ? 8 : 14,
                   vertical: 12,
                 ),
-                child: Row(
+                child: Flex(
+                  direction: stacked ? Axis.vertical : Axis.horizontal,
                   mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     if (icon != null) ...[
-                      Icon(icon, size: 22, color: mark),
-                      const SizedBox(width: 10),
+                      // Stacked, the icon slot doubles as the selected mark —
+                      // there is no room beside the label for a second one, and
+                      // a tile that showed neither would carry its state on
+                      // tint alone.
+                      Icon(
+                        stacked && selected ? Icons.check_circle_rounded : icon,
+                        size: stacked ? 20 : 22,
+                        color: stacked && selected ? brand : mark,
+                      ),
+                      SizedBox(
+                        width: stacked ? 0 : 10,
+                        height: stacked ? 6 : 0,
+                      ),
                     ],
                     Flexible(
                       child: Column(
@@ -681,8 +700,10 @@ class _ChoiceTile extends StatelessWidget {
                         ],
                       ),
                     ),
-                    if (selected) ...[
-                      const SizedBox(width: 8),
+                    // Beside the label only when there is room for it. Stacked,
+                    // the icon above has already become the check.
+                    if (selected && !(stacked && icon != null)) ...[
+                      SizedBox(width: stacked ? 0 : 8, height: stacked ? 6 : 0),
                       Icon(Icons.check_circle_rounded, size: 20, color: brand),
                     ],
                   ],
@@ -713,13 +734,13 @@ class UnknownAnswerRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AnswerChoiceRow<PatientAnswer>(
-        choices: PatientAnswer.values,
-        labelOf: (answer) => answer.label,
-        iconOf: (answer) => answer.icon,
-        keyOf: keyOf,
-        selected: selected,
-        onSelected: onAnswered,
-      );
+    choices: PatientAnswer.values,
+    labelOf: (answer) => answer.label,
+    iconOf: (answer) => answer.icon,
+    keyOf: keyOf,
+    selected: selected,
+    onSelected: onAnswered,
+  );
 }
 
 // ── Speaking ────────────────────────────────────────────────────────────────
@@ -745,11 +766,7 @@ enum MicState {
 /// after a week of that nobody on the ward reads red as urgent any more. The
 /// live state is carried by the halo, the glyph and the word underneath.
 class MicButton extends StatelessWidget {
-  const MicButton({
-    super.key,
-    required this.state,
-    required this.onPressed,
-  });
+  const MicButton({super.key, required this.state, required this.onPressed});
 
   final MicState state;
 
@@ -864,11 +881,8 @@ class MicButton extends StatelessWidget {
 ///    explicit; a `TweenAnimationBuilder` on a value that changes is the
 ///    honest shape anyway.
 class ListeningIndicator extends StatelessWidget {
-  const ListeningIndicator({
-    super.key,
-    required this.level,
-    this.bars = 5,
-  }) : assert(bars >= 3, 'A meter reads as a meter from three bars up.');
+  const ListeningIndicator({super.key, required this.level, this.bars = 5})
+    : assert(bars >= 3, 'A meter reads as a meter from three bars up.');
 
   /// 0…1, from `SpeechAudio.levelOfPcm16`.
   final double level;
@@ -895,10 +909,14 @@ class ListeningIndicator extends StatelessWidget {
             TweenAnimationBuilder<double>(
               // Short: the meter is following a voice, and a long ease turns
               // speech into a slow swell that no longer matches the speaking.
-              duration: motionDuration(context, const Duration(milliseconds: 110)),
+              duration: motionDuration(
+                context,
+                const Duration(milliseconds: 110),
+              ),
               curve: Curves.easeOut,
               tween: Tween<double>(
-                end: _floor +
+                end:
+                    _floor +
                     (_height - _floor) *
                         loudness *
                         // The ends move less than the middle, which is what
@@ -1039,10 +1057,11 @@ class ConfidenceMark extends StatelessWidget {
             // The weight is asked of the factory rather than applied with a
             // `copyWith`, which moves the weight and not the face's `wght`
             // axis; the colour is a `copyWith`, which is only a colour.
-            style: (isDark
-                    ? AppTextStyles.darkFootnote(weight: FontWeight.w600)
-                    : AppTextStyles.lightFootnote(weight: FontWeight.w600))
-                .copyWith(color: ink),
+            style:
+                (isDark
+                        ? AppTextStyles.darkFootnote(weight: FontWeight.w600)
+                        : AppTextStyles.lightFootnote(weight: FontWeight.w600))
+                    .copyWith(color: ink),
           ),
         ),
       ],
@@ -1136,7 +1155,10 @@ class ProgressRail extends StatelessWidget {
         SizedBox(
           height: _thickness,
           child: TweenAnimationBuilder<double>(
-            duration: motionDuration(context, const Duration(milliseconds: 260)),
+            duration: motionDuration(
+              context,
+              const Duration(milliseconds: 260),
+            ),
             curve: Curves.easeOutCubic,
             tween: Tween<double>(end: fraction),
             builder: (context, value, _) => Stack(
@@ -1190,11 +1212,7 @@ class ProgressRail extends StatelessWidget {
 /// the card says how serious this is and the button says what to do about it,
 /// and those are two different jobs for two different colours.
 class RedFlagNotice extends StatelessWidget {
-  const RedFlagNotice({
-    super.key,
-    required this.reported,
-    this.onTellSomeone,
-  });
+  const RedFlagNotice({super.key, required this.reported, this.onTellSomeone});
 
   /// What the patient said, in their words. Quoted, not summarised: a
   /// paraphrase is the app editing a clinical statement.
@@ -1245,10 +1263,11 @@ class RedFlagNotice extends StatelessWidget {
               Expanded(
                 child: Text(
                   PatientText.tellANurseNow,
-                  style: (isDark
-                          ? AppTextStyles.darkTitle3()
-                          : AppTextStyles.lightTitle3())
-                      .copyWith(color: ink),
+                  style:
+                      (isDark
+                              ? AppTextStyles.darkTitle3()
+                              : AppTextStyles.lightTitle3())
+                          .copyWith(color: ink),
                 ),
               ),
             ],
@@ -1297,10 +1316,7 @@ class RedFlagNotice extends StatelessWidget {
           ],
           if (onTellSomeone != null) ...[
             const SizedBox(height: BentoSpace.action),
-            PrimaryBar(
-              label: PatientText.tellANurse,
-              onPressed: onTellSomeone,
-            ),
+            PrimaryBar(label: PatientText.tellANurse, onPressed: onTellSomeone),
           ],
         ],
       ),
