@@ -1321,6 +1321,86 @@ class CaseTakingController extends GetxController with LoadStateMixin {
   /// resume, and it is why there is no "are you sure" here — nothing is lost.
   void leave() => PatientPortalNavigation.backToDashboard();
 
+  /// True while [startNewConversation] is in flight, so the button it drives
+  /// cannot be pressed twice.
+  ///
+  /// Its own flag rather than `LoadStateMixin`'s: the busy state belongs to one
+  /// button on the finished card, and putting the whole screen into loading
+  /// would replace the card — and the explanation on it — with a spinner, for
+  /// an action whose first step is irreversible.
+  final RxBool rxStartingNew = false.obs;
+
+  /// Sends this case to the hospital and opens a fresh interview.
+  ///
+  /// ── Why sending is part of it
+  ///
+  /// A patient who has answered everything and wants to raise something new has
+  /// nowhere to go: `POST /sessions` is start-*or-resume* and there is one open
+  /// session per patient, so it hands back the interview they have just
+  /// finished — `resumed: true`, `interviewStatus: complete`, no question on
+  /// screen. Reopening the app lands on the same dead end for ever.
+  ///
+  /// The server offers exactly one way out of it. `POST /sessions/:id/submit`
+  /// moves the session to `submitted`, and that is the only transition that
+  /// ends an interview — there is no abandon route, and nothing client-side can
+  /// stand in for one. So "start a new conversation" *is* "send this one", and
+  /// the button says so rather than discovering it afterwards. Silently filing a
+  /// clinical document to the hospital under a label about starting fresh is the
+  /// one thing this must not do.
+  ///
+  /// ── The half-done case
+  ///
+  /// The submit can succeed and the start can fail — a dropped connection
+  /// between two requests. That leaves the case correctly sent and no interview
+  /// open, which is a recoverable state and not a lost one: the next
+  /// `POST /sessions` finds nothing in progress and makes the new session. The
+  /// message says the case went, because it did, and [reload] is the retry.
+  Future<void> startNewConversation() async {
+    if (rxStartingNew.value) return;
+    final session = rxSession.value;
+    if (session == null) return;
+
+    rxStartingNew.value = true;
+    try {
+      await _repository.submitCase(session.id);
+    } catch (error, stack) {
+      AppLog.error('CaseTakingController', 'the case did not send', error, stack);
+      rxStartingNew.value = false;
+      showBentoToast(
+        parseErrorMessage(error, PatientText.couldNotSendCase),
+        tone: ToastTone.failure,
+      );
+      return;
+    }
+
+    // Sent. Everything from here is about the *next* interview, and a failure
+    // in it must not read as a failure to send.
+    await _cache.clear();
+    rxTurns.clear();
+    rxRedFlagRaised.value = false;
+    rxRedFlagQuote.value = null;
+    rxTurnError.value = null;
+    rxSettleStalled.value = false;
+
+    try {
+      final started = await _repository.startOrResume(
+        CaseSessionStartDraft(language: entry.language.code),
+      );
+      await _adopt(started);
+      showBentoToast(PatientText.caseSentNewStarted, tone: ToastTone.success);
+    } catch (error, stack) {
+      AppLog.error(
+        'CaseTakingController',
+        'the case was sent but the new interview did not open',
+        error,
+        stack,
+      );
+      showBentoToast(PatientText.caseSentNotReopened, tone: ToastTone.info);
+    } finally {
+      rxStartingNew.value = false;
+    }
+  }
+
   // ── Internals ─────────────────────────────────────────────────────────────
 
   String? _lastPatientWords() {

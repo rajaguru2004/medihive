@@ -502,9 +502,54 @@ class _Finished extends StatelessWidget {
             label: PatientText.done,
             onPressed: c.leave,
           ),
+          const SizedBox(height: BentoSpace.action),
+          // Secondary, and below the primary, because leaving is the common
+          // move and this one cannot be undone. It is on this card at all
+          // because a finished interview is otherwise a dead end: there is one
+          // open session per patient, `POST /sessions` resumes rather than
+          // creates, so a patient with something new to raise comes back to
+          // this same completed card every time they open the app.
+          Obx(
+            () => SecondaryBar(
+              key: CaseTakingKeys.finishedStartNew,
+              label: PatientText.sendAndStartNew,
+              icon: Icons.send_rounded,
+              // Null while it runs, which is what disables it. The first step
+              // is a one-way door and the server answers a second press with a
+              // 409, so a double tap must be impossible rather than merely
+              // handled.
+              onPressed: c.rxStartingNew.value
+                  ? null
+                  : () => _confirmStartNew(context, c),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  /// Asks before sending, because sending cannot be taken back.
+  ///
+  /// `ConfirmDialog` is described in its own file as the one dialog in this app,
+  /// reserved for what deserves stopping the world. Filing a clinical document
+  /// to the hospital on a tap whose label is about starting fresh is exactly
+  /// that: the dialog is where the patient is told, in full, before it happens.
+  ///
+  /// Not `destructive` — nothing is deleted or lost. It is irreversible, which
+  /// the wording carries; painting it red would spend the colour this codebase
+  /// reserves for acuity and error on an action that is neither.
+  static Future<void> _confirmStartNew(
+    BuildContext context,
+    CaseTakingController c,
+  ) async {
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: PatientText.sendAndStartNewTitle,
+      message: PatientText.sendAndStartNewBody,
+      confirmLabel: PatientText.sendAndStartNewConfirm,
+    );
+    if (!confirmed) return;
+    await c.startNewConversation();
   }
 }
 

@@ -55,6 +55,13 @@ abstract final class CaseTakingKeys {
   /// being written down — is a sentence that is no longer true by then.
   static const Key settleStalled = Key('case_taking_settle_stalled');
 
+  /// The way out of a finished interview: send it, and start another.
+  ///
+  /// Keyed because it is the only control that ends a session, and because what
+  /// it does is irreversible — a test that means to press "Done for now" and
+  /// finds this instead has sent a clinical document to the hospital.
+  static const Key finishedStartNew = Key('case_taking_finished_start_new');
+
   // ── Answering by touch ────────────────────────────────────────────────────
 
   /// One tile, by the token it sends.

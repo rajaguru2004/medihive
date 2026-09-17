@@ -24,6 +24,6 @@
           because resource merging overrides that file rather than merging it -
           without this line a debug build cannot reach the default API at all.
         -->
-        <domain includeSubdomains="false">192.168.163.97</domain>
+        <domain includeSubdomains="false">192.168.163.136</domain>
     </domain-config>
 </network-security-config>
