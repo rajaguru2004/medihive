@@ -1077,12 +1077,33 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     _liveMic(talking);
   }
 
+  /// True when an agent in the room is driving the interview.
+  ///
+  /// [VoiceSession.carriesTheVoice] goes true the moment something in the room
+  /// publishes audio, which only the agent does — and an agent that speaks is
+  /// an agent that is also posting the answers. That makes it the one honest
+  /// test for "somebody else owns the turn", which is the difference between
+  /// the two behaviours in [_onHeard].
+  bool get _agentDrivesTheTurn => _voice?.carriesTheVoice ?? false;
+
   void _onHeard(VoiceTranscript heard) {
-    // The agent's own words come down the same stream and are **never** an
-    // answer. Dropped here rather than filtered further down, so there is one
-    // place to read and no path by which the room can put words on a chart
-    // that the patient did not say.
-    if (heard.speaker != VoiceSpeaker.patient || heard.isEmpty) return;
+    if (heard.isEmpty) return;
+
+    // ── The agent's own words ────────────────────────────────────────────────
+    //
+    // Never an answer, in either mode — nothing the room says may be filed as
+    // something the patient said, and that is structural in
+    // `livekit_voice_session.dart` rather than a flag here.
+    //
+    // They are still the next *question*, though, which is why they are no
+    // longer simply dropped. In conversation mode the agent is the thing that
+    // advanced the interview, so its final utterance is the app's cue that the
+    // session on the server has moved and the screen is now out of date.
+    if (heard.speaker == VoiceSpeaker.agent) {
+      if (!_agentDrivesTheTurn || !heard.isFinal) return;
+      _followAgent(heard.text);
+      return;
+    }
 
     if (!heard.isFinal) {
       rxLiveHeard.value = heard.text;
@@ -1090,9 +1111,39 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     }
 
     rxLiveHeard.value = null;
+
+    // ── Conversation mode: the patient stops speaking and nothing is asked ──
+    //
+    // The agent has already endpointed this answer on a second of silence,
+    // transcribed it, posted it to `/turns` and is about to speak what came
+    // back. Drafting it here would put a "is this right?" card in front of
+    // somebody who is about to be asked the next question out loud, and
+    // confirming it would post the same answer a second time — the agent's copy
+    // is already on the chart.
+    //
+    // So the words go into the conversation as what they are, and the
+    // microphone **stays open**. That last part is the whole feature: a mic
+    // that closes after every answer is a button press per turn, which is what
+    // hands-free means not doing.
+    if (_agentDrivesTheTurn) {
+      rxTurns.add(
+        InterviewTurn.answered(
+          heard.text,
+          source: AnswerSource.spoken,
+          confidence: AnswerConfidence.fromScore(null),
+          fieldPath: rxQuestion.value?.fieldPath,
+        ),
+      );
+      unawaited(_saveSnapshot());
+      return;
+    }
+
+    // ── No agent: the room is only a transcriber ────────────────────────────
+    //
     // Onto exactly the path a recorded answer takes: the patient is shown what
-    // was heard and confirms it. Nothing a room produces reaches a chart
-    // without that tap.
+    // was heard and confirms it. With nothing else in the room posting turns,
+    // this app is the only thing that can — and nothing it produces reaches a
+    // chart without that tap.
     //
     // No confidence, because the room measured none — and
     // `AnswerConfidence.fromScore(null)` reads that as "check this", which is
@@ -1106,6 +1157,77 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     // transcript the patient was in the middle of reading.
     _liveMic(false);
     rxMic.value = MicState.idle;
+  }
+
+  /// Serialises the session re-reads [_followAgent] triggers.
+  ///
+  /// The agent can speak twice in a row — a routing instruction before the
+  /// question, which is `engine.utterances()`' documented order — and two reads
+  /// in flight can land out of order, which would put the *previous* question
+  /// back on screen after the current one.
+  Future<void>? _following;
+
+  /// Catches the screen up with an interview somebody else is advancing.
+  ///
+  /// In conversation mode the app posts nothing, so it learns nothing from a
+  /// response — `_apply` is never called and `rxQuestion`, `rxProgress` and the
+  /// red-flag banner would all sit at whatever they held when the room opened.
+  /// The agent's spoken question would be the only thing that had moved, and it
+  /// would be audible rather than readable, which is exactly backwards for the
+  /// patient this mode is most useful to.
+  ///
+  /// So the server is asked. One cheap GET per agent utterance, against the
+  /// same session view the interview already reads everywhere else — rather
+  /// than parsing the agent's sentence into a question, which would make the
+  /// screen agree with the audio and disagree with the chart.
+  void _followAgent(String spoken) {
+    // On screen immediately, from the words themselves. The read is a round
+    // trip and the patient is already hearing this sentence; waiting would show
+    // the previous question underneath the new one being spoken.
+    rxTurns.add(InterviewTurn.asked(spoken));
+
+    if (_following != null) return;
+    _following = () async {
+      try {
+        final session = await _repository.session(_sessionId);
+        rxSession.value = session;
+        rxProgress.value = session.progress;
+        rxStatus.value = session.interviewStatus;
+        rxQuestion.value = session.currentQuestion;
+        if (session.redFlags.isNotEmpty) {
+          rxRedFlagRaised.value = true;
+          rxRedFlagQuote.value ??= _lastPatientWords();
+        }
+        if (session.interviewStatus.isFinished) {
+          // Nothing left to ask, so nothing left to listen for. The room is
+          // closed rather than left muted: an open microphone on a shared ward
+          // tablet outlives the reason it was opened.
+          await _endLiveVoiceQuietly();
+        }
+        unawaited(_saveSnapshot());
+      } catch (error, stack) {
+        // Swallowed. The audio is the conversation and it is still happening;
+        // a failed catch-up means the screen lags by a question, which is worth
+        // far less than an error banner over a patient mid-sentence. The next
+        // utterance tries again.
+        AppLog.error(
+          'CaseTakingController',
+          'could not follow the agent',
+          error,
+          stack,
+        );
+      } finally {
+        _following = null;
+      }
+    }();
+  }
+
+  /// Closes the room without a notice. Used when the interview simply ended.
+  Future<void> _endLiveVoiceQuietly() async {
+    rxMic.value = MicState.idle;
+    rxLiveHeard.value = null;
+    await _voice?.leave();
+    rxLive.value = VoiceSessionState.idle;
   }
 
   void _onLiveState(VoiceSessionState next) {
