@@ -386,6 +386,16 @@ class _LivePanel extends StatelessWidget {
                 // way to know the conversation moved on.
                 child: AssistantBubble(text: question.prompt, live: true),
               )
+            else if (settling && c.rxSettleStalled.value)
+              // Waited out and still nothing to ask. `almostThere` has stopped
+              // being true by this point, and repeating it leaves the patient
+              // watching a sentence about an answer nobody is writing down.
+              ErrorRetryBanner(
+                key: CaseTakingKeys.settleStalled,
+                title: PatientText.checkAgain,
+                message: PatientText.stillNothingToAsk,
+                onRetry: c.reload,
+              )
             else if (settling)
               NoticeBanner(
                 message: PatientText.almostThere,

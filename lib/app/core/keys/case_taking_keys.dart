@@ -48,6 +48,13 @@ abstract final class CaseTakingKeys {
   /// rather than the milliseconds the happy path measures.
   static const Key sending = Key('case_taking_sending');
 
+  /// Where the panel gives up on a settling interview and offers the way out.
+  ///
+  /// Keyed for the same reason as [sending]: it is the only thing on the answer
+  /// panel when it shows, and what it replaces — a sentence saying an answer is
+  /// being written down — is a sentence that is no longer true by then.
+  static const Key settleStalled = Key('case_taking_settle_stalled');
+
   // ── Answering by touch ────────────────────────────────────────────────────
 
   /// One tile, by the token it sends.

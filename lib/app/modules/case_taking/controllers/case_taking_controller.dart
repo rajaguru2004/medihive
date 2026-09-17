@@ -95,6 +95,17 @@ class CaseTakingController extends GetxController with LoadStateMixin {
   /// controls, and nothing else — it is measured in milliseconds.
   final RxBool rxSending = false.obs;
 
+  /// True when the interview settled with no question and stayed that way past
+  /// every re-check. The screen stops promising that an answer is being written
+  /// down — because by this point nothing is — and offers the way out instead.
+  final RxBool rxSettleStalled = false.obs;
+
+  /// Re-checks a settling interview. See [_watchSettling].
+  Timer? _settle;
+
+  /// How many re-checks have gone by without a question arriving.
+  int _settleAttempts = 0;
+
   /// An answer that did not reach the server. Inline and persistent, with the
   /// retry attached: a toast here would take the retry with it and leave the
   /// patient looking at a question they have already answered.
@@ -376,6 +387,7 @@ class CaseTakingController extends GetxController with LoadStateMixin {
 
   @override
   void onClose() {
+    _settle?.cancel();
     unawaited(_level?.cancel());
     unawaited(_heard?.cancel());
     unawaited(_liveState?.cancel());
@@ -482,6 +494,10 @@ class CaseTakingController extends GetxController with LoadStateMixin {
 
     _touchLock();
     unawaited(_saveSnapshot());
+    // A resumed interview can land straight into the settling state — which is
+    // exactly how the stuck session presented: opened from the portal, no
+    // question, nothing to press.
+    _watchSettling();
   }
 
   /// Puts back what was on screen when the connection went.
@@ -730,8 +746,101 @@ class CaseTakingController extends GetxController with LoadStateMixin {
 
     _touchLock();
     unawaited(_saveSnapshot());
+    // After the status is set, because it reads it. A turn that lands on
+    // `awaiting_extraction` with no question is the state nothing else on this
+    // screen can move.
+    _watchSettling();
 
     if (result.interviewStatus.isFinished) unawaited(_cache.clear());
+  }
+
+  /// Re-checks an interview that has nothing to ask.
+  ///
+  /// `awaiting_extraction` means the questions have run out but an answer is
+  /// still being read, and it is the one status this screen cannot act on: there
+  /// is no question to answer and no control to press. Every other state moves
+  /// because the patient moves it. This one moves only when the server changes
+  /// its mind, and until now nothing ever asked it again — `reload()` ran once
+  /// in `onReady` and that was the only read of the session in the screen's
+  /// life. A patient who landed here stayed here, watching a sentence about an
+  /// answer being written down, for as long as they were willing to.
+  ///
+  /// The server can now always leave this state on its own: a lost extraction is
+  /// released on the clock, and the question comes back. What was missing was
+  /// anybody on this side to notice. So while the interview is settling, ask
+  /// again — and stop asking, rather than poll a waiting room forever.
+  ///
+  /// [_settleAttempts] is not a retry count in the usual sense: nothing here has
+  /// failed. It bounds a wait. Six looks at five seconds covers half a minute,
+  /// which is past the twenty the longest measured extraction takes and well
+  /// short of the two minutes the server's own backstop needs — after which the
+  /// session is genuinely stuck rather than slow, and saying so with a way out
+  /// beats a sentence that is no longer true.
+  void _watchSettling() {
+    final settling = rxStatus.value == CaseInterviewStatus.awaitingExtraction &&
+        rxQuestion.value == null;
+
+    if (!settling) {
+      _settle?.cancel();
+      _settle = null;
+      _settleAttempts = 0;
+      rxSettleStalled.value = false;
+      return;
+    }
+
+    if (_settle != null) return; // Already watching this one.
+
+    _settle = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      final session = rxSession.value;
+      // Nothing to re-read against, or the screen has moved on under us.
+      if (session == null || rxFromSnapshot.value) {
+        timer.cancel();
+        _settle = null;
+        return;
+      }
+
+      _settleAttempts += 1;
+      if (_settleAttempts > 6) {
+        timer.cancel();
+        _settle = null;
+        rxSettleStalled.value = true;
+        AppLog.warn(
+          'CaseTakingController',
+          'the interview has been settling for ${_settleAttempts * 5}s with no '
+              'question; offering the way out',
+        );
+        return;
+      }
+
+      try {
+        final fresh = await _repository.session(session.id);
+        rxSession.value = fresh;
+        rxProgress.value = fresh.progress;
+        rxStatus.value = fresh.interviewStatus;
+        rxQuestion.value = fresh.currentQuestion;
+        if (fresh.currentQuestion != null || fresh.interviewStatus.isFinished) {
+          timer.cancel();
+          _settle = null;
+          _settleAttempts = 0;
+          rxSettleStalled.value = false;
+          _settlePreviousReading();
+          _readAloud(fresh.currentQuestion);
+          unawaited(_saveSnapshot());
+        }
+      } catch (error, stack) {
+        // Swallowed on purpose. This is a background re-check of a screen the
+        // patient is not being asked to do anything on; surfacing a network
+        // error here would put a failure in front of them for something they
+        // never asked for. The attempt counter still advances, so a connection
+        // that is down lands on the same way out as a session that is stuck.
+        AppLog.error(
+          'CaseTakingController',
+          'a settling re-check did not reach the hospital',
+          error,
+          stack,
+        );
+      }
+    });
   }
 
   /// Retires the mark on the previous answer.

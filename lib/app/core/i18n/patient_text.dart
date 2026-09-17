@@ -399,6 +399,20 @@ abstract final class PatientText {
         'We are finishing writing down your last answer.',
       );
 
+  /// The settling state, still there after the screen has waited it out.
+  ///
+  /// [almostThere] stops being true at some point, and a screen that keeps
+  /// saying it is a screen lying to a patient who is doing nothing wrong. This
+  /// says what is actually the case and hands them the only two useful moves:
+  /// look again, or leave and come back to it.
+  static String get stillNothingToAsk => _of(
+        'interview.settling.stalled',
+        'Your last answer is taking longer than usual to save. Your answers so '
+            'far are safe. You can check again, or come back to this later.',
+      );
+
+  static String get checkAgain => _of('interview.settling.retry', 'Check again');
+
   // ── When something goes wrong ─────────────────────────────────────────────
 
   static String get couldNotStart => _of(
