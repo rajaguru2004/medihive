@@ -3,10 +3,14 @@ import 'package:integration_test/integration_test.dart';
 import 'package:medihive/app/modules/home/controllers/home_controller.dart';
 import 'package:medihive/app/routes/app_pages.dart';
 
+import '../fixtures/modules/case_review_fixtures.dart';
 import '../fixtures/modules/case_taking_fixtures.dart';
+import '../fixtures/modules/patient_documents_fixtures.dart';
 import '../fixtures/world_roles.dart';
+import '../robots/case_review_robot.dart';
 import '../robots/case_taking_robot.dart';
 import '../robots/home_robot.dart';
+import '../robots/patient_documents_robot.dart';
 import '../robots/patient_portal_robot.dart';
 import '../support/app_harness.dart';
 import '../support/pump.dart';
@@ -148,6 +152,65 @@ void main() {
 
       interview.seeAnswerInTranscript('Not sure');
       interview.seeNoText('No known allergies');
+      await tester.pumpSeconds(4);
+    });
+  });
+
+  // ── 1b. The documents they already hold ────────────────────────────────────
+  //
+  // The other half of the patient's side: a prescription photographed in a
+  // waiting room, read, and shown back with both confidences under their own
+  // names — how legible the page was, and how much of its meaning was found.
+  // Never one blended "accuracy", because the two measure different things.
+  group('the documents', () {
+    testWidgets('a prescription is read, and checked by the patient',
+        (tester) async {
+      final harness = await openAs(
+        tester,
+        WorldRole.patient,
+        overrides: (api) => installPatientDocumentsFixtures(
+          api as dynamic,
+          withDocuments: true,
+        ),
+      );
+
+      final documents = PatientDocumentsRobot(harness);
+
+      await documents.openFromDashboard();
+      await documents.assertOnList();
+      await tester.pumpSeconds(3);
+
+      // The three ways in. The camera is offered first — a patient holding a
+      // prescription wants to photograph it — but the library is what a demo
+      // drives, because an emulator has no lens.
+      await documents.addFromGallery();
+      await tester.pumpSeconds(3);
+    });
+  });
+
+  // ── 1c. What we understood ─────────────────────────────────────────────────
+  //
+  // The case read back before it is sent. Every line carries where it came
+  // from, each can be confirmed or corrected, and the unanswered questions are
+  // printed in their own words rather than left to look like negatives.
+  group('the read-back', () {
+    testWidgets('the patient checks the case before it is sent',
+        (tester) async {
+      final harness = await openAs(
+        tester,
+        WorldRole.patient,
+        overrides: (api) => installCaseReviewFixtures(api as dynamic),
+      );
+
+      final review = CaseReviewRobot(harness);
+
+      await review.openFromDashboard();
+      await tester.pumpSeconds(3);
+
+      // Above the case, not beneath it: this is a record of what the patient
+      // said, and nothing on it has been decided about them.
+      await review.seeItIsNotADiagnosis();
+      review.seeNoDiagnosisLanguage();
       await tester.pumpSeconds(4);
     });
   });
