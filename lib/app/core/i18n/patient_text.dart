@@ -391,6 +391,52 @@ abstract final class PatientText {
 
   static String get done => _of('interview.done.action', 'Done for now');
 
+  /// Starting again, and the two things it does.
+  ///
+  /// The label names the send first because the send is the part that cannot be
+  /// taken back — the new interview is the *consequence*, not the price. A
+  /// button that said only "Start a new conversation" would file a clinical
+  /// document to the hospital on a tap that did not mention one.
+  ///
+  /// Short because `SecondaryBar` gives a label one line and ellipsises the
+  /// rest, and it was measured doing it: "Send this and start a new
+  /// conversation" rendered as "Send this and start a new c…" on the handset,
+  /// which is a button whose irreversible half is the half that fits and whose
+  /// consequence trails off into a character nobody can act on. The full
+  /// sentence lives in the dialog, which has room for it and is where the
+  /// patient is asked to agree.
+  static String get sendAndStartNew =>
+      _of('interview.done.restart', 'Send and start a new one');
+
+  static String get sendAndStartNewTitle =>
+      _of('interview.done.restart.title', 'Send this to the hospital?');
+
+  /// Said in the order it happens, and it does not promise a reply. "A doctor
+  /// will read it" is already on the card above; repeating it here in a dialog
+  /// that is asking permission would read as a commitment about when.
+  static String get sendAndStartNewBody => _of(
+        'interview.done.restart.body',
+        'Your answers will be sent to the hospital as they are, and cannot be '
+            'changed afterwards. You will then start a fresh set of questions.',
+      );
+
+  static String get sendAndStartNewConfirm =>
+      _of('interview.done.restart.confirm', 'Send and start');
+
+  static String get caseSentNewStarted => _of(
+        'interview.done.restart.sent',
+        'Sent. You can start answering the new questions.',
+      );
+
+  /// Sent, but the next interview did not open — a connection that went between
+  /// two requests. It leads with the fact that matters and does not call it a
+  /// failure, because nothing failed that the patient did.
+  static String get caseSentNotReopened => _of(
+        'interview.done.restart.halfway',
+        'Your answers were sent. We could not open the new questions just yet — '
+            'try again in a moment.',
+      );
+
   /// Nothing left to ask, but an answer is still being read. **Not the same as
   /// finished**: saying so would invite somebody to close the app while the
   /// last thing they said was still being written down.

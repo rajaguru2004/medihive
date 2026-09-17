@@ -164,13 +164,40 @@ class LiveKitVoiceSession implements VoiceSession {
       // current rule and is sent anyway — the room should not have to assume
       // what the interview is written in.
       //
-      // Best-effort: an agent that ignores attributes loses nothing, and a
-      // server that refuses them is not a reason to drop a working room.
-      await me?.setAttributes({
-        'inputLanguage': inputLanguage,
-        'outputLanguage': outputLanguage,
-      });
+      // ── Its own try, and that is the whole of the fix
+      //
+      // "Best-effort: an agent that ignores attributes loses nothing, and a
+      // server that refuses them is not a reason to drop a working room" is
+      // what this comment said while the call sat inside the connect's `try`,
+      // awaited. So a refusal *was* a reason to drop a working room, and it
+      // dropped one: a token minted without `canUpdateOwnMetadata` answers
+      //
+      //     NOT_ALLOWED - does not have permission to update own metadata
+      //
+      // and that threw, landed in the catch below, set `_failed` — which
+      // retires live voice for the rest of the session — and tore down a room
+      // whose DTLS handshake had already completed and whose SRTP was already
+      // active. On the handset it read as "We could not listen as you speak
+      // just now", with the media path in perfect working order underneath.
+      //
+      // The grant is fixed too, server-side, so the attributes now land. This
+      // stays because the two are independent: the next best-effort signal call
+      // somebody adds must not be able to do this again.
+      try {
+        await me?.setAttributes({
+          'inputLanguage': inputLanguage,
+          'outputLanguage': outputLanguage,
+        });
+      } catch (error) {
+        AppLog.warn(
+          'LiveKitVoiceSession',
+          'the room would not take the language attributes, carrying on: $error',
+        );
+      }
 
+      // Not best-effort, and deliberately inside the outer try: a room the
+      // patient cannot speak into is not a conversation, and failing here is
+      // exactly the case the record-then-upload fallback exists for.
       await me?.setMicrophoneEnabled(true);
 
       _live = true;

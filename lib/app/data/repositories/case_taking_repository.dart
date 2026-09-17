@@ -111,6 +111,29 @@ class CaseTakingRepository {
     return CaseTurnResult.fromJson(ApiEnvelope.of(response).orThrow().object);
   }
 
+  /// Sends the finished case to the hospital, and closes the session.
+  ///
+  /// Two things happen server-side and only one of them is in the name. It
+  /// writes a `CaseSubmission` against the patient record — and it moves the
+  /// session to `submitted`, which is what *ends* it. That second effect is the
+  /// only way an interview ever ends: there is no abandon route, and
+  /// `POST /sessions` hands back the open one rather than making a second, so a
+  /// patient with a session still `in_progress` cannot start another however
+  /// many times they ask. [startOrResume] after this one returns a genuinely
+  /// new interview.
+  ///
+  /// Not idempotent, and the server says so: a second call is a 409
+  /// `CASE_SESSION_ALREADY_SUBMITTED` rather than a quiet second copy of a
+  /// clinical document. Callers must treat it as a one-way door.
+  ///
+  /// The response describes what was sent — the submission id, how complete it
+  /// was, and the safety view. Nothing here reads it yet; it is returned rather
+  /// than dropped so the read-back screen does not have to change this method.
+  Future<Map<String, dynamic>> submitCase(String sessionId) async {
+    final response = await _client.post(Endpoints.caseSessionSubmit(sessionId));
+    return ApiEnvelope.of(response).orThrow().object;
+  }
+
   /// Corrects an answer already recorded.
   ///
   /// Returns the new fact's id alongside the one it superseded, because both
