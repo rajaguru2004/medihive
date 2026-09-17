@@ -170,7 +170,7 @@ class CaseTakingController extends GetxController with LoadStateMixin {
   ///   the red-flag notice above is clipping the patient's own quoted words
   ///   mid-syllable. That is what the screenshot showed: "YOU SAID / Th…".
   double get livePanelHeightFraction {
-    if (rxConversation.value) return hasNotices ? 0.38 : 0.52;
+    if (rxConversation.value) return hasNotices ? 0.36 : 0.52;
     if (!hasNotices) return rxTurns.isEmpty ? 0.86 : 0.58;
     return rxTurns.isEmpty ? 0.52 : 0.44;
   }
@@ -186,10 +186,13 @@ class CaseTakingController extends GetxController with LoadStateMixin {
   /// one thing on this screen that must be readable without being worked for:
   /// a warning whose instruction is off the bottom of its own scroll is a
   /// warning somebody skims past, and this is the screen where that matters
-  /// most. 0.38 + 0.38 still leaves the transcript about a fifth, which is the
-  /// floor the starved-`ListView` case established.
+  /// most. The rail takes 0.08 before either band gets a share, so the pair has
+  /// 0.74 to divide if the transcript is to keep the fifth the
+  /// starved-`ListView` case established: 0.36 + 0.36 leaves it 0.20.
+  /// `case_taking_layout_test.dart` holds that arithmetic still — it caught
+  /// this very sum written as 0.38 + 0.38, which leaves 0.16.
   double get noticesHeightFraction {
-    if (rxConversation.value) return 0.38;
+    if (rxConversation.value) return 0.36;
     return rxTurns.isEmpty ? 0.34 : 0.28;
   }
 
