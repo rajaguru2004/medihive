@@ -55,6 +55,22 @@ abstract final class CaseTakingKeys {
   /// being written down — is a sentence that is no longer true by then.
   static const Key settleStalled = Key('case_taking_settle_stalled');
 
+  // ── Answering by talking ──────────────────────────────────────────────────
+
+  /// The answer panel while the interview is a spoken conversation.
+  ///
+  /// Keyed because its job is to be *instead of* something: a test that finds
+  /// both this and [answers] on screen has found the defect this mode exists to
+  /// prevent — two ways to answer one field, one of which files it twice.
+  static const Key conversation = Key('case_taking_conversation');
+
+  /// Listening, or speaking. The only status a conversation shows.
+  static const Key conversationState = Key('case_taking_conversation_state');
+
+  /// The way back to tiles and a keyboard. The one control a conversation has,
+  /// and never a way of answering.
+  static const Key conversationExit = Key('case_taking_conversation_exit');
+
   /// The way out of a finished interview: send it, and start another.
   ///
   /// Keyed because it is the only control that ends a session, and because what

@@ -384,7 +384,18 @@ class _LivePanel extends StatelessWidget {
                 // `live` steps the question up to title2 and announces it to
                 // a screen reader — a patient using VoiceOver has no other
                 // way to know the conversation moved on.
-                child: AssistantBubble(text: question.prompt, live: true),
+                // `spoken` in a conversation, `prompt` otherwise. They are the
+                // same question; `prompt` ends with the shape of the expected
+                // answer — "You can answer yes or no." — which belongs over the
+                // tiles it describes. While the agent is talking there are no
+                // tiles, the hint describes nothing, and the screen would be
+                // saying a sentence the voice did not.
+                child: AssistantBubble(
+                  text: c.rxConversation.value
+                      ? question.spoken
+                      : question.prompt,
+                  live: true,
+                ),
               )
             else if (settling && c.rxSettleStalled.value)
               // Waited out and still nothing to ask. `almostThere` has stopped
@@ -450,7 +461,15 @@ class _LivePanel extends StatelessWidget {
             // touch these controls is `sending`, which is one answer's round
             // trip and is passed down to disable the send button rather than to
             // remove anything.
-            if (question != null) ...[
+            // In a spoken conversation there is nothing to answer *with*. The
+            // agent endpoints on a second of silence, transcribes, posts and
+            // speaks the next question, so a tile or a Send button here is not
+            // a convenience — it is a second way to answer the same field, and
+            // pressing it would file the answer twice.
+            if (c.rxConversation.value) ...[
+              const SizedBox(height: BentoSpace.section),
+              _SpokenPanel(c),
+            ] else if (question != null) ...[
               const SizedBox(height: BentoSpace.section),
               _Answers(c, question: question, sending: sending),
             ],
@@ -794,6 +813,130 @@ class _Voice extends StatelessWidget {
       ],
     );
   });
+}
+
+/// The whole of the answer panel while the interview is a spoken conversation.
+///
+/// ## Why there is nothing to press
+///
+/// The agent endpoints the patient's turn on a second of silence, transcribes
+/// it, posts it to `/turns` and speaks what comes back. A tile, a keyboard or a
+/// Send button here would not be a convenience — it would be a *second* way to
+/// answer the field the agent has already answered, and using it would file the
+/// same answer twice.
+///
+/// So this surface carries exactly two things: what is happening, and the way
+/// out. Everything else a patient needs is audible.
+///
+/// ## Why nothing here animates forever
+///
+/// `ListeningIndicator` is driven by the microphone's own level, so it moves
+/// when there is something to move about and is still otherwise. Nothing on
+/// this surface schedules frames on its own — the rule `_StillReading` states,
+/// and the shape that hangs the e2e harness.
+class _SpokenPanel extends StatelessWidget {
+  const _SpokenPanel(this.c);
+
+  final CaseTakingController c;
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final heard = c.rxLiveHeard.value;
+      final speaking = c.rxQuestion.value == null;
+
+      return Column(
+        key: CaseTakingKeys.conversation,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // The patient's own words as they form. It is the best possible proof
+          // that the microphone is working, which is why it takes precedence
+          // over the meter: somebody watching their sentence appear needs no
+          // bar to tell them they are being heard.
+          if (heard != null)
+            _LiveHeard(key: CaseTakingKeys.liveTranscript, text: heard)
+          else
+            _ConversationState(
+              key: CaseTakingKeys.conversationState,
+              label: speaking
+                  ? PatientText.speakingNow
+                  : PatientText.listeningToYou,
+              icon: speaking
+                  ? Icons.volume_up_rounded
+                  : Icons.graphic_eq_rounded,
+              level: speaking ? 0 : c.rxLevel.value,
+            ),
+          const SizedBox(height: BentoSpace.action),
+          // Said once, quietly, and only here. A conversation that needs a
+          // legend is not a conversation — this is the single thing a patient
+          // cannot discover by looking, because "do nothing" is invisible.
+          Text(
+            PatientText.justTalk,
+            textAlign: TextAlign.center,
+            style: AppTextStyles.lightFootnote().copyWith(
+              color: secondaryLabelColor(context),
+            ),
+          ),
+          const SizedBox(height: BentoSpace.section),
+          // Not an answer, and placed apart from one: this is the exit, and a
+          // hands-free mode with no exit is an open microphone on a shared ward
+          // tablet belonging to somebody who has changed their mind.
+          SecondaryBar(
+            key: CaseTakingKeys.conversationExit,
+            label: PatientText.tapInstead,
+            icon: Icons.keyboard_rounded,
+            onPressed: c.endConversation,
+          ),
+        ],
+      );
+    });
+  }
+}
+
+/// Listening, or speaking — the two states of a conversation, said plainly.
+class _ConversationState extends StatelessWidget {
+  const _ConversationState({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.level,
+  });
+
+  final String label;
+  final IconData icon;
+  final double level;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return BentoCard(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 20, color: brandInkColor(context)),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: (isDark
+                        ? AppTextStyles.darkHeadline()
+                        : AppTextStyles.lightHeadline())
+                    .copyWith(color: brandInkColor(context)),
+              ),
+            ],
+          ),
+          if (level > 0) ...[
+            const SizedBox(height: BentoSpace.action),
+            ListeningIndicator(level: level),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 /// The words arriving while the patient is still speaking.

@@ -232,6 +232,7 @@ class CaseQuestion {
     required this.label,
     required this.kind,
     required this.prompt,
+    this.spokenPrompt = '',
     this.choices = const [],
     this.remaining = 0,
   });
@@ -251,6 +252,20 @@ class CaseQuestion {
 
   /// The sentence the patient reads, phrased by the server.
   final String prompt;
+
+  /// The same question with no answer hint — what it sounds like out loud.
+  ///
+  /// [prompt] ends in the shape of the expected answer, "You can answer yes or
+  /// no.", which is written for the row of tiles underneath it. In a spoken
+  /// conversation it is the clause that makes every question sound like a form,
+  /// so the agent says this instead and the screen shows this while a
+  /// conversation is running.
+  ///
+  /// Empty against a server that does not send it; [spoken] resolves that.
+  final String spokenPrompt;
+
+  /// The question as it is said aloud, falling back to the written one.
+  String get spoken => spokenPrompt.trim().isEmpty ? prompt : spokenPrompt;
 
   /// The field's own options, in the engine's snake_case. Empty for a question
   /// with no fixed answers.
@@ -325,6 +340,7 @@ class CaseQuestion {
         label: asString(json['label']),
         kind: CaseQuestionKind.resolve(asStringOrNull(json['kind'])),
         prompt: asString(json['prompt']),
+        spokenPrompt: asString(json['spokenPrompt']),
         choices: asStringList(json['choices']),
         remaining: asInt(json['remaining']),
       );

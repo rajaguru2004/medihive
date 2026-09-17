@@ -237,8 +237,16 @@ abstract final class PatientText {
 
   static String get heardClearly => _of('confidence.clear', 'Clear');
   static String get pleaseCheckThis => _of('confidence.unsure', 'Check this');
+  /// Low confidence, said without contradicting the screen.
+  ///
+  /// This was "Not heard", printed directly beneath the words that were heard.
+  /// A patient reading their own sentence above a badge saying it was not heard
+  /// is being told the app is broken — and the sentence was *recorded*, so the
+  /// badge was also wrong about what happened. What it actually means is that
+  /// the recogniser scored the transcript below 0.5, which is a reason to read
+  /// it back, not a reason to disbelieve the screen.
   static String get didNotCatchThat =>
-      _of('confidence.unheard', 'Not heard');
+      _of('confidence.unheard', 'Hard to hear');
 
   // ── Where an answer came from ─────────────────────────────────────────────
 
@@ -376,6 +384,34 @@ abstract final class PatientText {
         'interview.voice.short',
         'That was too short to hear. Hold on a moment longer, or type your '
             'answer.',
+      );
+
+  // ── Talking, rather than answering ────────────────────────────────────────
+
+  /// The whole instruction for a spoken interview, and there is only one.
+  ///
+  /// A conversation that needs a legend is not one. This says the single thing
+  /// a patient cannot work out by looking — that nothing has to be pressed —
+  /// and then gets out of the way.
+  static String get justTalk => _of(
+        'interview.live.hint',
+        'Just talk. When you stop, we will ask the next question.',
+      );
+
+  /// While the agent has the floor.
+  static String get listeningToYou =>
+      _of('interview.live.listening', 'Listening');
+
+  static String get speakingNow => _of('interview.live.speaking', 'Speaking');
+
+  /// The way out of hands-free, named by what it gives back rather than by what
+  /// it stops — "End" alone reads like ending the interview.
+  static String get tapInstead =>
+      _of('interview.live.exit', 'Tap or type instead');
+
+  static String get backToTapping => _of(
+        'interview.live.exited',
+        'You can tap or type your answers again.',
       );
 
   // ── Finishing ─────────────────────────────────────────────────────────────

@@ -163,7 +163,14 @@ class CaseTakingController extends GetxController with LoadStateMixin {
   ///   see the answer they just gave. Both caps come down so the history keeps
   ///   about a fifth. Raising the panel to `0.72` instead overflowed this
   ///   screen by 91 points, which is how the ceiling was found.
+  /// * **A spoken conversation.** A fifth case, and the easy one: the panel is
+  ///   a status card, one line of copy and the way out — no tile grid, no
+  ///   keyboard, no send button. It needs roughly half what the tap panel does,
+  ///   and holding the tap panel's cap for it is height nobody can use while
+  ///   the red-flag notice above is clipping the patient's own quoted words
+  ///   mid-syllable. That is what the screenshot showed: "YOU SAID / Th…".
   double get livePanelHeightFraction {
+    if (rxConversation.value) return hasNotices ? 0.38 : 0.52;
     if (!hasNotices) return rxTurns.isEmpty ? 0.86 : 0.58;
     return rxTurns.isEmpty ? 0.52 : 0.44;
   }
@@ -174,7 +181,17 @@ class CaseTakingController extends GetxController with LoadStateMixin {
   /// out by a banner. The band scrolls inside whatever it is given and never
   /// ellipsises the patient's quoted words, so a long notice loses nothing —
   /// it just needs a scroll.
-  double get noticesHeightFraction => rxTurns.isEmpty ? 0.34 : 0.28;
+  ///
+  /// It gets the slack a spoken conversation frees. The red-flag notice is the
+  /// one thing on this screen that must be readable without being worked for:
+  /// a warning whose instruction is off the bottom of its own scroll is a
+  /// warning somebody skims past, and this is the screen where that matters
+  /// most. 0.38 + 0.38 still leaves the transcript about a fifth, which is the
+  /// floor the starved-`ListView` case established.
+  double get noticesHeightFraction {
+    if (rxConversation.value) return 0.38;
+    return rxTurns.isEmpty ? 0.34 : 0.28;
+  }
 
   // ── Answering out loud ────────────────────────────────────────────────────
 
@@ -1086,6 +1103,17 @@ class CaseTakingController extends GetxController with LoadStateMixin {
   /// the two behaviours in [_onHeard].
   bool get _agentDrivesTheTurn => _voice?.carriesTheVoice ?? false;
 
+  /// True while the interview is a spoken conversation.
+  ///
+  /// The reactive half of [_agentDrivesTheTurn], which reads a plain bool off
+  /// the seam and so cannot drive a rebuild. The view needs one, because this
+  /// decides whether the answer panel exists at all: in a conversation there is
+  /// nothing to tap, nothing to type and nothing to send, and leaving those
+  /// controls on screen invites a patient to answer twice — once out loud to
+  /// the agent, once with a thumb to a path that would post the same field
+  /// again.
+  final RxBool rxConversation = false.obs;
+
   void _onHeard(VoiceTranscript heard) {
     if (heard.isEmpty) return;
 
@@ -1100,8 +1128,14 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     // advanced the interview, so its final utterance is the app's cue that the
     // session on the server has moved and the screen is now out of date.
     if (heard.speaker == VoiceSpeaker.agent) {
-      if (!_agentDrivesTheTurn || !heard.isFinal) return;
-      _followAgent(heard.text);
+      if (!_agentDrivesTheTurn) return;
+      // The first thing the agent says is the first moment this is provably a
+      // conversation rather than a room with a transcriber in it. Raised here
+      // rather than on connect, because a room whose agent never speaks must
+      // leave the tiles and the keyboard exactly where they were.
+      rxConversation.value = true;
+      if (!heard.isFinal) return;
+      _followAgent();
       return;
     }
 
@@ -1126,12 +1160,23 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     // that closes after every answer is a button press per turn, which is what
     // hands-free means not doing.
     if (_agentDrivesTheTurn) {
+      // The question moves into the conversation ahead of the answer, exactly
+      // as `_submit` does it on the tap path: the answer belongs *under* the
+      // question it answered, and the pinned slot belongs to whatever is being
+      // asked now — which, a moment from now, is the next one.
+      final asked = rxQuestion.value;
+      if (asked != null) {
+        rxTurns.add(
+          InterviewTurn.asked(asked.spoken, fieldPath: asked.fieldPath),
+        );
+        rxQuestion.value = null;
+      }
       rxTurns.add(
         InterviewTurn.answered(
           heard.text,
           source: AnswerSource.spoken,
           confidence: AnswerConfidence.fromScore(null),
-          fieldPath: rxQuestion.value?.fieldPath,
+          fieldPath: asked?.fieldPath,
         ),
       );
       unawaited(_saveSnapshot());
@@ -1180,12 +1225,29 @@ class CaseTakingController extends GetxController with LoadStateMixin {
   /// same session view the interview already reads everywhere else — rather
   /// than parsing the agent's sentence into a question, which would make the
   /// screen agree with the audio and disagree with the chart.
-  void _followAgent(String spoken) {
-    // On screen immediately, from the words themselves. The read is a round
-    // trip and the patient is already hearing this sentence; waiting would show
-    // the previous question underneath the new one being spoken.
-    rxTurns.add(InterviewTurn.asked(spoken));
-
+  void _followAgent() {
+    // ── Nothing the agent says is put on screen as text ─────────────────────
+    //
+    // This used to add every agent utterance to the conversation as an asked
+    // turn, and that was wrong twice over.
+    //
+    // `engine.utterances()` speaks `patientMessage` *before* the next question:
+    // the routing instruction from the most severe triggered rule, "tell the
+    // front desk now — do not wait in the queue". `RedFlagNotice` is already on
+    // screen saying exactly that in fixed copy, so the patient read the same
+    // instruction twice, once in a red banner and once in a white bubble — the
+    // bloat, and it pushed the notice's own quote into a clipped scroll.
+    //
+    // The second reason is the one that matters more. `_Notices` says plainly
+    // that the server's `patientMessage` "is deliberately not drawn here …
+    // rendering server free text on this surface would reopen the hole the
+    // component closes" — the hole being the rule that this screen never tells
+    // a patient what is wrong with them. Putting agent audio on screen verbatim
+    // reopened it, because the agent says whatever the engine hands it.
+    //
+    // So the transcript is built from what this app already knows: `_onHeard`
+    // moves the question into it when the answer arrives, and the refresh below
+    // supplies the next one. The agent's words are heard, not printed.
     if (_following != null) return;
     _following = () async {
       try {
@@ -1222,8 +1284,23 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     }();
   }
 
+  /// Leaves the spoken conversation and puts the tiles and keyboard back.
+  ///
+  /// The one control a conversation keeps, and it is not a way of answering —
+  /// it is the way out. A hands-free mode with no exit is a shared ward tablet
+  /// with an open microphone and a patient who has changed their mind.
+  ///
+  /// The interview itself is untouched: the session stays open, every answer
+  /// already given is on the chart, and the next question is the one the agent
+  /// had just asked. Only the modality changes.
+  void endConversation() {
+    if (!rxConversation.value && !(_voice?.isLive ?? false)) return;
+    _endLiveVoice(notice: PatientText.backToTapping);
+  }
+
   /// Closes the room without a notice. Used when the interview simply ended.
   Future<void> _endLiveVoiceQuietly() async {
+    rxConversation.value = false;
     rxMic.value = MicState.idle;
     rxLiveHeard.value = null;
     await _voice?.leave();
@@ -1261,6 +1338,10 @@ class CaseTakingController extends GetxController with LoadStateMixin {
   /// that failed costs a patient the live transcript and nothing else, because
   /// the control it was behind still records, still uploads and still answers.
   void _endLiveVoice({String? notice}) {
+    // First, because every path out of a room has to put the answer panel back.
+    // A conversation that ends with this flag still raised leaves a patient
+    // looking at a screen with no tiles, no keyboard and nothing listening.
+    rxConversation.value = false;
     rxLive.value = VoiceSessionState.idle;
     rxLiveHeard.value = null;
     rxMic.value = MicState.idle;
