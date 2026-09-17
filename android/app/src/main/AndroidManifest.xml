@@ -68,11 +68,18 @@
          the system picker is granted to this app by that choice. Noted because
          the missing line looks like an oversight otherwise. -->
 
+    <!-- The cleartext policy is stated in res/xml/network_security_config.xml
+         rather than as a bare android:usesCleartextTraffic flag here. The flag
+         is all-or-nothing; the config permits plain http to exactly one named
+         address - the development machine's LAN API - and denies it everywhere
+         else, which is what "false" used to buy and now does not cost the LAN
+         demo. On API 24+ the config wins over the flag anyway, so declaring
+         both would only be a second place to read the answer. -->
     <application
         android:label="MediHive"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon"
-        android:usesCleartextTraffic="false">
+        android:networkSecurityConfig="@xml/network_security_config">
         <activity
             android:name=".MainActivity"
             android:exported="true"

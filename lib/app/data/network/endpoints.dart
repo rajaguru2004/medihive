@@ -27,8 +27,21 @@ abstract class Endpoints {
   /// flutter run --dart-define=MEDIHIVE_API=https://api.example.com/
   /// ```
   ///
-  /// The default is the **demo tunnel**, so a build with no `--dart-define`
-  /// reaches a real server from a real phone.
+  /// The default is the **LAN address of the development machine**, so a build
+  /// with no `--dart-define` reaches the API started by `npm run dev` from a
+  /// phone on the same Wi-Fi. It replaced the reserved ngrok tunnel when the
+  /// demo moved onto the local network.
+  ///
+  /// Two things this default depends on, both of which fail silently:
+  ///
+  /// - **The address is DHCP.** When the laptop's lease changes, this constant
+  ///   is stale and every request times out. `npm run dev` prints the current
+  ///   LAN address on startup; if it is not the one below, pass
+  ///   `--dart-define=MEDIHIVE_API=...` or change it here.
+  /// - **It is plain http.** Android forbids cleartext by default, so
+  ///   `android/app/src/{main,debug}/res/xml/network_security_config.xml`
+  ///   names this exact address. Changing the address here without changing it
+  ///   there produces a network failure with no explanation attached.
   ///
   /// It was `http://10.0.2.2:3000/` — the Android *emulator's* loopback to the
   /// host. That is right for `flutter run` on an emulator and wrong everywhere
@@ -38,18 +51,18 @@ abstract class Endpoints {
   /// the address was never reachable in the first place. That cost a debugging
   /// round on a real device.
   ///
-  /// The tunnel is a **reserved** ngrok domain, so it survives restarts of the
-  /// tunnel and of the stack behind it. What it does not survive is the machine
-  /// hosting it going away — when that happens this default is wrong again, and
-  /// the fix is to change it here or pass `--dart-define=MEDIHIVE_API=...`,
-  /// which still wins.
+  /// If the phone has to reach the API from off this network, the reserved
+  /// ngrok domain is still the way:
+  /// `--dart-define=MEDIHIVE_API=https://convincedly-photometric-ariella.ngrok-free.dev/`
+  /// (start the tunnel with `ngrok start hms-api`). A `--dart-define` always
+  /// wins over the default below.
   ///
   /// ```sh
   /// flutter run --dart-define=MEDIHIVE_API=http://10.0.2.2:3000/   # emulator, local API
   /// ```
   static const String baseUrl = String.fromEnvironment(
     'MEDIHIVE_API',
-    defaultValue: 'https://convincedly-photometric-ariella.ngrok-free.dev/',
+    defaultValue: 'http://192.168.163.97:3000/',
   );
 
   /// Where uploaded files live. The API returns storage-relative paths, which
@@ -65,7 +78,7 @@ abstract class Endpoints {
   /// all the free plan gives.
   static const String fileBaseUrl = String.fromEnvironment(
     'MEDIHIVE_FILES',
-    defaultValue: 'https://convincedly-photometric-ariella.ngrok-free.dev/',
+    defaultValue: 'http://192.168.163.97:3000/',
   );
 
   /// Whether this build is pointed somewhere only a developer can reach.
