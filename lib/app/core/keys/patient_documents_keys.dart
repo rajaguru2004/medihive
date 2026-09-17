@@ -62,6 +62,10 @@ abstract final class PatientDocumentsKeys {
   static const Key message = Key('patient_document_review_message');
 
   /// §21: the same document twice is reported, not refused.
+  ///
+  /// The banner carrying that sentence no longer exists — the server's own
+  /// message says it — so this now keys the way out of the duplicate: the
+  /// button onto the copy that holds the reading.
   static const Key duplicate = Key('patient_document_review_duplicate');
 
   /// The two measured numbers, each under its own name. Two keys because they

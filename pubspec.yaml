@@ -113,6 +113,7 @@ dependencies:
   # everything else, so the sentence a patient reads when they say no is still
   # written once.
   livekit_client: ^2.13.0
+  pdfx: ^2.11.0
 
 dev_dependencies:
   flutter_test:

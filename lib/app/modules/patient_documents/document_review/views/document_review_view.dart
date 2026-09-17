@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:pdfx/pdfx.dart';
 
 import '../../../../core/i18n/patient_text.dart';
 import '../../../../core/keys/app_keys.dart';
 import '../../../../data/models/patient_document.dart';
 import '../../../../data/services/settings_service.dart';
 import '../../../../theme/theme.dart';
+import '../../patient_documents_navigation.dart';
 import '../controllers/document_review_controller.dart';
 
 /// One document, and what was read out of it.
@@ -142,15 +144,38 @@ class _Message extends StatelessWidget {
       // filed while the other said it could not be read.
       //
       // The duplicate icon still marks it, so the fact is not lost.
-      return NoticeBanner(
-        key: PatientDocumentsKeys.message,
-        icon: document.isDuplicate
-            ? Icons.content_copy_outlined
-            : document.status.isRefusal
-            ? Icons.image_not_supported_outlined
-            : Icons.info_outline_rounded,
-        tint: tint,
-        message: document.message,
+      final firstCopyId = document.duplicateOfId;
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          NoticeBanner(
+            key: PatientDocumentsKeys.message,
+            icon: document.isDuplicate
+                ? Icons.content_copy_outlined
+                : document.status.isRefusal
+                ? Icons.image_not_supported_outlined
+                : Icons.info_outline_rounded,
+            tint: tint,
+            message: document.message,
+          ),
+          // A duplicate is a dead end without this. The pipeline never runs for
+          // one, so the row carries no extraction and no facts — the screen is
+          // the sentence and nothing else. The reading the patient came for is
+          // on the copy this points at, and until now the only route to it was
+          // to go back and find it in the list themselves.
+          if (document.isDuplicate && (firstCopyId ?? '').isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: BentoSpace.action),
+              child: SecondaryBar(
+                key: PatientDocumentsKeys.duplicate,
+                label: PatientText.openTheFirstCopy,
+                icon: Icons.description_outlined,
+                onPressed: () =>
+                    PatientDocumentsNavigation.toFirstCopy(firstCopyId!),
+              ),
+            ),
+        ],
       );
     });
   }
@@ -265,15 +290,18 @@ class _Original extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      final url = c.originalUrl.value;
+      final bytes = c.originalBytes.value;
+      final error = c.originalError.value;
+      final pdf = c.pdfController.value;
 
       if (!c.canShowOriginal) {
-        // A PDF. This build ships no renderer for one, and a button that
-        // opened nothing would be worse than none — so the row says what is
-        // true: the file itself is kept.
+        // Neither a photograph nor a PDF, so nothing here can draw it. The row
+        // says what is true instead: the file itself is kept. The upload route
+        // accepts only those two, so this is a floor rather than a case the
+        // patient meets.
         return const NoticeBanner(
           key: PatientDocumentsKeys.original,
-          icon: Icons.picture_as_pdf_outlined,
+          icon: Icons.insert_drive_file_outlined,
           message:
               'The file you sent is kept with your record exactly as it '
               'was. Ask at the desk if you would like to see it.',
@@ -286,12 +314,25 @@ class _Original extends StatelessWidget {
           SecondaryBar(
             key: PatientDocumentsKeys.original,
             label: PatientText.seeTheOriginal,
-            icon: url == null
+            icon: bytes == null
                 ? Icons.visibility_outlined
                 : Icons.visibility_off_outlined,
             onPressed: c.isFetchingOriginal.value ? null : c.toggleOriginal,
           ),
-          if (url != null)
+          // The fetch failed. Said here, under the button that was pressed,
+          // rather than in the confirmation block — that block is not drawn at
+          // all on a verified or failed document, which is where this used to
+          // vanish and leave a button that appeared to do nothing.
+          if (error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: BentoSpace.action),
+              child: NoticeBanner(
+                icon: Icons.image_not_supported_outlined,
+                tint: AppColors.warning,
+                message: error,
+              ),
+            ),
+          if (bytes != null && c.originalIsPdf)
             Padding(
               padding: const EdgeInsets.only(top: BentoSpace.action),
               child: InsetSurface(
@@ -299,8 +340,38 @@ class _Original extends StatelessWidget {
                 padding: const EdgeInsets.all(6),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(BentoRadius.control),
-                  child: Image.network(
-                    url,
+                  // A fixed height, because `PdfView` expands to whatever it is
+                  // given and this sits inside a scrolling column — unbounded,
+                  // it throws during layout rather than rendering small.
+                  //
+                  // Tall enough that a prescription's dose line is legible
+                  // without pinching, which is the whole reason a patient opens
+                  // this.
+                  child: SizedBox(
+                    height: 520,
+                    child: pdf == null
+                        ? const Center(child: CircularProgressIndicator())
+                        : PdfView(
+                            controller: pdf,
+                            scrollDirection: Axis.vertical,
+                          ),
+                  ),
+                ),
+              ),
+            ),
+          if (bytes != null && !c.originalIsPdf)
+            Padding(
+              padding: const EdgeInsets.only(top: BentoSpace.action),
+              child: InsetSurface(
+                radius: BentoRadius.card,
+                padding: const EdgeInsets.all(6),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(BentoRadius.control),
+                  // From memory, not from a URL. The bytes arrived over the
+                  // authenticated client, so there is no second request here
+                  // to be refused for want of a token or a reachable host.
+                  child: Image.memory(
+                    bytes,
                     fit: BoxFit.contain,
                     // A page that will not load must still leave a readable
                     // screen: an unhandled image error throws from inside

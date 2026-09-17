@@ -62,7 +62,7 @@ abstract class Endpoints {
   /// ```
   static const String baseUrl = String.fromEnvironment(
     'MEDIHIVE_API',
-    defaultValue: 'http://192.168.163.136:3000/',
+    defaultValue: 'http://192.168.163.97:3000/',
   );
 
   /// Where uploaded files live. The API returns storage-relative paths, which
@@ -78,7 +78,7 @@ abstract class Endpoints {
   /// all the free plan gives.
   static const String fileBaseUrl = String.fromEnvironment(
     'MEDIHIVE_FILES',
-    defaultValue: 'http://192.168.163.136:3000/',
+    defaultValue: 'http://192.168.163.97:3000/',
   );
 
   /// Whether this build is pointed somewhere only a developer can reach.
@@ -271,8 +271,27 @@ abstract class Endpoints {
   /// The bucket is private, so this is the only way a patient can look at their
   /// own evidence. It expires in minutes: fetch it when the patient asks to
   /// see the original, never at list time.
+  ///
+  /// **Not what the app uses to show a document** — see
+  /// [patientDocumentFile]. The signed URL names the bucket's own host, which
+  /// a phone cannot resolve.
   static String patientDocumentOriginal(String documentId) =>
       '${patientDocuments.base}/$documentId/original';
+
+  /// GET: the original file itself, streamed through the API.
+  ///
+  /// This is the one the app fetches, and the reason is the whole point of
+  /// [fileBaseUrl] above: [patientDocumentOriginal] answers with a URL signed
+  /// against the bucket — `localhost:9010` on a developer machine,
+  /// `minio:9000` in compose — and a handset can resolve neither. The app used
+  /// to hand that URL to `Image.network`, which also sends no bearer token, so
+  /// "See the original" failed with "We couldn't open the original just now"
+  /// no matter what was wrong.
+  ///
+  /// Through here the bytes come back over the same authenticated origin as
+  /// every other call, so one reachable host serves the whole app.
+  static String patientDocumentFile(String documentId) =>
+      '${patientDocuments.base}/$documentId/file';
 
   /// POST: the patient confirming that what was read out of this document is
   /// correct.
@@ -436,10 +455,10 @@ enum HttpVerb { get, post, put, patch, delete }
 /// the route exists before assuming a 404 is a bug in the app.
 class Crud {
   const Crud(this.base, {this.updateVerb = HttpVerb.patch})
-      : assert(
-          updateVerb == HttpVerb.patch || updateVerb == HttpVerb.put,
-          'an update is PATCH or PUT; nothing else reaches this route',
-        );
+    : assert(
+        updateVerb == HttpVerb.patch || updateVerb == HttpVerb.put,
+        'an update is PATCH or PUT; nothing else reaches this route',
+      );
 
   /// The collection path, with no trailing slash.
   final String base;

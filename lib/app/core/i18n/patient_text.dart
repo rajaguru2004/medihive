@@ -559,6 +559,16 @@ abstract final class PatientText {
   /// so there is no server outcome to quote. The picker already filters by
   /// extension — this covers the file browsers that treat that filter as
   /// advisory and hand back anything the patient tapped.
+  /// The way out of a duplicate, onto the copy that holds the reading.
+  ///
+  /// "The first copy" and not "the original": `original` on this screen already
+  /// means the file itself — the photograph or the PDF behind "See the
+  /// original" — and two buttons a thumb apart meaning different things by the
+  /// same word is how somebody ends up looking at a picture when they wanted
+  /// the medicines.
+  static String get openTheFirstCopy =>
+      _of('documents.duplicate.open', 'Open the first copy');
+
   static String get unsupportedDocument => _of(
         'documents.error.type',
         'That kind of file cannot be read. Choose a photo of the document, or '

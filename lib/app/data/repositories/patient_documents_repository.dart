@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 // `FormData` is declared by both packages; GetX's belongs to its own HTTP
 // client, which this app does not use.
@@ -49,11 +51,11 @@ abstract final class PatientDocumentEntities {
 /// ─────────────────────────────────────────────────────────────────────────────
 class PatientDocumentsRepository extends CrudRepository<PatientDocument> {
   const PatientDocumentsRepository()
-      : super(
-          Endpoints.patientDocuments,
-          PatientDocument.fromJson,
-          PatientDocumentEntities.documents,
-        );
+    : super(
+        Endpoints.patientDocuments,
+        PatientDocument.fromJson,
+        PatientDocumentEntities.documents,
+      );
 
   /// This patient's documents, newest first.
   ///
@@ -116,9 +118,32 @@ class PatientDocumentsRepository extends CrudRepository<PatientDocument> {
   /// held: the URL expires in five minutes, and one fetched at list time is
   /// one that has already stopped working by the time anybody wants it.
   Future<DocumentOriginal> original(String documentId) async {
-    final response =
-        await client.get(Endpoints.patientDocumentOriginal(documentId));
+    final response = await client.get(
+      Endpoints.patientDocumentOriginal(documentId),
+    );
     return DocumentOriginal.fromJson(ApiEnvelope.of(response).orThrow().object);
+  }
+
+  /// The original file's bytes, over the authenticated client.
+  ///
+  /// Used instead of [original] for anything the app displays itself. A signed
+  /// bucket URL is unusable on a handset twice over: it names a host only the
+  /// server can reach, and `Image.network` sends no `Authorization` header, so
+  /// nothing that arrives through it is ever this patient's document.
+  ///
+  /// The response is bytes rather than an envelope — this route streams the
+  /// file with its own `Content-Type` rather than wrapping it in JSON.
+  /// No `patientId`, for the same reason [mine] sends none: a patient's token
+  /// carries the scope and the route reads it from there. A **staff** caller
+  /// has no scope and would need one in the query — worth knowing before this
+  /// is reused from a clinician screen, where it would otherwise answer "Say
+  /// which patient this document belongs to."
+  Future<Uint8List> originalBytes(String documentId) async {
+    final response = await client.get<List<int>>(
+      Endpoints.patientDocumentFile(documentId),
+      options: Options(responseType: ResponseType.bytes),
+    );
+    return Uint8List.fromList(response.data ?? const []);
   }
 
   /// The patient confirming that what was read out of this document is right.
