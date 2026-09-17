@@ -160,9 +160,14 @@ final class PatientDocumentsRobot extends Robot {
   }
 
   /// §21: the same document twice is reported, not refused.
+  ///
+  /// One banner, not two. There used to be a second one restating the first in
+  /// different words; the server's sentence carries it now, and on a duplicate
+  /// of a rejected copy it carries the rejection reason instead — which the
+  /// hardcoded second line flatly contradicted.
   Future<void> seeReportedAsDuplicate() async {
-    await tester.scrollToKey(PatientDocumentsKeys.duplicate);
-    expect(find.byKey(PatientDocumentsKeys.duplicate), findsOneWidget);
+    await tester.scrollToKey(PatientDocumentsKeys.message);
+    expect(find.byKey(PatientDocumentsKeys.message), findsOneWidget);
     await seeMessage(containing: 'already uploaded');
   }
 

@@ -57,12 +57,25 @@ class DocumentReviewView extends GetView<DocumentReviewController> {
         bottomClearance: false,
         onRefresh: c.reload,
         slivers: [
-          BentoSection(top: BentoSpace.page, bottom: 0, child: _Load(c: c)),
-          BentoSection(top: BentoSpace.section, child: _Message(c: c)),
+          BentoSection(
+            top: BentoSpace.page,
+            bottom: 0,
+            child: _Load(c: c),
+          ),
+          BentoSection(
+            top: BentoSpace.section,
+            child: _Message(c: c),
+          ),
           BentoSection(bottom: 0, child: _HowThisWasRead(c: c)),
-          BentoSection(top: BentoSpace.section, child: _Original(c: c)),
+          BentoSection(
+            top: BentoSpace.section,
+            child: _Original(c: c),
+          ),
           BentoSection(bottom: 0, child: _Findings(c: c)),
-          BentoSection(top: BentoSpace.section, child: _Confirm(c: c)),
+          BentoSection(
+            top: BentoSpace.section,
+            child: _Confirm(c: c),
+          ),
         ],
       ),
     );
@@ -85,15 +98,15 @@ class _Load extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Obx(
-        () => c.hasLoadError
-            ? ErrorRetryBanner(
-                key: PatientDocumentsKeys.reviewError,
-                margin: EdgeInsets.zero,
-                message: c.rxLoadError.value ?? '',
-                onRetry: c.reload,
-              )
-            : const SizedBox.shrink(),
-      );
+    () => c.hasLoadError
+        ? ErrorRetryBanner(
+            key: PatientDocumentsKeys.reviewError,
+            margin: EdgeInsets.zero,
+            message: c.rxLoadError.value ?? '',
+            onRetry: c.reload,
+          )
+        : const SizedBox.shrink(),
+  );
 }
 
 /// What the server says about this document, in the server's own words.
@@ -116,37 +129,28 @@ class _Message extends StatelessWidget {
         _ when document.isDuplicate => AppColors.acuityStandard,
         DocumentStatus.verified => AppColors.success,
         DocumentStatus.failed ||
-        DocumentStatus.rejectedQuality =>
-          AppColors.warning,
+        DocumentStatus.rejectedQuality => AppColors.warning,
         _ => AppColors.acuityStandard,
       };
 
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          NoticeBanner(
-            key: PatientDocumentsKeys.message,
-            icon: document.status.isRefusal
-                ? Icons.image_not_supported_outlined
-                : Icons.info_outline_rounded,
-            tint: tint,
-            message: document.message,
-          ),
-          // §21: the same document twice is recorded and reported, never
-          // refused. Said as a second line rather than folded into the first,
-          // because "this is the one you already sent" is a different fact
-          // from "here is what is in it".
-          if (document.isDuplicate)
-            const Padding(
-              padding: EdgeInsets.only(top: BentoSpace.action),
-              child: NoticeBanner(
-                key: PatientDocumentsKeys.duplicate,
-                icon: Icons.content_copy_outlined,
-                message: 'We have kept it with the copy you sent before, so '
-                    'nothing is counted twice.',
-              ),
-            ),
-        ],
+      // §21: the same document twice is recorded and reported, never refused —
+      // and the server's own sentence already says so, in whichever form fits
+      // the first copy's outcome ("we have kept it with the first copy", or,
+      // when that copy was rejected, why it was). A second banner here
+      // repeated the first in different words, and on a duplicate of a
+      // rejected photo it contradicted it: one line said the document was
+      // filed while the other said it could not be read.
+      //
+      // The duplicate icon still marks it, so the fact is not lost.
+      return NoticeBanner(
+        key: PatientDocumentsKeys.message,
+        icon: document.isDuplicate
+            ? Icons.content_copy_outlined
+            : document.status.isRefusal
+            ? Icons.image_not_supported_outlined
+            : Icons.info_outline_rounded,
+        tint: tint,
+        message: document.message,
       );
     });
   }
@@ -227,10 +231,11 @@ class _ConfidenceRow extends StatelessWidget {
           if (value == null)
             Text(
               PatientText.notMeasured,
-              style: (Theme.of(context).brightness == Brightness.dark
-                      ? AppTextStyles.darkSubheadline()
-                      : AppTextStyles.lightSubheadline())
-                  .copyWith(color: tertiaryLabelColor(context)),
+              style:
+                  (Theme.of(context).brightness == Brightness.dark
+                          ? AppTextStyles.darkSubheadline()
+                          : AppTextStyles.lightSubheadline())
+                      .copyWith(color: tertiaryLabelColor(context)),
             )
           else
             Text(
@@ -269,7 +274,8 @@ class _Original extends StatelessWidget {
         return const NoticeBanner(
           key: PatientDocumentsKeys.original,
           icon: Icons.picture_as_pdf_outlined,
-          message: 'The file you sent is kept with your record exactly as it '
+          message:
+              'The file you sent is kept with your record exactly as it '
               'was. Ask at the desk if you would like to see it.',
         );
       }
@@ -305,11 +311,13 @@ class _Original extends StatelessWidget {
                         child: Text(
                           PatientText.couldNotOpenOriginal,
                           textAlign: TextAlign.center,
-                          style: (Theme.of(context).brightness ==
-                                      Brightness.dark
-                                  ? AppTextStyles.darkSubheadline()
-                                  : AppTextStyles.lightSubheadline())
-                              .copyWith(color: secondaryLabelColor(context)),
+                          style:
+                              (Theme.of(context).brightness == Brightness.dark
+                                      ? AppTextStyles.darkSubheadline()
+                                      : AppTextStyles.lightSubheadline())
+                                  .copyWith(
+                                    color: secondaryLabelColor(context),
+                                  ),
                         ),
                       ),
                     ),
@@ -367,11 +375,7 @@ class _Findings extends StatelessWidget {
           const SizedBox(height: BentoSpace.header),
           _Group(c: c, title: PatientText.medicines, rows: c.medications),
           _Group(c: c, title: PatientText.testResults, rows: c.investigations),
-          _Group(
-            c: c,
-            title: PatientText.diagnosesRecorded,
-            rows: c.diagnoses,
-          ),
+          _Group(c: c, title: PatientText.diagnosesRecorded, rows: c.diagnoses),
           _Group(
             c: c,
             title: PatientText.proceduresRecorded,
@@ -381,17 +385,15 @@ class _Findings extends StatelessWidget {
           _Group(c: c, title: PatientText.followUpRecorded, rows: c.followUp),
           if (silences.isNotEmpty)
             BentoCard(
-              padding:
-                  const EdgeInsets.symmetric(vertical: BentoSpace.listCardPad),
+              padding: const EdgeInsets.symmetric(
+                vertical: BentoSpace.listCardPad,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   for (var i = 0; i < silences.length; i++) ...[
                     if (i > 0) const Hairline(indent: BentoSpace.listPad),
-                    _Silence(
-                      topic: silences[i].$1,
-                      fact: silences[i].$2,
-                    ),
+                    _Silence(topic: silences[i].$1, fact: silences[i].$2),
                   ],
                 ],
               ),
@@ -438,10 +440,14 @@ class _Silence extends StatelessWidget {
           Expanded(
             child: Text(
               fact.label,
-              style: (isDark
-                      ? AppTextStyles.darkSubheadline()
-                      : AppTextStyles.lightSubheadline())
-                  .copyWith(color: secondaryLabelColor(context), height: 1.4),
+              style:
+                  (isDark
+                          ? AppTextStyles.darkSubheadline()
+                          : AppTextStyles.lightSubheadline())
+                      .copyWith(
+                        color: secondaryLabelColor(context),
+                        height: 1.4,
+                      ),
             ),
           ),
         ],
@@ -496,6 +502,18 @@ class _ValueRow extends StatelessWidget {
       final value = c.valueOf(row);
       final isEditing = c.editingField.value == row.field;
 
+      // Confirmed documents are read-only. `_Confirm` already withdraws the
+      // document-level button on `verified`, but these per-value choices were
+      // left behind, so a patient who had just been told "this is now part of
+      // your medical history" was still being asked, three times over, whether
+      // each medicine was right — with every row captioned "Not checked yet".
+      //
+      // Two things wrong with that, and neither is cosmetic: it invites a tap
+      // that the server will refuse, and it contradicts the confirmation
+      // directly above it. §18 puts verification at the end of the road; this
+      // screen should look like the end of it.
+      final isSettled = c.document.value.status == DocumentStatus.verified;
+
       return Padding(
         key: PatientDocumentsKeys.value(row.field),
         padding: const EdgeInsets.fromLTRB(
@@ -520,10 +538,14 @@ class _ValueRow extends StatelessWidget {
               const SizedBox(height: 3),
               Text(
                 row.detail!,
-                style: (isDark
-                        ? AppTextStyles.darkSubheadline()
-                        : AppTextStyles.lightSubheadline())
-                    .copyWith(color: secondaryLabelColor(context), height: 1.35),
+                style:
+                    (isDark
+                            ? AppTextStyles.darkSubheadline()
+                            : AppTextStyles.lightSubheadline())
+                        .copyWith(
+                          color: secondaryLabelColor(context),
+                          height: 1.35,
+                        ),
               ),
             ],
             const SizedBox(height: 8),
@@ -555,60 +577,72 @@ class _ValueRow extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              switch (check) {
-                ValueCheck.confirmed => PatientText.youConfirmedThis,
-                ValueCheck.corrected => PatientText.youCorrectedThis,
-                ValueCheck.unsure => PatientText.youAreNotSure,
-                ValueCheck.unchecked => PatientText.notCheckedYet,
-              },
-              style: (isDark
-                      ? AppTextStyles.darkFootnote()
-                      : AppTextStyles.lightFootnote())
-                  .copyWith(color: tertiaryLabelColor(context)),
-            ),
-            const SizedBox(height: 10),
-
-            if (isEditing)
-              _Editor(c: c)
-            else
-              AnswerChoiceRow<ValueCheck>(
-                columns: 3,
-                choices: const [
-                  ValueCheck.confirmed,
-                  ValueCheck.corrected,
-                  ValueCheck.unsure,
-                ],
-                selected: check == ValueCheck.unchecked ? null : check,
-                labelOf: (choice) => switch (choice) {
-                  ValueCheck.confirmed => PatientText.thatIsRight,
-                  ValueCheck.corrected => PatientText.change,
-                  ValueCheck.unsure => PatientText.iDontKnow,
-                  ValueCheck.unchecked => '',
+            // "Not checked yet" is a prompt, and there is nothing left to do
+            // once the document is confirmed — the patient checked it as a
+            // whole. A value they touched individually still says so, because
+            // that is a fact about what they did rather than an instruction.
+            if (!(isSettled && check == ValueCheck.unchecked)) ...[
+              const SizedBox(height: 4),
+              Text(
+                switch (check) {
+                  ValueCheck.confirmed => PatientText.youConfirmedThis,
+                  ValueCheck.corrected => PatientText.youCorrectedThis,
+                  ValueCheck.unsure => PatientText.youAreNotSure,
+                  ValueCheck.unchecked => PatientText.notCheckedYet,
                 },
-                iconOf: (choice) => switch (choice) {
-                  ValueCheck.confirmed => Icons.check_rounded,
-                  ValueCheck.corrected => Icons.edit_outlined,
-                  ValueCheck.unsure => Icons.help_outline_rounded,
-                  ValueCheck.unchecked => null,
-                },
-                keyOf: (choice) => switch (choice) {
-                  ValueCheck.confirmed =>
-                    PatientDocumentsKeys.confirmValue(row.field),
-                  ValueCheck.corrected =>
-                    PatientDocumentsKeys.correctValue(row.field),
-                  ValueCheck.unsure =>
-                    PatientDocumentsKeys.unsureValue(row.field),
-                  ValueCheck.unchecked => null,
-                },
-                onSelected: (choice) => switch (choice) {
-                  ValueCheck.confirmed => c.confirmValue(row.field),
-                  ValueCheck.corrected => c.startCorrecting(row),
-                  ValueCheck.unsure => c.markUnsure(row.field),
-                  ValueCheck.unchecked => null,
-                },
+                style:
+                    (isDark
+                            ? AppTextStyles.darkFootnote()
+                            : AppTextStyles.lightFootnote())
+                        .copyWith(color: tertiaryLabelColor(context)),
               ),
+            ],
+
+            if (!isSettled) ...[
+              const SizedBox(height: 10),
+              if (isEditing)
+                _Editor(c: c)
+              else
+                AnswerChoiceRow<ValueCheck>(
+                  columns: 3,
+                  choices: const [
+                    ValueCheck.confirmed,
+                    ValueCheck.corrected,
+                    ValueCheck.unsure,
+                  ],
+                  selected: check == ValueCheck.unchecked ? null : check,
+                  labelOf: (choice) => switch (choice) {
+                    ValueCheck.confirmed => PatientText.thatIsRight,
+                    ValueCheck.corrected => PatientText.change,
+                    ValueCheck.unsure => PatientText.iDontKnow,
+                    ValueCheck.unchecked => '',
+                  },
+                  iconOf: (choice) => switch (choice) {
+                    ValueCheck.confirmed => Icons.check_rounded,
+                    ValueCheck.corrected => Icons.edit_outlined,
+                    ValueCheck.unsure => Icons.help_outline_rounded,
+                    ValueCheck.unchecked => null,
+                  },
+                  keyOf: (choice) => switch (choice) {
+                    ValueCheck.confirmed => PatientDocumentsKeys.confirmValue(
+                      row.field,
+                    ),
+                    ValueCheck.corrected => PatientDocumentsKeys.correctValue(
+                      row.field,
+                    ),
+                    ValueCheck.unsure => PatientDocumentsKeys.unsureValue(
+                      row.field,
+                    ),
+                    ValueCheck.unchecked => null,
+                  },
+                  onSelected: (choice) => switch (choice) {
+                    ValueCheck.confirmed => c.confirmValue(row.field),
+                    ValueCheck.corrected => c.startCorrecting(row),
+                    ValueCheck.unsure => c.markUnsure(row.field),
+                    ValueCheck.unchecked => null,
+                  },
+                ),
+            ],
           ],
         ),
       );

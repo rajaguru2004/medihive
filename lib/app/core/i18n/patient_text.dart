@@ -508,6 +508,17 @@ abstract final class PatientText {
         "We couldn't open that file.",
       );
 
+  /// A file type the route would refuse. Local, and not a second opinion about
+  /// a server sentence: this one is said about a file that was never uploaded,
+  /// so there is no server outcome to quote. The picker already filters by
+  /// extension — this covers the file browsers that treat that filter as
+  /// advisory and hand back anything the patient tapped.
+  static String get unsupportedDocument => _of(
+        'documents.error.type',
+        'That kind of file cannot be read. Choose a photo of the document, or '
+            'a PDF.',
+      );
+
   /// The heading over the extracted values. Never "what we found in your
   /// record": nothing on this screen has been added to anything yet.
   static String get checkWhatWeFound =>

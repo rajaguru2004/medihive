@@ -6,11 +6,10 @@ import 'package:get/get.dart' hide Response, FormData, MultipartFile;
 import '../models/drafts/patient_document_drafts.dart';
 import '../models/patient_document.dart';
 import '../network/endpoints.dart';
-import '../services/file_picker_file_source.dart';
-import '../services/file_source.dart';
 import '../services/image_picker_image_source.dart';
 import '../services/image_source.dart';
 import '../services/media_access.dart';
+import '../services/patient_document_file_source.dart';
 import '../utils/api_envelope.dart';
 import 'crud_repository.dart';
 
@@ -177,8 +176,17 @@ abstract final class PatientDocumentsRepositories {
     if (!Get.isRegistered<ImageSource>()) {
       Get.put<ImageSource>(const ImagePickerImageSource(), permanent: true);
     }
-    if (!Get.isRegistered<FileSource>()) {
-      Get.put<FileSource>(const FilePickerFileSource(), permanent: true);
+    // Its own type, not `FileSource`. That one belongs to the analyser results
+    // import, which offers csv/xls/xlsx/hl7/txt and labels anything else
+    // `application/octet-stream` — and whichever screen was opened first used
+    // to win the single registration for both features, permanently. The
+    // symptom was "Choose a PDF" uploading a spreadsheet fixture, or a real
+    // PDF being refused by the route as unreadable.
+    if (!Get.isRegistered<PatientDocumentFileSource>()) {
+      Get.put<PatientDocumentFileSource>(
+        const FilePickerPatientDocumentFileSource(),
+        permanent: true,
+      );
     }
     if (!Get.isRegistered<MediaPermissionGate>()) {
       Get.put<MediaPermissionGate>(

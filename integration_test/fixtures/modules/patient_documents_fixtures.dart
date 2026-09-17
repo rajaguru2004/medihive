@@ -36,6 +36,7 @@ import 'package:medihive/app/data/repositories/patient_documents_repository.dart
 import 'package:medihive/app/data/services/file_source.dart';
 import 'package:medihive/app/data/services/image_source.dart';
 import 'package:medihive/app/data/services/media_access.dart';
+import 'package:medihive/app/data/services/patient_document_file_source.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../fakes/fake_api.dart';
@@ -493,7 +494,7 @@ class TooSmallImageSource implements ImageSource {
 /// `StubFileSource` answers with a CSV, which is right for the analyser import
 /// it was written for and is exactly what this route refuses. This is the same
 /// prescription as a PDF, out of the backend's own fixtures.
-class StubPdfFileSource implements FileSource {
+class StubPdfFileSource implements PatientDocumentFileSource {
   const StubPdfFileSource();
 
   static const String filename = 'prescription.pdf';
@@ -512,7 +513,7 @@ class StubPdfFileSource implements FileSource {
 /// the reason a denied permission throws instead. A screen that treated the two
 /// alike would show the person who declined the camera the same nothing it
 /// shows the person who changed their mind.
-class CancelledFileSource implements FileSource {
+class CancelledFileSource implements PatientDocumentFileSource {
   const CancelledFileSource();
 
   @override
