@@ -75,6 +75,47 @@ void main() {
     }
   });
 
+  group('the language picker says what the choice actually does', () {
+    // The patient picks the language they will **speak**; everything they read
+    // and hear is English. This sentence is the whole honesty of that, and it
+    // is the first thing on the first screen of the interview.
+
+    test('it names speaking as the thing being chosen', () {
+      final detail = PatientText.chooseYourLanguageDetail.toLowerCase();
+      expect(detail, contains('speak'));
+      expect(detail, contains('english'));
+    });
+
+    test('it does not promise the questions in the chosen language', () {
+      // The line this replaced — "The questions will be asked in the language
+      // you pick." It was true of a build where the server phrased every
+      // question in the patient's own language. A patient told that and then
+      // shown an English question has been lied to by the app rather than let
+      // down by it, and a screen that lies in its first sentence has spent the
+      // trust the rest of the interview runs on.
+      expect(
+        PatientText.chooseYourLanguageDetail,
+        isNot(contains('in the language you pick')),
+      );
+    });
+
+    test('the missing-microphone notice offers no reading in that language',
+        () {
+      // Said on the picker and again where the microphone would have been. It
+      // used to end on "the questions can still be read to you", which read as
+      // a promise of Odia; read-aloud is English for everybody now, so that is
+      // neither this line's news nor this language's exception.
+      final notice = PatientText.cannotAnswerOutLoudIn('ଓଡ଼ିଆ');
+
+      expect(notice, contains('ଓଡ଼ିଆ'));
+      expect(notice, isNot(contains('read to you')));
+      // It still ends on the two ways forward, which is the half a patient
+      // holding the tablet actually needs.
+      expect(notice, contains('type'));
+      expect(notice, contains('tap'));
+    });
+  });
+
   test('nothing a patient reads ends in an exclamation mark', () {
     // DESIGN.md §9. Nobody in a waiting room wants to be cheered up by a form.
     final everything = [
@@ -111,6 +152,9 @@ void main() {
       PatientText.photosBlocked,
       PatientText.openSettings,
       PatientText.questionProgress(1, 2),
+      PatientText.chooseYourLanguage,
+      PatientText.chooseYourLanguageDetail,
+      PatientText.cannotAnswerOutLoudIn('ଓଡ଼ିଆ'),
     ];
 
     for (final line in everything) {

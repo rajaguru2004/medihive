@@ -497,6 +497,8 @@ class CaseSession {
     this.patientId = '',
     this.kind = '',
     this.language = 'en',
+    this.inputLanguage,
+    this.outputLanguage,
     this.status = '',
     this.consent = const CaseConsent(),
     this.startedAt,
@@ -514,7 +516,26 @@ class CaseSession {
   final String id;
   final String patientId;
   final String kind;
+
+  /// The session's language, before the server learned to keep two.
+  ///
+  /// Still read, because it is the floor [inputLanguage] and [outputLanguage]
+  /// fall back to — a deployment that has not split yet answers with this one
+  /// tag and means it for both halves.
   final String language;
+
+  /// The language the **patient speaks**, and the only one `/stt` is told.
+  ///
+  /// Null where the server sent no split. Null rather than [language] because
+  /// the difference matters to the caller: one is the server saying which
+  /// language to listen for, the other is the app guessing, and only the caller
+  /// knows what it has to fall back on.
+  final String? inputLanguage;
+
+  /// The language the questions are **written and read aloud in** — English,
+  /// under the rule that the patient answers in their own language and reads
+  /// and hears this one. Null where the server sent no split.
+  final String? outputLanguage;
 
   /// `in_progress`, `review`, `submitted` or `abandoned`.
   final String status;
@@ -559,6 +580,14 @@ class CaseSession {
         patientId: asString(json['patientId']),
         kind: asString(json['kind']),
         language: asString(json['language'], fallback: 'en'),
+        inputLanguage: _languageTag(
+          json,
+          const ['inputLanguage', 'input_language', 'sttLanguage'],
+        ),
+        outputLanguage: _languageTag(
+          json,
+          const ['outputLanguage', 'output_language', 'ttsLanguage'],
+        ),
         status: asString(json['status']),
         consent: CaseConsent.fromJson(asMap(json['consent'])),
         startedAt: asDate(json['startedAt']),
@@ -573,6 +602,22 @@ class CaseSession {
         patientMessage: asStringOrNull(json['patientMessage']),
         resumed: asBool(json['resumed']),
       );
+
+  /// The first of [keys] the payload actually carries, or null.
+  ///
+  /// Tolerant for the reason `CaseLanguage.fromJson` is: the two halves of the
+  /// session's language are being split on the server while this screen is
+  /// being written, and `inputLanguage` / `input_language` / `sttLanguage` are
+  /// three names two people would each pick one of. Null on absence, never a
+  /// default — a parser that answered `en` here would be the app deciding what
+  /// the patient speaks.
+  static String? _languageTag(Map<String, dynamic> json, List<String> keys) {
+    for (final key in keys) {
+      final tag = asStringOrNull(json[key]);
+      if (tag != null) return tag;
+    }
+    return null;
+  }
 }
 
 // ── One turn ────────────────────────────────────────────────────────────────
@@ -727,4 +772,75 @@ class CaseTranscript {
         language: asStringOrNull(json['language']),
         durationMs: asInt(json['durationMs']),
       );
+}
+
+/// One language the hospital's sidecar can currently work in.
+///
+/// The row `GET /api/case-taking/languages` answers with. It carries a code and
+/// two capabilities and **no names**: what a language is called in its own
+/// script is the app's to hold, because that string is the one line on the
+/// picker a patient who reads nothing else is depending on, and a name arriving
+/// over the wire is a name that can arrive truncated, mojibake'd or absent.
+///
+/// Both flags are nullable and both parse to null when the key is missing,
+/// which is the difference between "the server says no" and "the server did not
+/// say". Only the first should override what the app already believes — see
+/// `PatientLanguageOffer`, which is where they meet.
+class CaseLanguage {
+  const CaseLanguage({required this.code, this.canSpeak, this.canHear});
+
+  /// `en`, `ta`, `or`. Matched against the app's own catalogue, so a code this
+  /// build cannot name is dropped rather than rendered.
+  final String code;
+
+  /// Whether a patient can **speak** this language to the app — the
+  /// transcriber's side. Null when the payload said nothing about it.
+  final bool? canSpeak;
+
+  /// Whether a patient who picks this row will be **read to** at all.
+  ///
+  /// Read from `outputTts` in preference to `tts`, and the difference is not
+  /// cosmetic. Since the interview answers in English whatever the patient
+  /// speaks, the per-row `tts` flag now means "a voice exists for *that*
+  /// language on this box" — which for Tamil is false, and which has nothing
+  /// to do with whether a Tamil-speaking patient hears their questions. They
+  /// hear English, and they hear it fine.
+  ///
+  /// `outputTts` is the flag that answers the question a speaker button
+  /// actually asks. Reading `tts` here would withdraw read-aloud from ten of
+  /// the eleven languages — from exactly the patients it exists for, the ones
+  /// least able to read the screen.
+  final bool? canHear;
+
+  bool get isEmpty => code.isEmpty;
+
+  /// Tolerant on purpose.
+  ///
+  /// This route is being built alongside this screen, and the two halves of the
+  /// pair that decide the flags — `stt`/`tts`, `speech`/`voice`, `canSpeak`/
+  /// `canHear` — are exactly the names two people would each pick one of. A
+  /// parser that insisted on one spelling would answer a working endpoint with
+  /// a picker that silently withdrew every microphone.
+  factory CaseLanguage.fromJson(Map<String, dynamic> json) => CaseLanguage(
+        code: asString(json['code'] ?? json['language'] ?? json['id']),
+        canSpeak: _flag(json, const ['canSpeak', 'speech', 'stt', 'transcribe']),
+        // `outputTts` first: it is the only one of these that answers "will
+        // this patient hear anything". See the note on [canHear].
+        canHear: _flag(
+          json,
+          const ['outputTts', 'canHear', 'voice', 'tts', 'speak'],
+        ),
+      );
+
+  /// The first of [keys] the payload actually carries, or null.
+  ///
+  /// Null rather than a default, because absence here means "the server did not
+  /// answer this question" and a default would be the app answering it.
+  static bool? _flag(Map<String, dynamic> json, List<String> keys) {
+    for (final key in keys) {
+      final value = json[key];
+      if (value != null) return asBool(value, fallback: true);
+    }
+    return null;
+  }
 }

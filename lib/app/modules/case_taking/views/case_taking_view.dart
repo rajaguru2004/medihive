@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../../core/i18n/patient_text.dart';
 import '../../../core/keys/app_keys.dart';
 import '../../../data/models/case_session.dart';
+import '../../../data/services/voice_session.dart';
 import '../../../theme/theme.dart';
 import '../controllers/case_taking_controller.dart';
 import '../interview_turn.dart';
@@ -385,6 +386,16 @@ class _LivePanel extends StatelessWidget {
                 // way to know the conversation moved on.
                 child: AssistantBubble(text: question.prompt, live: true),
               )
+            else if (settling && c.rxSettleStalled.value)
+              // Waited out and still nothing to ask. `almostThere` has stopped
+              // being true by this point, and repeating it leaves the patient
+              // watching a sentence about an answer nobody is writing down.
+              ErrorRetryBanner(
+                key: CaseTakingKeys.settleStalled,
+                title: PatientText.checkAgain,
+                message: PatientText.stillNothingToAsk,
+                onRetry: c.reload,
+              )
             else if (settling)
               NoticeBanner(
                 message: PatientText.almostThere,
@@ -409,6 +420,10 @@ class _LivePanel extends StatelessWidget {
                 message: PatientText.sendingYourAnswer,
                 icon: Icons.schedule_send_rounded,
               ),
+            // Under the question, because it controls the question and not the
+            // answer — and outside the `available` check in `_Voice`, because a
+            // patient whose microphone was refused may still want to be read to.
+            if (question != null) _ReadAloudSwitch(c),
             if (turnError != null) ...[
               const SizedBox(height: BentoSpace.action),
               ErrorRetryBanner(
@@ -487,9 +502,54 @@ class _Finished extends StatelessWidget {
             label: PatientText.done,
             onPressed: c.leave,
           ),
+          const SizedBox(height: BentoSpace.action),
+          // Secondary, and below the primary, because leaving is the common
+          // move and this one cannot be undone. It is on this card at all
+          // because a finished interview is otherwise a dead end: there is one
+          // open session per patient, `POST /sessions` resumes rather than
+          // creates, so a patient with something new to raise comes back to
+          // this same completed card every time they open the app.
+          Obx(
+            () => SecondaryBar(
+              key: CaseTakingKeys.finishedStartNew,
+              label: PatientText.sendAndStartNew,
+              icon: Icons.send_rounded,
+              // Null while it runs, which is what disables it. The first step
+              // is a one-way door and the server answers a second press with a
+              // 409, so a double tap must be impossible rather than merely
+              // handled.
+              onPressed: c.rxStartingNew.value
+                  ? null
+                  : () => _confirmStartNew(context, c),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  /// Asks before sending, because sending cannot be taken back.
+  ///
+  /// `ConfirmDialog` is described in its own file as the one dialog in this app,
+  /// reserved for what deserves stopping the world. Filing a clinical document
+  /// to the hospital on a tap whose label is about starting fresh is exactly
+  /// that: the dialog is where the patient is told, in full, before it happens.
+  ///
+  /// Not `destructive` — nothing is deleted or lost. It is irreversible, which
+  /// the wording carries; painting it red would spend the colour this codebase
+  /// reserves for acuity and error on an action that is neither.
+  static Future<void> _confirmStartNew(
+    BuildContext context,
+    CaseTakingController c,
+  ) async {
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: PatientText.sendAndStartNewTitle,
+      message: PatientText.sendAndStartNewBody,
+      confirmLabel: PatientText.sendAndStartNewConfirm,
+    );
+    if (!confirmed) return;
+    await c.startNewConversation();
   }
 }
 
@@ -605,6 +665,42 @@ class _TypedAnswer extends StatelessWidget {
   );
 }
 
+/// The switch that stops the questions being read out loud.
+///
+/// Deliberately a quiet text control rather than a tile: it is not an answer,
+/// and it must never compete with the four that are. It sits under the
+/// question because that is what it governs.
+///
+/// It disappears when the device cannot play audio at all — a control that is
+/// plainly absent is better than one that takes a tap and does nothing, which
+/// is the same rule `_Voice` follows for a refused microphone.
+class _ReadAloudSwitch extends StatelessWidget {
+  const _ReadAloudSwitch(this.c);
+
+  final CaseTakingController c;
+
+  @override
+  Widget build(BuildContext context) => Obx(() {
+    if (!c.canReadAloud) return const SizedBox.shrink();
+    final on = c.rxReadAloud.value;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        key: CaseTakingKeys.readAloud,
+        onPressed: c.toggleReadAloud,
+        icon: Icon(
+          on ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+          size: 20,
+        ),
+        // The label says what a tap will *do*, not what is currently true.
+        // "Reading aloud" next to a speaker icon leaves somebody guessing
+        // whether they are reading a state or pressing a switch.
+        label: Text(on ? PatientText.stopReadingAloud : PatientText.readAloud),
+      ),
+    );
+  });
+}
+
 class _Voice extends StatelessWidget {
   const _Voice(this.c);
 
@@ -618,6 +714,8 @@ class _Voice extends StatelessWidget {
     final draft = c.rxDraft.value;
     final mic = c.rxMic.value;
     final level = c.rxLevel.value;
+    final live = c.rxLive.value;
+    final heard = c.rxLiveHeard.value;
 
     // Gone, with a sentence in its place. Not a disabled microphone: a
     // control that is plainly not accepting a tap is better than one that
@@ -661,7 +759,24 @@ class _Voice extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (mic == MicState.listening) ...[
+        if (live == VoiceSessionState.connecting) ...[
+          // The tap, acknowledged. Not a spinner — nothing on this surface may
+          // schedule frames forever; see `_StillReading`. The microphone under
+          // it is disabled meanwhile, because a second tap would end what the
+          // first is still opening.
+          NoticeBanner(
+            key: CaseTakingKeys.liveConnecting,
+            message: PatientText.connectingYourVoice,
+            icon: Icons.graphic_eq_rounded,
+          ),
+          const SizedBox(height: BentoSpace.action),
+        ] else if (heard != null) ...[
+          // Where the level meter goes on the recorded path, and it does the
+          // same job better: a patient watching their own words appear needs
+          // no bar to tell them the microphone is working.
+          _LiveHeard(key: CaseTakingKeys.liveTranscript, text: heard),
+          const SizedBox(height: BentoSpace.action),
+        ] else if (mic == MicState.listening) ...[
           KeyedSubtree(
             key: CaseTakingKeys.listening,
             child: ListeningIndicator(level: level),
@@ -671,9 +786,64 @@ class _Voice extends StatelessWidget {
         MicButton(
           key: CaseTakingKeys.mic,
           state: mic,
-          onPressed: mic == MicState.working ? null : c.toggleMicrophone,
+          onPressed: mic == MicState.working ||
+                  live == VoiceSessionState.connecting
+              ? null
+              : c.toggleMicrophone,
         ),
       ],
     );
   });
+}
+
+/// The words arriving while the patient is still speaking.
+///
+/// **Not a [TranscriptDraft], and it must never be mistaken for one.** What is
+/// here is unfinished — the recogniser revises it several times a sentence —
+/// so it carries no "That's right", no confidence mark and no way to file it.
+/// The only thing that reaches a chart is the final segment, which arrives on
+/// `rxDraft` and gets the confirmation card like every recorded answer does.
+///
+/// Never ellipsised, for the reason `TranscriptDraft` is not: half a sentence
+/// a patient is reading back to themselves is half a sentence they stop
+/// correcting.
+class _LiveHeard extends StatelessWidget {
+  const _LiveHeard({super.key, required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return BentoCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            PatientText.weAreHearing.toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.overline(
+              isDark ? Brightness.dark : Brightness.light,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            text,
+            style:
+                (isDark ? AppTextStyles.darkBody() : AppTextStyles.lightBody())
+                    .copyWith(
+                      // Muted with a token rather than with an `Opacity`: live
+                      // text under a wrapper that fades it is a contrast bug,
+                      // and this is text a patient is being asked to read.
+                      color: secondaryLabelColor(context),
+                      height: 1.45,
+                    ),
+          ),
+        ],
+      ),
+    );
+  }
 }

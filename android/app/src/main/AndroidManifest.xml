@@ -11,6 +11,27 @@
          only permission `record` asks for on any Android this app supports. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
 
+    <!-- The live voice room, when a site has a media server configured.
+
+         WebRTC puts the device into the communication audio mode and routes
+         capture and playback while a call is up, and Android refuses both
+         without this. It is a *normal* permission — granted at install, no
+         prompt, nothing for a patient to read — so it costs nothing to declare
+         and the feature is silently half-broken without it: the room connects,
+         the transcripts arrive, and the agent's voice comes out of the earpiece
+         at the wrong volume or not at all.
+
+         `flutter_webrtc` declares no permissions of its own, so nothing merges
+         this in. RECORD_AUDIO above is the other half and is already here for
+         `record`.
+
+         Deliberately **not** BLUETOOTH_CONNECT. A headset would route better
+         with it, but on 12 and up it is a runtime permission — a second
+         prompt, through a second call site, for a convenience — and
+         `media_access.dart` being the only place this app asks a patient for
+         anything is worth more than a Bluetooth earpiece. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+
     <!-- Photographing the thing the patient wants looked at: a rash, a
          swelling, the box a medicine came in.
 
@@ -47,11 +68,18 @@
          the system picker is granted to this app by that choice. Noted because
          the missing line looks like an oversight otherwise. -->
 
+    <!-- The cleartext policy is stated in res/xml/network_security_config.xml
+         rather than as a bare android:usesCleartextTraffic flag here. The flag
+         is all-or-nothing; the config permits plain http to exactly one named
+         address - the development machine's LAN API - and denies it everywhere
+         else, which is what "false" used to buy and now does not cost the LAN
+         demo. On API 24+ the config wins over the flag anyway, so declaring
+         both would only be a second place to read the answer. -->
     <application
         android:label="MediHive"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon"
-        android:usesCleartextTraffic="false">
+        android:networkSecurityConfig="@xml/network_security_config">
         <activity
             android:name=".MainActivity"
             android:exported="true"

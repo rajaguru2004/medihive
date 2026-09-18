@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:get/get.dart';
 
+import 'document_review/controllers/document_review_controller.dart';
 import 'patient_documents_routes.dart';
 
 /// Moving between the two document screens, in one place.
@@ -38,6 +39,33 @@ abstract final class PatientDocumentsNavigation {
   static void toReview(String documentId) {
     unawaited(
       Get.toNamed<void>(PatientDocumentsRoutes.review(documentId)) ??
+          Future<void>.value(),
+    );
+  }
+
+  /// From a duplicate onto the copy that actually holds the reading.
+  ///
+  /// `offNamed`, and this is the one place that differs from [toReview]: the
+  /// duplicate has nothing on it — no extraction, no facts, because the
+  /// pipeline never ran for it — so leaving it on the stack means a back tap
+  /// returns to a screen the patient has already been told is empty, and they
+  /// have to press twice to reach the list. Replacing it makes back mean the
+  /// list, which is where they came from.
+  static void toFirstCopy(String documentId) {
+    // Deleted before the jump, and this is the part that is not obvious.
+    //
+    // `DocumentReviewController` is registered by **type**, so the screen being
+    // opened resolves the instance this screen is already using rather than
+    // building a new one. `documentId` reads the route parameter live and would
+    // therefore be right, but nothing would re-read it: `onReady` fires once
+    // per instance, so the first copy's screen would sit there showing the
+    // duplicate's `document.value` — the empty row the patient just left.
+    //
+    // Removing it first makes the binding's `lazyPut` build a fresh one, which
+    // loads the document it was actually opened for.
+    Get.delete<DocumentReviewController>(force: true);
+    unawaited(
+      Get.offNamed<void>(PatientDocumentsRoutes.review(documentId)) ??
           Future<void>.value(),
     );
   }

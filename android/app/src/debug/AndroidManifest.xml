@@ -9,17 +9,23 @@
     <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
-        android:usesCleartextTraffic="true"
-        android:networkSecurityConfig="@xml/network_security_config"
-        tools:replace="android:usesCleartextTraffic">
-        <!-- Cleartext is re-enabled here and nowhere else, narrowed by the
-             config above to the three loopback addresses a local backend
-             answers on. It lives in the debug source set so it cannot reach a
-             release APK: this app carries patient data over ward wifi, which is
-             shared, often open, and exactly where an attacker sits. A release
-             build that trusts cleartext can be silently read and rewritten in
-             transit — a bed state or a triage code changed on the way to the
-             device is a clinical event, not a networking one. -->
+        android:networkSecurityConfig="@xml/network_security_config">
+        <!-- Cleartext is permitted only for the addresses the debug copy of
+             network_security_config.xml names: the three loopback addresses a
+             local backend answers on, plus the development machine's LAN API.
+             Everything else is still TLS-or-nothing.
+
+             The main source set now carries a config of the same name, and
+             resource merging *overrides* rather than merges it, so the debug
+             copy is the complete list for a debug build - an address added to
+             one file and not the other works in exactly one build type.
+
+             Why the narrowness is worth the duplication: this app carries
+             patient data over ward wifi, which is shared, often open, and
+             exactly where an attacker sits. A build that trusts cleartext
+             generally can be silently read and rewritten in transit — a bed
+             state or a triage code changed on the way to the device is a
+             clinical event, not a networking one. -->
         <activity android:name=".MainActivity">
             <!-- Lets the screenshot harness drive a route directly:
                    adb shell am start -a android.intent.action.VIEW \

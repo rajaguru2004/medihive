@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 // `FormData` and `MultipartFile` are declared by both packages, and GetX's
 // belong to its own HTTP client. Hidden here the way the two other multipart
@@ -9,6 +11,7 @@ import '../models/drafts/case_taking_drafts.dart';
 import '../network/dio_client.dart';
 import '../network/endpoints.dart';
 import '../services/audio_source.dart';
+import '../services/voice_session.dart';
 import '../utils/api_envelope.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
@@ -108,6 +111,29 @@ class CaseTakingRepository {
     return CaseTurnResult.fromJson(ApiEnvelope.of(response).orThrow().object);
   }
 
+  /// Sends the finished case to the hospital, and closes the session.
+  ///
+  /// Two things happen server-side and only one of them is in the name. It
+  /// writes a `CaseSubmission` against the patient record — and it moves the
+  /// session to `submitted`, which is what *ends* it. That second effect is the
+  /// only way an interview ever ends: there is no abandon route, and
+  /// `POST /sessions` hands back the open one rather than making a second, so a
+  /// patient with a session still `in_progress` cannot start another however
+  /// many times they ask. [startOrResume] after this one returns a genuinely
+  /// new interview.
+  ///
+  /// Not idempotent, and the server says so: a second call is a 409
+  /// `CASE_SESSION_ALREADY_SUBMITTED` rather than a quiet second copy of a
+  /// clinical document. Callers must treat it as a one-way door.
+  ///
+  /// The response describes what was sent — the submission id, how complete it
+  /// was, and the safety view. Nothing here reads it yet; it is returned rather
+  /// than dropped so the read-back screen does not have to change this method.
+  Future<Map<String, dynamic>> submitCase(String sessionId) async {
+    final response = await _client.post(Endpoints.caseSessionSubmit(sessionId));
+    return ApiEnvelope.of(response).orThrow().object;
+  }
+
   /// Corrects an answer already recorded.
   ///
   /// Returns the new fact's id alongside the one it superseded, because both
@@ -128,6 +154,44 @@ class CaseTakingRepository {
   }
 
   // ── Voice ─────────────────────────────────────────────────────────────────
+
+  /// Which languages this hospital can take an interview in.
+  ///
+  /// Throws like any other read, and the caller is expected to let it: the
+  /// language screen ships its own catalogue and this only refines it, so a
+  /// refusal here costs a patient nothing they can see. That is the opposite
+  /// posture from [startOrResume], and deliberately — a list that cannot be
+  /// fetched is a list the app already has, while a session that cannot be
+  /// started is an interview that cannot happen.
+  Future<List<CaseLanguage>> languages() async {
+    final response = await _client.get(Endpoints.caseLanguages);
+    return ApiEnvelope.of(response)
+        .orThrow()
+        .listOf(CaseLanguage.fromJson)
+        .where((language) => !language.isEmpty)
+        .toList();
+  }
+
+  /// A short-lived pass into a live voice room, and the URL to dial.
+  ///
+  /// The app is handed a token and never a key: the credential is minted on
+  /// the server against this patient's bearer token, because a secret inside
+  /// an APK belongs to anybody who has the APK. [VoiceGrant] is the whole of
+  /// what comes back, and it has no field that could hold one.
+  ///
+  /// Throws like any other write, and the caller is expected to let it and
+  /// carry on — the posture [languages] takes rather than the one
+  /// [startOrResume] takes. A site with no media server answers this with a
+  /// 404 and a patient there is meant to notice nothing: the microphone still
+  /// records, [transcribe] still answers, and the tiles and the keyboard were
+  /// never conditional on any of it.
+  Future<VoiceGrant> voiceGrant(CaseVoiceTokenDraft draft) async {
+    final response = await _client.post(
+      Endpoints.caseVoiceToken,
+      data: draft.toCreateJson(),
+    );
+    return VoiceGrant.fromJson(ApiEnvelope.of(response).orThrow().object);
+  }
 
   /// Transcribes a recorded answer.
   ///
@@ -163,5 +227,44 @@ class CaseTakingRepository {
       options: Options(contentType: 'multipart/form-data'),
     );
     return CaseTranscript.fromJson(ApiEnvelope.of(response).orThrow().object);
+  }
+
+  /// A question, read aloud.
+  ///
+  /// The mirror of [transcribe], and the reason it exists is the same one: a
+  /// patient who is frightened, in pain, or holding a phone in one hand speaks
+  /// better than they type — and a patient with long sight, low literacy, or a
+  /// language they speak but do not read cannot use a question that only
+  /// exists on the screen.
+  ///
+  /// Returns the WAV bytes. **Not an envelope** — this route answers
+  /// `audio/wav` directly, which is why `ApiEnvelope` is not involved and
+  /// `ResponseType.bytes` is set; the default JSON transform would take a
+  /// binary body and hand back mojibake rather than fail, which is the worst
+  /// of the available outcomes.
+  ///
+  /// Throws like any other read. The caller's job is to treat a refusal as
+  /// "this question cannot be read aloud right now" and carry on — the
+  /// question is already on screen before this is ever called, so there is
+  /// nothing here worth interrupting an interview for.
+  Future<Uint8List> speak(String text, {String? language}) async {
+    final response = await _client.post(
+      Endpoints.caseTts,
+      data: {
+        'text': text,
+        if (language != null && language.isNotEmpty) 'language': language,
+      },
+      options: Options(responseType: ResponseType.bytes),
+    );
+
+    final data = response.data;
+    if (data is Uint8List) return data;
+    if (data is List<int>) return Uint8List.fromList(data);
+
+    // A body that is neither is a route that has stopped answering audio —
+    // most likely an HTML error page from something between here and the API.
+    // Empty bytes read downstream as "nothing to play", which is the same
+    // quiet degradation as a missing voice.
+    return Uint8List(0);
   }
 }

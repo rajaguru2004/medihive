@@ -4,8 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:medihive/app/data/repositories/patient_documents_repository.dart';
-import 'package:medihive/app/data/services/file_source.dart';
 import 'package:medihive/app/data/services/image_source.dart';
+import 'package:medihive/app/data/services/patient_document_file_source.dart';
 import 'package:medihive/app/theme/theme.dart';
 
 import '../../fakes/fake_api.dart';
@@ -58,7 +58,7 @@ void registerPatientDocumentsFlows() {
     Future<PatientDocumentsRobot> openPortal(
       WidgetTester tester, {
       ImageSource images = const StubGalleryImageSource(),
-      FileSource files = const StubPdfFileSource(),
+      PatientDocumentFileSource files = const StubPdfFileSource(),
       MediaPermissionGate permissions = const GrantedMediaPermissions(),
       void Function(FakeApi api)? extra,
     }) async {
@@ -72,11 +72,11 @@ void registerPatientDocumentsFlows() {
       );
 
       Get.put<ImageSource>(images, permanent: true);
-      Get.put<FileSource>(files, permanent: true);
+      Get.put<PatientDocumentFileSource>(files, permanent: true);
       Get.put<MediaPermissionGate>(permissions, permanent: true);
       addTearDown(() {
         Get.delete<ImageSource>(force: true);
-        Get.delete<FileSource>(force: true);
+        Get.delete<PatientDocumentFileSource>(force: true);
         Get.delete<MediaPermissionGate>(force: true);
       });
 

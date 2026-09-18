@@ -215,6 +215,23 @@ void installCaseTakingFixtures(
     });
   });
 
+  // What this hospital's sidecar can work in.
+  //
+  // Not the app's catalogue echoed back. The list is deliberately *shorter*
+  // than the twelve the app ships, because the property worth reproducing is
+  // that the server narrows: a fixture that returned all twelve would pass
+  // identically against a screen that ignored the response. Odia is on it with
+  // `canSpeak: false`, which is the live sidecar's actual shape — Piper has an
+  // Odia voice and `faster-whisper` has no Odia model.
+  api.on('GET', '/api/case-taking/languages', (_) {
+    return FakeResponse.ok(const [
+      {'code': 'en', 'canSpeak': true, 'canHear': true},
+      {'code': 'hi', 'canSpeak': true, 'canHear': true},
+      {'code': 'ta', 'canSpeak': true, 'canHear': true},
+      {'code': 'or', 'canSpeak': false, 'canHear': true},
+    ]);
+  });
+
   // Speech in, words out. The confidence is a real measurement on the live
   // path, so it is a plausible one here — 0.84 is what a round trip through
   // Piper and back through Whisper actually returned on this hardware.

@@ -18,5 +18,12 @@
         <domain>10.0.2.2</domain>
         <domain>localhost</domain>
         <domain>127.0.0.1</domain>
+        <!--
+          The development machine's LAN address, which is what `Endpoints`
+          defaults to. It is repeated from `src/main/res/xml/` of the same name
+          because resource merging overrides that file rather than merging it -
+          without this line a debug build cannot reach the default API at all.
+        -->
+        <domain includeSubdomains="false">192.168.163.97</domain>
     </domain-config>
 </network-security-config>

@@ -10,6 +10,7 @@ import '../../../../data/repositories/patient_documents_repository.dart';
 import '../../../../data/services/file_source.dart';
 import '../../../../data/services/image_source.dart';
 import '../../../../data/services/media_access.dart';
+import '../../../../data/services/patient_document_file_source.dart';
 import '../../../../data/utils/error_handler.dart';
 import '../../../../data/utils/load_state.dart';
 import '../../patient_documents_navigation.dart';
@@ -150,7 +151,7 @@ class DocumentListController extends GetxController with LoadStateMixin {
         // No permission call. A document picker on both platforms hands back
         // exactly what was chosen and asks for nothing broader, so a prompt
         // here would be the app asking for access it does not need.
-        final file = await Get.find<FileSource>().pick();
+        final file = await Get.find<PatientDocumentFileSource>().pick();
         return file == null ? null : _fromFile(file);
     }
   }

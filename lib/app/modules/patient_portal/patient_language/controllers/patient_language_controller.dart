@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:get/get.dart';
 
+import '../../../../core/app_log.dart';
+import '../../../../data/repositories/case_taking_repository.dart';
 import '../../patient_entry.dart';
 import '../../patient_portal_navigation.dart';
 
@@ -9,25 +13,97 @@ import '../../patient_portal_navigation.dart';
 /// what language the conversation is *in* — and a question about language
 /// asked in a language the patient does not read is not a question.
 class PatientLanguageController extends GetxController {
+  PatientLanguageController({
+    CaseTakingRepository repository = const CaseTakingRepository(),
+  }) : _repository = repository;
+
+  final CaseTakingRepository _repository;
+
   /// Whatever the dashboard passed. Empty on a deep link, which is why
   /// `PatientEntry.fromArguments` falls back rather than throwing.
   late final PatientEntry entry = PatientEntry.fromArguments(Get.arguments);
 
   late final Rx<PatientLanguage> selected = entry.language.obs;
 
-  /// What the screen offers. One entry today; see [PatientLanguage].
-  List<PatientLanguage> get languages => PatientLanguage.available;
-
-  /// True while this build ships a single language, which is what the screen
-  /// uses to decide whether to say so out loud.
+  /// What the screen offers, starting from what the app shipped with.
   ///
-  /// Derived rather than hardcoded: the line disappears on its own the moment
-  /// the translation phase adds a second entry, rather than sitting there
-  /// promising languages that have already arrived.
-  bool get isSingleLanguage => languages.length == 1;
+  /// Seeded rather than empty, and that is the whole posture of this screen:
+  /// the twelve rows are on the tablet and are on screen in the first frame.
+  /// [_loadOfferedLanguages] can only narrow the list or correct what it says
+  /// about the microphone.
+  final RxList<PatientLanguageOffer> rxLanguages =
+      PatientLanguageOffer.catalogue.obs;
 
-  void choose(PatientLanguage language) => selected.value = language;
+  /// The row that is currently chosen, as the list holds it.
+  ///
+  /// By identity out of [rxLanguages] rather than by building a fresh offer, so
+  /// the tile the patient tapped is the tile that draws as selected — and so
+  /// that this follows the list when the server's answer replaces it.
+  PatientLanguageOffer? get selectedOffer {
+    for (final offer in rxLanguages) {
+      if (offer.language == selected.value) return offer;
+    }
+    return null;
+  }
 
-  void continueToConsent() =>
-      PatientPortalNavigation.toConsent(entry.copyWith(language: selected.value));
+  /// True where the chosen language can be read to the patient but not spoken
+  /// back — which is what the notice under the list is for.
+  bool get selectedCannotBeSpoken => selectedOffer?.canSpeak == false;
+
+  @override
+  void onReady() {
+    super.onReady();
+    // `onReady`, never `onInit`: the first widget to touch `controller`
+    // constructs it, and a write to an observable during that build marks the
+    // building `Obx` dirty.
+    unawaited(_loadOfferedLanguages());
+  }
+
+  void choose(PatientLanguageOffer offer) => selected.value = offer.language;
+
+  void continueToConsent() => PatientPortalNavigation.toConsent(
+        entry.copyWith(language: selected.value),
+      );
+
+  /// Asks the hospital which languages its sidecar can actually work in.
+  ///
+  /// **Not `runGuarded`, and no `ErrorRetryBanner`** — which is the one place
+  /// this controller departs from `.agents/RULES.md` §3.3, so it is worth
+  /// saying why. That rule is for a screen with nothing to show until a request
+  /// lands; this screen is fully drawn before the call is made. Putting a retry
+  /// banner in front of a patient over a list the tablet already has would be
+  /// asking them to fix the hospital's network before they are allowed to say
+  /// they read Tamil.
+  ///
+  /// So a failure is logged and nothing else happens. The failure that *would*
+  /// be visible — a microphone offered in a language the transcriber cannot
+  /// hear — is caught in the interview instead, where `_withdrawVoice` takes
+  /// the control away with a sentence the first time it proves unavailable.
+  Future<void> _loadOfferedLanguages() async {
+    try {
+      final offered = PatientLanguageOffer.merge(await _repository.languages());
+
+      // An empty answer is not an instruction to offer nothing. It is a route
+      // that is not mounted yet, a list that has not been seeded, or a payload
+      // shaped differently from the one this build parses — and a language
+      // screen with no languages on it is a patient who cannot start.
+      if (offered.isEmpty) return;
+
+      rxLanguages.assignAll(offered);
+
+      // The language in hand may not have survived the narrowing — a deep link
+      // carrying `ta` into a hospital that has taken Tamil down, or simply the
+      // default. Moving the selection is better than leaving it pointing at a
+      // row that is no longer on screen, where "Continue" would start an
+      // interview in a language nothing here offered.
+      if (selectedOffer == null) selected.value = offered.first.language;
+    } catch (error, stack) {
+      AppLog.error(
+        'PatientLanguageController',
+        'the language list did not load; offering the built-in one',
+        error,
+        stack,
+      );
+    }
+  }
 }

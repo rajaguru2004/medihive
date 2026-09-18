@@ -27,8 +27,21 @@ abstract class Endpoints {
   /// flutter run --dart-define=MEDIHIVE_API=https://api.example.com/
   /// ```
   ///
-  /// The default is the **demo tunnel**, so a build with no `--dart-define`
-  /// reaches a real server from a real phone.
+  /// The default is the **LAN address of the development machine**, so a build
+  /// with no `--dart-define` reaches the API started by `npm run dev` from a
+  /// phone on the same Wi-Fi. It replaced the reserved ngrok tunnel when the
+  /// demo moved onto the local network.
+  ///
+  /// Two things this default depends on, both of which fail silently:
+  ///
+  /// - **The address is DHCP.** When the laptop's lease changes, this constant
+  ///   is stale and every request times out. `npm run dev` prints the current
+  ///   LAN address on startup; if it is not the one below, pass
+  ///   `--dart-define=MEDIHIVE_API=...` or change it here.
+  /// - **It is plain http.** Android forbids cleartext by default, so
+  ///   `android/app/src/{main,debug}/res/xml/network_security_config.xml`
+  ///   names this exact address. Changing the address here without changing it
+  ///   there produces a network failure with no explanation attached.
   ///
   /// It was `http://10.0.2.2:3000/` — the Android *emulator's* loopback to the
   /// host. That is right for `flutter run` on an emulator and wrong everywhere
@@ -38,18 +51,18 @@ abstract class Endpoints {
   /// the address was never reachable in the first place. That cost a debugging
   /// round on a real device.
   ///
-  /// The tunnel is a **reserved** ngrok domain, so it survives restarts of the
-  /// tunnel and of the stack behind it. What it does not survive is the machine
-  /// hosting it going away — when that happens this default is wrong again, and
-  /// the fix is to change it here or pass `--dart-define=MEDIHIVE_API=...`,
-  /// which still wins.
+  /// If the phone has to reach the API from off this network, the reserved
+  /// ngrok domain is still the way:
+  /// `--dart-define=MEDIHIVE_API=https://convincedly-photometric-ariella.ngrok-free.dev/`
+  /// (start the tunnel with `ngrok start hms-api`). A `--dart-define` always
+  /// wins over the default below.
   ///
   /// ```sh
   /// flutter run --dart-define=MEDIHIVE_API=http://10.0.2.2:3000/   # emulator, local API
   /// ```
   static const String baseUrl = String.fromEnvironment(
     'MEDIHIVE_API',
-    defaultValue: 'https://unguessable-sunshine-transpolar.ngrok-free.dev/',
+    defaultValue: 'http://192.168.163.97:3000/',
   );
 
   /// Where uploaded files live. The API returns storage-relative paths, which
@@ -65,7 +78,7 @@ abstract class Endpoints {
   /// all the free plan gives.
   static const String fileBaseUrl = String.fromEnvironment(
     'MEDIHIVE_FILES',
-    defaultValue: 'https://unguessable-sunshine-transpolar.ngrok-free.dev/',
+    defaultValue: 'http://192.168.163.97:3000/',
   );
 
   /// Whether this build is pointed somewhere only a developer can reach.
@@ -201,6 +214,42 @@ abstract class Endpoints {
   /// A question read aloud. Answers `audio/wav`, outside the envelope.
   static const String caseTts = '/api/case-taking/tts';
 
+  /// POST: a short-lived pass into a live voice room, and the URL to dial.
+  ///
+  /// Answers `{token, url, roomName, expiresAt}` and **never a key or a
+  /// secret**: the room credential is minted server-side against the patient's
+  /// bearer token, because a credential inside an APK belongs to everybody who
+  /// has the APK and a hospital cannot rotate what is already on a thousand
+  /// phones. `data/services/voice_session.dart` is the parser and says the
+  /// same thing from the other end.
+  ///
+  /// **The second route here that is allowed to 404**, on the same terms as
+  /// [caseLanguages] and for a stronger reason: a live conversation is an
+  /// enhancement over an interview that already works by tap, by keyboard and
+  /// by [caseStt], so a site with no media server configured answers this with
+  /// nothing and the microphone goes on recording and uploading exactly as it
+  /// did before. A 404, a 500, a timeout and a grant with no token in it are
+  /// one behaviour in `CaseTakingController`.
+  static const String caseVoiceToken = '/api/case-taking/voice/token';
+
+  /// GET: which languages an interview can be taken in here, and which of them
+  /// [caseStt] and [caseTts] can currently handle.
+  ///
+  /// `data` is the array itself — `[{code, canSpeak, canHear}, …]` — like every
+  /// other collection in this file, and not an object wrapping one. It carries
+  /// no names; `CaseLanguage` says why the app holds those.
+  ///
+  /// **The one route here that is allowed to 404.** The rule at the top of this
+  /// file is that a constant for a route the server does not mount reads as
+  /// verified and lands its 404 on a screen, and this one is landing ahead of
+  /// its handler. What makes it safe is that nothing waits on it: the language
+  /// screen renders its own catalogue first and this only refines the two
+  /// capability flags, so a 404, a timeout and a waiting-room tablet with no
+  /// signal are one behaviour — the picker the app shipped with. Which models
+  /// the sidecar has loaded is genuinely server state and changes without a
+  /// release, which is why the call exists at all.
+  static const String caseLanguages = '/api/case-taking/languages';
+
   // ── The patient's own documents ───────────────────────────────────────────
   //
   // A [Crud] this time, because there genuinely is a collection: a patient can
@@ -222,8 +271,27 @@ abstract class Endpoints {
   /// The bucket is private, so this is the only way a patient can look at their
   /// own evidence. It expires in minutes: fetch it when the patient asks to
   /// see the original, never at list time.
+  ///
+  /// **Not what the app uses to show a document** — see
+  /// [patientDocumentFile]. The signed URL names the bucket's own host, which
+  /// a phone cannot resolve.
   static String patientDocumentOriginal(String documentId) =>
       '${patientDocuments.base}/$documentId/original';
+
+  /// GET: the original file itself, streamed through the API.
+  ///
+  /// This is the one the app fetches, and the reason is the whole point of
+  /// [fileBaseUrl] above: [patientDocumentOriginal] answers with a URL signed
+  /// against the bucket — `localhost:9010` on a developer machine,
+  /// `minio:9000` in compose — and a handset can resolve neither. The app used
+  /// to hand that URL to `Image.network`, which also sends no bearer token, so
+  /// "See the original" failed with "We couldn't open the original just now"
+  /// no matter what was wrong.
+  ///
+  /// Through here the bytes come back over the same authenticated origin as
+  /// every other call, so one reachable host serves the whole app.
+  static String patientDocumentFile(String documentId) =>
+      '${patientDocuments.base}/$documentId/file';
 
   /// POST: the patient confirming that what was read out of this document is
   /// correct.
@@ -387,10 +455,10 @@ enum HttpVerb { get, post, put, patch, delete }
 /// the route exists before assuming a 404 is a bug in the app.
 class Crud {
   const Crud(this.base, {this.updateVerb = HttpVerb.patch})
-      : assert(
-          updateVerb == HttpVerb.patch || updateVerb == HttpVerb.put,
-          'an update is PATCH or PUT; nothing else reaches this route',
-        );
+    : assert(
+        updateVerb == HttpVerb.patch || updateVerb == HttpVerb.put,
+        'an update is PATCH or PUT; nothing else reaches this route',
+      );
 
   /// The collection path, with no trailing slash.
   final String base;

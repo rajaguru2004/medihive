@@ -36,6 +36,15 @@ class DioClient {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
+          // The default origin is an ngrok tunnel, and ngrok's free tier
+          // answers anything it judges browser-like with an HTML interstitial
+          // instead of forwarding it. `Accept: application/json` usually
+          // avoids that, but "usually" is the problem: when it does fire, Dio
+          // receives a 200 carrying HTML and the failure surfaces as a JSON
+          // parse error, which reads as a corrupt API rather than a tunnel
+          // that never passed the request through. This header is ngrok's
+          // documented opt-out and is inert against every other server.
+          'ngrok-skip-browser-warning': 'true',
         },
         // Let every status through to the caller rather than throwing on 4xx.
         // The envelope carries a usable message on a 409 validation failure,

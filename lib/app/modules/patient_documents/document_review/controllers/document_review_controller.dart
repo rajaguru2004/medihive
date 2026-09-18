@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
+import 'package:pdfx/pdfx.dart';
 
 import '../../../../core/app_log.dart';
 import '../../../../core/i18n/patient_text.dart';
@@ -89,13 +91,33 @@ class DocumentReviewController extends GetxController with LoadStateMixin {
   final RxnString editingField = RxnString();
   final TextEditingController correctionText = TextEditingController();
 
-  /// The signed link to the original, once the patient has asked for it.
+  /// The original's bytes, once the patient has asked to see them.
   ///
-  /// Fetched on the tap and never at load: it expires in five minutes, so one
-  /// fetched with the screen is one that has already stopped working by the
-  /// time anybody wants it.
-  final RxnString originalUrl = RxnString();
+  /// Bytes rather than a URL, and fetched through the authenticated client.
+  /// The signed-link route answers with a URL naming the bucket's own host —
+  /// `localhost:9010` here — which resolves to the handset itself, and the
+  /// widget that loaded it sent no bearer token either. Both failures rendered
+  /// as the same sentence, so neither could be told from the other.
+  ///
+  /// Fetched on the tap and never at load: a document nobody asks to see is a
+  /// download nobody needed, over hospital wifi.
+  final Rxn<Uint8List> originalBytes = Rxn<Uint8List>();
   final RxBool isFetchingOriginal = false.obs;
+
+  /// The renderer for a PDF original, alive only while one is on screen.
+  ///
+  /// Held here rather than built in the view because it owns a native document
+  /// handle: rebuilt on every frame it would leak one per rebuild, and the
+  /// review screen rebuilds on every poll of a processing document.
+  final Rxn<PdfController> pdfController = Rxn<PdfController>();
+
+  /// Why the original would not open, shown next to the button that failed.
+  ///
+  /// Its own field rather than `confirmError`: that one is drawn inside the
+  /// confirmation block, which is not on screen at all once a document is
+  /// verified or has failed — so on exactly those documents a failed fetch
+  /// used to produce a button that flickered and said nothing.
+  final RxnString originalError = RxnString();
 
   final RxBool isConfirming = false.obs;
   final RxnString confirmError = RxnString();
@@ -116,6 +138,7 @@ class DocumentReviewController extends GetxController with LoadStateMixin {
   void onClose() {
     _poll?.cancel();
     correctionText.dispose();
+    _closeOriginal();
     super.onClose();
   }
 
@@ -125,12 +148,9 @@ class DocumentReviewController extends GetxController with LoadStateMixin {
   /// an `onRefresh:` wired to it never awaits.
   Future<void> reload() async {
     if (documentId.isEmpty) return;
-    await runGuarded(
-      () async {
-        document.value = await _repository.read(documentId);
-      },
-      fallback: PatientText.couldNotOpenDocument,
-    );
+    await runGuarded(() async {
+      document.value = await _repository.read(documentId);
+    }, fallback: PatientText.couldNotOpenDocument);
     _schedulePoll();
   }
 
@@ -158,12 +178,12 @@ class DocumentReviewController extends GetxController with LoadStateMixin {
   /// your document now" and a dropped packet on the fourth poll should not
   /// replace that with an error — the next poll answers.
   Future<void> _reloadQuietly() => runGuarded(
-        () async {
-          document.value = await _repository.read(documentId);
-        },
-        fallback: PatientText.couldNotOpenDocument,
-        silent: true,
-      );
+    () async {
+      document.value = await _repository.read(documentId);
+    },
+    fallback: PatientText.couldNotOpenDocument,
+    silent: true,
+  );
 
   // ── What was found ────────────────────────────────────────────────────────
 
@@ -172,50 +192,50 @@ class DocumentReviewController extends GetxController with LoadStateMixin {
 
   /// The medicines, one row each, with the position baked into the key.
   List<DocumentValueRow> get medications => [
-        for (var i = 0; i < extraction.medications.length; i++)
-          DocumentValueRow(
-            field: 'medications.$i',
-            title: extraction.medications[i].name,
-            detail: extraction.medications[i].detail.isEmpty
-                ? null
-                : extraction.medications[i].detail,
-            // Two independent reasons, and either is enough. The model flags a
-            // medicine whose text was garbled — it is the only party that saw
-            // the ambiguity — and the grounding check flags a value that is
-            // not in the page text at all.
-            needsCheck: extraction.medications[i].uncertain ||
-                !extraction.isGrounded(extraction.medications[i].name),
-          ),
-      ];
+    for (var i = 0; i < extraction.medications.length; i++)
+      DocumentValueRow(
+        field: 'medications.$i',
+        title: extraction.medications[i].name,
+        detail: extraction.medications[i].detail.isEmpty
+            ? null
+            : extraction.medications[i].detail,
+        // Two independent reasons, and either is enough. The model flags a
+        // medicine whose text was garbled — it is the only party that saw
+        // the ambiguity — and the grounding check flags a value that is
+        // not in the page text at all.
+        needsCheck:
+            extraction.medications[i].uncertain ||
+            !extraction.isGrounded(extraction.medications[i].name),
+      ),
+  ];
 
   List<DocumentValueRow> get investigations => [
-        for (var i = 0; i < extraction.investigations.length; i++)
-          DocumentValueRow(
-            field: 'investigations.$i',
-            title: extraction.investigations[i].test,
-            detail: [
-              extraction.investigations[i].reading,
-              if ((extraction.investigations[i].referenceRange ?? '').isNotEmpty)
-                extraction.investigations[i].referenceRange!,
-              // The report's own flag, printed as the report printed it. Never
-              // derived and never coloured: surfacing a value outside a stated
-              // range is allowed and deciding it is abnormal is not.
-              if ((extraction.investigations[i].flag ?? '').isNotEmpty)
-                extraction.investigations[i].flag!,
-            ].where((part) => part.isNotEmpty).join(' · '),
-            needsCheck:
-                !extraction.isGrounded(extraction.investigations[i].test),
-          ),
-      ];
+    for (var i = 0; i < extraction.investigations.length; i++)
+      DocumentValueRow(
+        field: 'investigations.$i',
+        title: extraction.investigations[i].test,
+        detail: [
+          extraction.investigations[i].reading,
+          if ((extraction.investigations[i].referenceRange ?? '').isNotEmpty)
+            extraction.investigations[i].referenceRange!,
+          // The report's own flag, printed as the report printed it. Never
+          // derived and never coloured: surfacing a value outside a stated
+          // range is allowed and deciding it is abnormal is not.
+          if ((extraction.investigations[i].flag ?? '').isNotEmpty)
+            extraction.investigations[i].flag!,
+        ].where((part) => part.isNotEmpty).join(' · '),
+        needsCheck: !extraction.isGrounded(extraction.investigations[i].test),
+      ),
+  ];
 
   List<DocumentValueRow> _plain(String topic, List<String> values) => [
-        for (var i = 0; i < values.length; i++)
-          DocumentValueRow(
-            field: '$topic.$i',
-            title: values[i],
-            needsCheck: !extraction.isGrounded(values[i]),
-          ),
-      ];
+    for (var i = 0; i < values.length; i++)
+      DocumentValueRow(
+        field: '$topic.$i',
+        title: values[i],
+        needsCheck: !extraction.isGrounded(values[i]),
+      ),
+  ];
 
   List<DocumentValueRow> get diagnoses =>
       _plain('diagnosesRecorded', extraction.diagnosesRecorded);
@@ -228,13 +248,13 @@ class DocumentReviewController extends GetxController with LoadStateMixin {
 
   /// Every row on the screen, which is what the confirmation gate counts.
   List<DocumentValueRow> get allRows => [
-        ...medications,
-        ...investigations,
-        ...diagnoses,
-        ...procedures,
-        ...allergies,
-        ...followUp,
-      ];
+    ...medications,
+    ...investigations,
+    ...diagnoses,
+    ...procedures,
+    ...allergies,
+    ...followUp,
+  ];
 
   /// What the document says about a topic it listed nothing for.
   ///
@@ -322,9 +342,9 @@ class DocumentReviewController extends GetxController with LoadStateMixin {
   /// Something on this screen is wrong or uncertain, so the document stays
   /// unconfirmed and the patient is told what happens instead.
   bool get isBlocked => allRows.any((row) {
-        final check = checkOf(row.field);
-        return check == ValueCheck.corrected || check == ValueCheck.unsure;
-      });
+    final check = checkOf(row.field);
+    return check == ValueCheck.corrected || check == ValueCheck.unsure;
+  });
 
   /// The patient confirming the reading. The only write this screen makes.
   Future<bool> confirmDocument() async {
@@ -337,8 +357,10 @@ class DocumentReviewController extends GetxController with LoadStateMixin {
       return true;
     } catch (e, stack) {
       AppLog.error('$runtimeType', 'confirming a document failed', e, stack);
-      confirmError.value =
-          parseErrorMessage(e, PatientText.couldNotConfirmDocument);
+      confirmError.value = parseErrorMessage(
+        e,
+        PatientText.couldNotConfirmDocument,
+      );
       return false;
     } finally {
       isConfirming.value = false;
@@ -347,34 +369,67 @@ class DocumentReviewController extends GetxController with LoadStateMixin {
 
   // ── The evidence ──────────────────────────────────────────────────────────
 
-  /// Fetches the short-lived link and shows the original inline.
+  /// Fetches the original and shows it inline.
   ///
   /// A second tap hides it again, which is what a disclosure does, and does not
-  /// spend another signed URL on a file already on screen.
+  /// fetch a file already on screen a second time.
   Future<void> toggleOriginal() async {
-    if (originalUrl.value != null) {
-      originalUrl.value = null;
+    if (originalBytes.value != null) {
+      _closeOriginal();
       return;
     }
     if (isFetchingOriginal.value) return;
 
     isFetchingOriginal.value = true;
-    confirmError.value = null;
+    originalError.value = null;
     try {
-      originalUrl.value = (await _repository.original(documentId)).url;
+      final bytes = await _repository.originalBytes(documentId);
+      // An empty body is a failure that would otherwise reach the screen as a
+      // broken image frame with nothing to say about it.
+      if (bytes.isEmpty) throw StateError('the original came back empty');
+      originalBytes.value = bytes;
+      if (originalIsPdf) {
+        pdfController.value = PdfController(
+          document: PdfDocument.openData(bytes),
+        );
+      }
     } catch (e, stack) {
       AppLog.error('$runtimeType', 'fetching the original failed', e, stack);
-      confirmError.value =
-          parseErrorMessage(e, PatientText.couldNotOpenOriginal);
+      originalError.value = parseErrorMessage(
+        e,
+        PatientText.couldNotOpenOriginal,
+      );
     } finally {
       isFetchingOriginal.value = false;
     }
   }
 
+  /// Puts the original away and releases the renderer with it.
+  ///
+  /// One place, because there are two ways out — the second tap and leaving the
+  /// screen — and a `PdfController` that outlives its widget holds a native
+  /// document open.
+  void _closeOriginal() {
+    originalBytes.value = null;
+    originalError.value = null;
+    pdfController.value?.dispose();
+    pdfController.value = null;
+  }
+
   /// Whether the original can be shown on the phone at all.
   ///
-  /// Only the photographs. This build ships no PDF renderer, and a button that
-  /// opened nothing would be worse than one that is not there — the row says
-  /// the file is kept instead, which is true and is what §22 promised.
-  bool get canShowOriginal => document.value.mimeType.startsWith('image/');
+  /// Photographs and PDFs — the two things the upload route accepts. It used to
+  /// be photographs alone, because the app shipped no PDF renderer and a button
+  /// that opened nothing is worse than no button. `pdfx` renders one now, so a
+  /// patient who sent a discharge letter can read it back instead of being told
+  /// to ask at the desk.
+  ///
+  /// Rendered **inside the app** rather than handed to the phone's PDF viewer:
+  /// that would mean writing a medical document to shared storage and passing
+  /// it to whatever app claims the type.
+  bool get canShowOriginal =>
+      document.value.mimeType.startsWith('image/') || originalIsPdf;
+
+  /// Which of the two renderers the bytes need.
+  bool get originalIsPdf => document.value.mimeType == 'application/pdf';
 }

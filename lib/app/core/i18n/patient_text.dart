@@ -9,13 +9,22 @@
 /// else in the product, because this is the only surface where a badly worded
 /// line produces a *wrong clinical answer* rather than a confused user.
 ///
-/// **This build ships English and only English.** Translation is the last
-/// phase of this project, deliberately: a vocabulary that is still moving is
-/// one that gets translated twice. What this file is for is making that phase
-/// cheap — every patient-facing line already has a stable key, already flows
-/// through one function, and already carries its placeholders as `{name}`
-/// rather than as Dart interpolation. The later phase installs a lookup with
-/// [useLookup] and **not one call site changes**.
+/// **Every line in this file is still English and only English.** Translation
+/// is the last phase of this project, deliberately: a vocabulary that is still
+/// moving is one that gets translated twice. What this file is for is making
+/// that phase cheap — every patient-facing line already has a stable key,
+/// already flows through one function, and already carries its placeholders as
+/// `{name}` rather than as Dart interpolation. The later phase installs a
+/// lookup with [useLookup] and **not one call site changes**.
+///
+/// The patient now *chooses* a language, and that is not the same thing and
+/// must not be read as it. What the choice moves is one thing: **the language
+/// the patient answers in.** `/stt` is told which language to listen for and
+/// the server turns what it hears into English. Everything in the other
+/// direction — the questions, the read-aloud voice, and every sentence in this
+/// file — is English. So a patient who picks Tamil speaks Tamil and reads
+/// English, which is worth knowing before somebody reads this header as a
+/// claim that nothing is translated.
 ///
 /// That is the whole seam. There is no `Translations` subclass here, no
 /// `flutter_localizations`, and nothing touching the staff screens — adding
@@ -90,7 +99,76 @@ abstract final class PatientText {
   /// worse than a wrong one because nobody knows it is wrong.
   static String get change => _of('answer.change', 'Change');
 
+  // ── Before anything is asked ──────────────────────────────────────────────
+  //
+  // The language screen, and it is the one block in this file whose English is
+  // **not** the fallback a lookup improves on. A patient who reads only Tamil
+  // meets this screen before anything has been translated for them, which is
+  // why the rows themselves are native names out of `PatientLanguage` rather
+  // than strings from here: a heading nobody on the screen can read is
+  // survivable when the twelve things under it are each written in their own
+  // script, and is not survivable otherwise.
+
+  static String get beforeWeStart => _of('entry.title', 'Before we start');
+
+  static String get chooseYourLanguage =>
+      _of('language.heading', 'Choose your language');
+
+  /// Under the heading, and the one sentence that makes this screen honest.
+  ///
+  /// The choice governs **only what the patient says**: the recogniser is told
+  /// which language to listen for, and what comes back is turned into English
+  /// before anybody reads it. Everything in the other direction stays English —
+  /// on the screen and in the voice that reads it out.
+  ///
+  /// So the sentence has to do two things in a row a patient can hold at once:
+  /// name what they are picking *for*, and say plainly what they will get back.
+  /// The line it replaced — "The questions will be asked in the language you
+  /// pick" — was true of a different build, and a patient who picks Tamil and
+  /// then meets an English question would have been told wrong by the app
+  /// rather than let down by it.
+  ///
+  /// It still promises nothing about changing the choice later: the language is
+  /// recorded on the case session when it is created, and this screen is not
+  /// the thing that can move it.
+  static String get chooseYourLanguageDetail => _of(
+        'language.detail',
+        'Pick the language you will speak. The questions will be in English, '
+            'on screen and read aloud.',
+      );
+
+  static String get languageContinue => _of('language.continue', 'Continue');
+
+  /// Where the patient's own language cannot be spoken back to the app,
+  /// because the transcriber has no model for it — Odia, today.
+  ///
+  /// Said twice and in one wording: once on the picker, under the row they just
+  /// tapped, and again in the interview where the microphone would have been.
+  /// It names the language, because "answering out loud does not work" with no
+  /// subject reads as a broken app rather than as a fact about one of twelve
+  /// choices — and it ends on the two ways forward, which is the half a patient
+  /// holding the tablet actually needs.
+  ///
+  /// It no longer offers "the questions can still be read to you" as the
+  /// consolation. That read as a promise of Odia, and read-aloud is English for
+  /// every patient now — so it is neither this line's news nor this language's
+  /// exception, and a sentence about a missing microphone is the wrong place to
+  /// discover it.
+  static String cannotAnswerOutLoudIn(String language) => _of(
+        'language.voice.unsupported',
+        'Answering out loud does not work in {language} yet. You can type your '
+            'answer or tap one of the choices.',
+        {'language': language},
+      );
+
   // ── Asking, and answering out loud ────────────────────────────────────────
+
+  /// The switch under the question. Both say what a tap will *do*, because a
+  /// label next to a speaker icon that states the current state instead leaves
+  /// somebody guessing which of the two they are looking at.
+  static String get readAloud => _of('speak.on', 'Read the questions to me');
+  static String get stopReadingAloud =>
+      _of('speak.off', 'Stop reading out loud');
 
   static String get speakYourAnswer =>
       _of('mic.idle', 'Answer out loud instead');
@@ -99,6 +177,55 @@ abstract final class PatientText {
       _of('mic.stop', 'Tap when you have finished');
   static String get writingThatDown =>
       _of('mic.working', 'Writing that down');
+
+  // ── Answering out loud, as a conversation ─────────────────────────────────
+  //
+  // The four lines the live room adds, and the register they are written in is
+  // the point of them: **none of them names the feature.** A patient taps the
+  // same microphone they have always tapped; whether their words come back a
+  // sentence at a time or a recording at a time is a fact about the hospital's
+  // servers, and a sentence that made them choose between two kinds of
+  // microphone would be the app asking somebody with chest pain to care about
+  // its architecture.
+  //
+  // So the two failures below say what changed and what still works, and
+  // neither says the word that would invite the question "why don't I have
+  // the other one".
+
+  /// While the room is being dialled. Short, and on screen the moment the
+  /// microphone is tapped: a tap that shows nothing for several seconds is a
+  /// tap somebody makes again, and the second one would end what the first
+  /// started.
+  static String get connectingYourVoice =>
+      _of('live.connecting', 'Connecting you…');
+
+  /// Above the words arriving while the patient is still speaking.
+  ///
+  /// Present tense, and deliberately not [youSaid]. What is under this heading
+  /// is unfinished — the recogniser revises it several times a sentence — and
+  /// a patient who read "You said" over it would correct text that was about
+  /// to correct itself. It is also the honest signal that the microphone is
+  /// working, which is the job `ListeningIndicator` does on the other path.
+  static String get weAreHearing => _of('live.interim', 'We are hearing');
+
+  /// The room would not open. Said once, as a passing note rather than a
+  /// banner: the microphone is still on screen, still works, and the patient
+  /// has lost nothing they knew they had.
+  static String get couldNotOpenLiveVoice => _of(
+        'live.error.open',
+        'We could not listen as you speak just now. You can still answer out '
+            'loud one question at a time, or type your answer.',
+      );
+
+  /// It was working and it stopped. Past tense, because the difference matters
+  /// to somebody who watched their words appear and then stop appearing — it
+  /// tells them the app noticed, which is the part that decides whether they
+  /// trust the next thing it says.
+  static String get liveVoiceEnded => _of(
+        'live.error.dropped',
+        'We have stopped listening as you speak. You can still answer out loud '
+            'one question at a time, or type your answer.',
+      );
 
   /// Above the text the app thinks it heard, before the patient confirms it.
   static String get youSaid => _of('draft.heading', 'You said');
@@ -264,6 +391,52 @@ abstract final class PatientText {
 
   static String get done => _of('interview.done.action', 'Done for now');
 
+  /// Starting again, and the two things it does.
+  ///
+  /// The label names the send first because the send is the part that cannot be
+  /// taken back — the new interview is the *consequence*, not the price. A
+  /// button that said only "Start a new conversation" would file a clinical
+  /// document to the hospital on a tap that did not mention one.
+  ///
+  /// Short because `SecondaryBar` gives a label one line and ellipsises the
+  /// rest, and it was measured doing it: "Send this and start a new
+  /// conversation" rendered as "Send this and start a new c…" on the handset,
+  /// which is a button whose irreversible half is the half that fits and whose
+  /// consequence trails off into a character nobody can act on. The full
+  /// sentence lives in the dialog, which has room for it and is where the
+  /// patient is asked to agree.
+  static String get sendAndStartNew =>
+      _of('interview.done.restart', 'Send and start a new one');
+
+  static String get sendAndStartNewTitle =>
+      _of('interview.done.restart.title', 'Send this to the hospital?');
+
+  /// Said in the order it happens, and it does not promise a reply. "A doctor
+  /// will read it" is already on the card above; repeating it here in a dialog
+  /// that is asking permission would read as a commitment about when.
+  static String get sendAndStartNewBody => _of(
+        'interview.done.restart.body',
+        'Your answers will be sent to the hospital as they are, and cannot be '
+            'changed afterwards. You will then start a fresh set of questions.',
+      );
+
+  static String get sendAndStartNewConfirm =>
+      _of('interview.done.restart.confirm', 'Send and start');
+
+  static String get caseSentNewStarted => _of(
+        'interview.done.restart.sent',
+        'Sent. You can start answering the new questions.',
+      );
+
+  /// Sent, but the next interview did not open — a connection that went between
+  /// two requests. It leads with the fact that matters and does not call it a
+  /// failure, because nothing failed that the patient did.
+  static String get caseSentNotReopened => _of(
+        'interview.done.restart.halfway',
+        'Your answers were sent. We could not open the new questions just yet — '
+            'try again in a moment.',
+      );
+
   /// Nothing left to ask, but an answer is still being read. **Not the same as
   /// finished**: saying so would invite somebody to close the app while the
   /// last thing they said was still being written down.
@@ -271,6 +444,20 @@ abstract final class PatientText {
         'interview.settling',
         'We are finishing writing down your last answer.',
       );
+
+  /// The settling state, still there after the screen has waited it out.
+  ///
+  /// [almostThere] stops being true at some point, and a screen that keeps
+  /// saying it is a screen lying to a patient who is doing nothing wrong. This
+  /// says what is actually the case and hands them the only two useful moves:
+  /// look again, or leave and come back to it.
+  static String get stillNothingToAsk => _of(
+        'interview.settling.stalled',
+        'Your last answer is taking longer than usual to save. Your answers so '
+            'far are safe. You can check again, or come back to this later.',
+      );
+
+  static String get checkAgain => _of('interview.settling.retry', 'Check again');
 
   // ── When something goes wrong ─────────────────────────────────────────────
 
@@ -365,6 +552,27 @@ abstract final class PatientText {
   static String get couldNotOpenFile => _of(
         'documents.error.pick',
         "We couldn't open that file.",
+      );
+
+  /// A file type the route would refuse. Local, and not a second opinion about
+  /// a server sentence: this one is said about a file that was never uploaded,
+  /// so there is no server outcome to quote. The picker already filters by
+  /// extension — this covers the file browsers that treat that filter as
+  /// advisory and hand back anything the patient tapped.
+  /// The way out of a duplicate, onto the copy that holds the reading.
+  ///
+  /// "The first copy" and not "the original": `original` on this screen already
+  /// means the file itself — the photograph or the PDF behind "See the
+  /// original" — and two buttons a thumb apart meaning different things by the
+  /// same word is how somebody ends up looking at a picture when they wanted
+  /// the medicines.
+  static String get openTheFirstCopy =>
+      _of('documents.duplicate.open', 'Open the first copy');
+
+  static String get unsupportedDocument => _of(
+        'documents.error.type',
+        'That kind of file cannot be read. Choose a photo of the document, or '
+            'a PDF.',
       );
 
   /// The heading over the extracted values. Never "what we found in your

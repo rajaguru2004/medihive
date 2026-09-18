@@ -6,6 +6,7 @@ import 'package:medihive/app/data/repositories/patient_documents_repository.dart
 import 'package:medihive/app/data/services/file_source.dart';
 import 'package:medihive/app/data/services/image_source.dart';
 import 'package:medihive/app/data/services/media_access.dart';
+import 'package:medihive/app/data/services/patient_document_file_source.dart';
 import 'package:medihive/app/modules/patient_documents/document_list/controllers/document_list_controller.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
@@ -33,7 +34,7 @@ void main() {
     Get.reset();
     // A file source has to exist for the controller's own registration guard to
     // leave it alone; nothing in this file reaches it.
-    Get.put<FileSource>(const _NoFile(), permanent: true);
+    Get.put<PatientDocumentFileSource>(const _NoFile(), permanent: true);
   });
 
   tearDown(Get.reset);
@@ -176,7 +177,7 @@ class _Refused implements MediaPermissionGate {
   }
 }
 
-class _NoFile implements FileSource {
+class _NoFile implements PatientDocumentFileSource {
   const _NoFile();
 
   @override

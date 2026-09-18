@@ -66,12 +66,31 @@ abstract final class PatientPortalKeys {
   // ── Language ──────────────────────────────────────────────────────────────
 
   static const Key language = Key('patient_language_screen');
-  static const Key languageMore = Key('patient_language_more_coming');
   static const Key languageContinue = Key('patient_language_continue');
 
-  /// One language, by its code — `en`. A key per option rather than per index,
-  /// so the list can grow in P10 without moving any existing assertion.
+  /// The scrolling list of languages.
+  ///
+  /// Keyed because twelve rows do not fit on a phone and a flow that wants the
+  /// last of them has to scroll something. `tester.scrollToKey` needs a
+  /// scrollable it can name, and "the only `Scrollable` on screen" stops being
+  /// true the first time this screen grows a second one.
+  static const Key languageList = Key('patient_language_list');
+
+  /// One language, by its code — `en`, `ta`, `or`. A key per option rather than
+  /// per index, so a language arriving or leaving the list moves no existing
+  /// assertion.
   static Key languageOption(String code) => Key('patient_language_$code');
+
+  /// Where the screen says the language just chosen cannot be answered out
+  /// loud — Odia, today.
+  ///
+  /// Keyed rather than matched on words, and it is the assertion this screen
+  /// most needs: the honest thing and the convenient thing point opposite ways
+  /// here. A picker that quietly offered Odia and let the patient discover in
+  /// the interview that the microphone was missing would look *better* than
+  /// this one and would be the defect. A key is what holds the sentence on the
+  /// screen while the wording is still being argued about.
+  static const Key languageVoiceNotice = Key('patient_language_voice_notice');
 
   // ── Consent ───────────────────────────────────────────────────────────────
 

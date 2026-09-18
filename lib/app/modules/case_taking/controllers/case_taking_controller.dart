@@ -11,6 +11,8 @@ import '../../../data/repositories/case_taking_repository.dart';
 import '../../../data/services/audio_source.dart';
 import '../../../data/services/media_access.dart';
 import '../../../data/services/session_lock_service.dart';
+import '../../../data/services/speech_player.dart';
+import '../../../data/services/voice_session.dart';
 import '../../../data/utils/error_handler.dart';
 import '../../../data/utils/load_state.dart';
 import '../../../theme/theme.dart';
@@ -92,6 +94,17 @@ class CaseTakingController extends GetxController with LoadStateMixin {
   /// True while an answer is on its way. Drives the disabled state of the
   /// controls, and nothing else — it is measured in milliseconds.
   final RxBool rxSending = false.obs;
+
+  /// True when the interview settled with no question and stayed that way past
+  /// every re-check. The screen stops promising that an answer is being written
+  /// down — because by this point nothing is — and offers the way out instead.
+  final RxBool rxSettleStalled = false.obs;
+
+  /// Re-checks a settling interview. See [_watchSettling].
+  Timer? _settle;
+
+  /// How many re-checks have gone by without a question arriving.
+  int _settleAttempts = 0;
 
   /// An answer that did not reach the server. Inline and persistent, with the
   /// retry attached: a toast here would take the retry with it and leave the
@@ -183,6 +196,59 @@ class CaseTakingController extends GetxController with LoadStateMixin {
   /// What the app thinks it heard, waiting to be confirmed.
   final Rxn<CaseTranscript> rxDraft = Rxn<CaseTranscript>();
 
+  // ── Answering out loud, as a conversation ─────────────────────────────────
+  //
+  // A live room is an **enhancement on the same microphone**, never a second
+  // one. The patient taps the control they have always tapped; what changes is
+  // that their words arrive a sentence at a time instead of a recording at a
+  // time, and that a final sentence lands in [rxDraft] on exactly the path
+  // `_finishRecording` puts one on — so `acceptDraft`, `recordAgain` and
+  // `typeInstead` are the same three ways out of it either way.
+  //
+  // Everything here degrades to nothing. A build with no WebRTC, a site with
+  // no media server, a token route that 404s, a dial that times out and a room
+  // that closes halfway are five different causes and one behaviour: the
+  // record-then-upload microphone, which was never conditional on any of it.
+
+  /// Where the live room has got to. [VoiceSessionState.idle] covers both "not
+  /// asked for" and "the patient stopped talking", which are the same thing to
+  /// the screen.
+  final Rx<VoiceSessionState> rxLive = VoiceSessionState.idle.obs;
+
+  /// The words arriving while the patient is still speaking.
+  ///
+  /// **Never filed.** The recogniser revises this several times a sentence;
+  /// what reaches [rxDraft] is the final segment and nothing else. It is here
+  /// so somebody can see they are being heard, which on the recorded path is
+  /// what the level meter is for.
+  final RxnString rxLiveHeard = RxnString();
+
+  /// One dial per interview.
+  ///
+  /// A room that would not open is not going to open on the next question
+  /// either, and a microphone that spends eight seconds trying before every
+  /// spoken answer is a slower interview bought with a convenience. Set before
+  /// the attempt rather than after it, so a second tap during the dial cannot
+  /// start a second one.
+  bool _liveTried = false;
+
+  StreamSubscription<VoiceTranscript>? _heard;
+  StreamSubscription<VoiceSessionState>? _liveState;
+
+  // ── Asking out loud ───────────────────────────────────────────────────────
+
+  /// Whether each new question is read to the patient.
+  ///
+  /// On by default, because the patient this helps most is the one least able
+  /// to discover a setting: somebody who cannot comfortably read the screen.
+  /// A patient who does not want it turns it off once and hears nothing more —
+  /// and `toggleReadAloud` silences the sentence already in the air, since a
+  /// waiting room is the usual place to realise you would rather it stopped.
+  ///
+  /// Not persisted. A shared ward device should not carry one patient's choice
+  /// into the next patient's interview.
+  final RxBool rxReadAloud = true.obs;
+
   // ── The keyboard ──────────────────────────────────────────────────────────
 
   final TextEditingController typed = TextEditingController();
@@ -207,7 +273,101 @@ class CaseTakingController extends GetxController with LoadStateMixin {
 
   AudioSource get _audio => _recorder ??= Get.find<AudioSource>();
 
+  /// Built on first use and remembered, for the reasons above [_recorder].
+  SpeechPlayer? _player;
+
+  SpeechPlayer get _speech => _player ??= Get.find<SpeechPlayer>();
+
+  /// Built on first use and remembered, for the reasons above [_recorder] —
+  /// and one more that is specific to this seam: constructing it is what puts
+  /// a WebRTC stack in the process, so a patient who never presses the
+  /// microphone never causes one to exist.
+  VoiceSession? _voice;
+
+  /// The room seam, or null where there is not one registered.
+  ///
+  /// Guarded rather than assumed, the way `_touchLock` guards
+  /// `SessionLockService` and for a stronger reason. A harness that registers a
+  /// recorder and a player but no room is a harness testing the interview this
+  /// feature is not allowed to require, and a controller that threw looking for
+  /// a seam it can do without would turn "there is no live conversation here"
+  /// into "the microphone crashes" — which is the one outcome §5 of this
+  /// module's brief rules out.
+  VoiceSession? get _room {
+    final found = _voice;
+    if (found != null) return found;
+    if (!Get.isRegistered<VoiceSession>()) return null;
+    return _voice = Get.find<VoiceSession>();
+  }
+
+  /// Opens or closes the published microphone on a room that exists.
+  ///
+  /// Fire-and-forget: nothing the interview does next depends on the platform
+  /// having finished muting, and awaiting it would put a round trip to the
+  /// audio device between a patient's answer and the next question.
+  void _liveMic(bool talking) {
+    final room = _voice;
+    if (room == null) return;
+    unawaited(room.setMicrophoneEnabled(talking));
+  }
+
+  /// Whether a room is up *right now*.
+  ///
+  /// Read from the seam rather than from [rxLive], deliberately. The state
+  /// stream is delivered asynchronously, so for a microtask after a successful
+  /// join the observable still says `connecting` — and the two places that ask
+  /// this question, `_submit` and `_readAloud`, are both on paths where being
+  /// one microtask wrong means a recording spanning two questions or two
+  /// voices reading one question.
+  bool get _isTalkingLive => _voice?.isLive ?? false;
+
   String get _sessionId => rxSession.value?.id ?? '';
+
+  /// The session's one language tag, and the floor under both halves below.
+  ///
+  /// **The session's language wins.** The server decides what language an
+  /// interview is being conducted in, and the two can differ once a session is
+  /// resumed on a different device or on a different day from the one the entry
+  /// screen was answered on. The entry's own answer is the floor for the moment
+  /// before the session lands, and for the case where it never does.
+  String get _languageCode => rxSession.value?.language ?? entry.language.code;
+
+  /// The tag `/stt` is told — **what the patient speaks**, which is the only
+  /// thing the language screen now chooses.
+  ///
+  /// The raw string rather than [spokenLanguage.code], deliberately: a tag this
+  /// build has no row for still has to reach the sidecar, which may well have a
+  /// model for it. Narrowing it to a known language here would quietly
+  /// transcribe somebody's answer as English.
+  ///
+  /// Falls back through [_languageCode] rather than to a constant, so a
+  /// deployment whose sessions carry one tag behaves exactly as it did before
+  /// the split existed.
+  String get _inputLanguageCode =>
+      rxSession.value?.inputLanguage ?? _languageCode;
+
+  /// The tag `/tts` is told — **the language the question on screen is written
+  /// in**, which the server settles and which is English under the current
+  /// rule.
+  ///
+  /// Read-aloud speaks the prompt the server sent, so the only correct voice is
+  /// the one that matches that text. That is the server's fact, not the
+  /// patient's choice, which is why this reads the session and never the entry
+  /// screen — and why the fallback is [_languageCode] rather than `en`: a
+  /// server still phrasing questions in one language would otherwise be read
+  /// aloud in an English voice.
+  String get _outputLanguageCode =>
+      rxSession.value?.outputLanguage ?? _languageCode;
+
+  /// What the patient speaks, as this build knows it — the capability question
+  /// behind the microphone. A tag with no row here lands on English.
+  PatientLanguage get spokenLanguage =>
+      PatientLanguage.fromCode(_inputLanguageCode);
+
+  /// What the patient is read to in, as this build knows it — the capability
+  /// question behind the read-aloud switch.
+  PatientLanguage get readAloudLanguage =>
+      PatientLanguage.fromCode(_outputLanguageCode);
 
   /// True while the questions have run out but an answer is still being read.
   /// Deliberately not the same as finished.
@@ -227,11 +387,23 @@ class CaseTakingController extends GetxController with LoadStateMixin {
 
   @override
   void onClose() {
+    _settle?.cancel();
     unawaited(_level?.cancel());
+    unawaited(_heard?.cancel());
+    unawaited(_liveState?.cancel());
+    // A room left open after the patient has walked away is a live microphone
+    // on a shared ward tablet, which is the same disclosure `_player?.stop()`
+    // below is here to prevent and a worse one. `dispose` rather than `leave`:
+    // the screen is going away and there will be no next conversation.
+    unawaited(_voice?.dispose());
     // Bytes, not a file. Cancelling clears the buffer, which is the point of
     // the recorder seam on a shared device — and only if one was ever built,
     // because a patient who typed every answer has nothing to clear.
     unawaited(_recorder?.cancel());
+    // A question still being read aloud after the patient has left the screen
+    // is audible to whoever picks the device up next, which on a shared ward
+    // tablet is a disclosure rather than an annoyance.
+    unawaited(_player?.stop());
     typed.dispose();
     typedFocus.dispose();
     super.onClose();
@@ -259,6 +431,12 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     // showing it first would put a stale question in front of somebody whose
     // wifi was fine.
     if (hasLoadError) await _restoreSnapshot();
+
+    // Again here for the path `_adopt` never reached: the session call failed
+    // and the language in force is the one the patient chose on the entry
+    // screen. A restored snapshot has a question on it and therefore controls
+    // under it, so the microphone has to be right on this path too.
+    _applyLanguageVoiceRule();
   }
 
   Future<void> _adopt(CaseSession session) async {
@@ -284,6 +462,16 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     rxStatus.value = current.interviewStatus;
     rxQuestion.value = current.currentQuestion;
     rxFromSnapshot.value = false;
+    // Before the awaits below, because the question is already on screen and a
+    // question on screen has an answer panel under it. A resumed interview
+    // waits on the snapshot read, and a microphone drawn for the length of that
+    // read is a microphone somebody can press.
+    _applyLanguageVoiceRule();
+    // The first question of the sitting, or the one a resumed interview came
+    // back to. Read here as well as in `_apply`, because a patient who needs
+    // the questions read to them needs the first one most — it is the one that
+    // tells them the screen talks.
+    _readAloud(current.currentQuestion);
 
     // A resumed interview has a history the server does not send back — its
     // session view carries state, not a transcript. The phone's own snapshot
@@ -306,6 +494,10 @@ class CaseTakingController extends GetxController with LoadStateMixin {
 
     _touchLock();
     unawaited(_saveSnapshot());
+    // A resumed interview can land straight into the settling state — which is
+    // exactly how the stuck session presented: opened from the portal, no
+    // question, nothing to press.
+    _watchSettling();
   }
 
   /// Puts back what was on screen when the connection went.
@@ -449,6 +641,41 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     // seconds a spoken answer takes, which is why this is here too.
     _touchLock();
 
+    // The patient has answered. Whatever the microphone was doing belongs to
+    // the question on screen *now*, and this one is about to leave it.
+    //
+    // Both lines are here for the same defect, and it is the one
+    // `case_taking_drafts.dart` calls worse than a missing answer: an unspoken
+    // draft used to survive a tapped or typed answer, reappear under the *next*
+    // question, and file its stale text against that question's `fieldPath` —
+    // an answer to a question nobody asked, reading as a finding. Stopping the
+    // recorder is the other half: left running, it kept listening across the
+    // boundary and produced audio spanning two questions.
+    rxDraft.value = null;
+    // The room stays up across a question boundary — that is what makes it a
+    // conversation — but the audio must not. Muted rather than left running,
+    // for the defect above: a live microphone across the boundary publishes a
+    // sentence that spans two questions, and the room would file it against
+    // whichever one is on screen when it finishes.
+    rxLiveHeard.value = null;
+    if (_isTalkingLive) {
+      // Given back on the next question, but **only for an answer the room
+      // itself produced**. Somebody who tapped a tile chose not to speak, and
+      // a microphone that reopened itself in a waiting room on the strength of
+      // that is publishing audio nobody asked it to.
+      _resumeTalking = draft.modality == CaseAnswerModality.voice;
+      rxMic.value = MicState.idle;
+      _liveMic(false);
+    } else if (rxMic.value == MicState.listening) {
+      rxMic.value = MicState.idle;
+      unawaited(_level?.cancel());
+      _level = null;
+      // `cancel`, not `stop` - a recording the patient abandoned by answering
+      // another way is not evidence, and on a shared device it should not
+      // outlive the question it belonged to.
+      unawaited(_audio.cancel());
+    }
+
     _unsent = draft;
     _unsentTurn = turn;
     rxTurnError.value = null;
@@ -483,10 +710,27 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     }
   }
 
+  /// Whether the microphone goes back on when the next question lands. Set by
+  /// `_submit`, which is the only place that knows how the last answer was
+  /// given.
+  bool _resumeTalking = false;
+
   void _apply(CaseTurnResult result, {required String quoting}) {
     rxProgress.value = result.progress;
     rxStatus.value = result.interviewStatus;
     rxQuestion.value = result.nextQuestion;
+    _readAloud(result.nextQuestion);
+
+    // After the question is on screen, never before: a room listening to a
+    // patient who has not been asked anything yet records an answer to the
+    // previous question. Only where there is a next question at all — a
+    // finished interview has nothing left to say into.
+    if (_resumeTalking) {
+      _resumeTalking = false;
+      if (result.nextQuestion != null && _isTalkingLive) {
+        _talkLive(true);
+      }
+    }
 
     // The answer went to the model to be read properly. The mark goes under
     // that bubble and the next question is already on screen — see the note on
@@ -502,8 +746,101 @@ class CaseTakingController extends GetxController with LoadStateMixin {
 
     _touchLock();
     unawaited(_saveSnapshot());
+    // After the status is set, because it reads it. A turn that lands on
+    // `awaiting_extraction` with no question is the state nothing else on this
+    // screen can move.
+    _watchSettling();
 
     if (result.interviewStatus.isFinished) unawaited(_cache.clear());
+  }
+
+  /// Re-checks an interview that has nothing to ask.
+  ///
+  /// `awaiting_extraction` means the questions have run out but an answer is
+  /// still being read, and it is the one status this screen cannot act on: there
+  /// is no question to answer and no control to press. Every other state moves
+  /// because the patient moves it. This one moves only when the server changes
+  /// its mind, and until now nothing ever asked it again — `reload()` ran once
+  /// in `onReady` and that was the only read of the session in the screen's
+  /// life. A patient who landed here stayed here, watching a sentence about an
+  /// answer being written down, for as long as they were willing to.
+  ///
+  /// The server can now always leave this state on its own: a lost extraction is
+  /// released on the clock, and the question comes back. What was missing was
+  /// anybody on this side to notice. So while the interview is settling, ask
+  /// again — and stop asking, rather than poll a waiting room forever.
+  ///
+  /// [_settleAttempts] is not a retry count in the usual sense: nothing here has
+  /// failed. It bounds a wait. Six looks at five seconds covers half a minute,
+  /// which is past the twenty the longest measured extraction takes and well
+  /// short of the two minutes the server's own backstop needs — after which the
+  /// session is genuinely stuck rather than slow, and saying so with a way out
+  /// beats a sentence that is no longer true.
+  void _watchSettling() {
+    final settling = rxStatus.value == CaseInterviewStatus.awaitingExtraction &&
+        rxQuestion.value == null;
+
+    if (!settling) {
+      _settle?.cancel();
+      _settle = null;
+      _settleAttempts = 0;
+      rxSettleStalled.value = false;
+      return;
+    }
+
+    if (_settle != null) return; // Already watching this one.
+
+    _settle = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      final session = rxSession.value;
+      // Nothing to re-read against, or the screen has moved on under us.
+      if (session == null || rxFromSnapshot.value) {
+        timer.cancel();
+        _settle = null;
+        return;
+      }
+
+      _settleAttempts += 1;
+      if (_settleAttempts > 6) {
+        timer.cancel();
+        _settle = null;
+        rxSettleStalled.value = true;
+        AppLog.warn(
+          'CaseTakingController',
+          'the interview has been settling for ${_settleAttempts * 5}s with no '
+              'question; offering the way out',
+        );
+        return;
+      }
+
+      try {
+        final fresh = await _repository.session(session.id);
+        rxSession.value = fresh;
+        rxProgress.value = fresh.progress;
+        rxStatus.value = fresh.interviewStatus;
+        rxQuestion.value = fresh.currentQuestion;
+        if (fresh.currentQuestion != null || fresh.interviewStatus.isFinished) {
+          timer.cancel();
+          _settle = null;
+          _settleAttempts = 0;
+          rxSettleStalled.value = false;
+          _settlePreviousReading();
+          _readAloud(fresh.currentQuestion);
+          unawaited(_saveSnapshot());
+        }
+      } catch (error, stack) {
+        // Swallowed on purpose. This is a background re-check of a screen the
+        // patient is not being asked to do anything on; surfacing a network
+        // error here would put a failure in front of them for something they
+        // never asked for. The attempt counter still advances, so a connection
+        // that is down lands on the same way out as a session that is stuck.
+        AppLog.error(
+          'CaseTakingController',
+          'a settling re-check did not reach the hospital',
+          error,
+          stack,
+        );
+      }
+    });
   }
 
   /// Retires the mark on the previous answer.
@@ -520,23 +857,424 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     }
   }
 
+  // ── Asking out loud ───────────────────────────────────────────────────────
+
+  /// Reads [question] to the patient, if this device can and they want it.
+  ///
+  /// Deliberately **not** awaited by any caller, and the ordering is the whole
+  /// design: `_apply` puts the question on screen first and calls this after,
+  /// so the text never waits on the audio. Synthesis costs a second or two on
+  /// the sidecar's CPU Piper, and a patient watching a blank panel for that
+  /// long — every turn — would be a slower interview bought with a
+  /// convenience.
+  ///
+  /// So the question is readable immediately and becomes audible shortly
+  /// after. If the audio never arrives, nothing on screen changes and the
+  /// patient loses nothing they can see — the same posture the server already
+  /// takes: "We cannot read this aloud right now. The question is on screen."
+  void _readAloud(CaseQuestion? question) {
+    final text = question?.prompt.trim() ?? '';
+    if (text.isEmpty) return;
+    if (!rxReadAloud.value || !canReadAloud) return;
+    // The room has a voice of its own and is already speaking. Two voices
+    // reading one clinical question over each other in a waiting room is worse
+    // than either of them alone, and the switch above is not the thing that
+    // can tell them apart.
+    //
+    // Asked as "is the room *speaking*", not "is the room open". A room whose
+    // agent never publishes audio must leave this alone — silencing it there
+    // would take the questions away from the one patient read-aloud exists
+    // for, somebody who cannot comfortably read the screen.
+    if (_voice?.carriesTheVoice ?? false) return;
+    final asked = question!.fieldPath;
+
+    unawaited(() async {
+      try {
+        final wav = await _repository.speak(
+          text,
+          language: _outputLanguageCode,
+        );
+        // The interview can move on while synthesis is in flight, and a
+        // patient who has already answered must not then hear the question
+        // they just answered. After the await is the only point where this can
+        // have changed.
+        if (rxQuestion.value?.fieldPath != asked) return;
+        await _speech.play(wav);
+      } catch (error, stack) {
+        // Not shown, and not disabled. Read-aloud assists a question that is
+        // already on screen, so a toast about audio on top of a clinical
+        // question is noise at the worst moment. Unlike the microphone, one
+        // failure costs the patient nothing, so the next question is free to
+        // try again rather than the control disappearing for good.
+        AppLog.error('CaseTakingController',
+            'a question could not be read aloud', error, stack);
+      }
+    }());
+  }
+
+  /// Whether this device can read a question aloud at all.
+  ///
+  /// False on a platform with no audio implementation, false once a player has
+  /// failed in a way it will not retry, and false in a language the synthesiser
+  /// has no voice for. The switch is hidden rather than disabled when this is
+  /// false — a control that plainly is not there beats one that takes a tap and
+  /// does nothing.
+  ///
+  /// **The language it asks about is [readAloudLanguage], not what the patient
+  /// picked.** The questions are asked in English however the patient answers,
+  /// so this is available to all twelve — including Odia, whose missing half is
+  /// the microphone and not the voice. Gating it on the patient's own language
+  /// would take the audio away from the one patient it was built for: somebody
+  /// who cannot comfortably read the screen and now cannot hear it either.
+  ///
+  /// Kept as a capability question rather than collapsed to `_speech
+  /// .isAvailable`, because the tag the server sends is what decides which
+  /// voice speaks: an interview whose output moved off English would need this
+  /// to answer for that language.
+  ///
+  /// Touching this builds the player, which is why it is read from the switch
+  /// and not from the interview: a patient who never sees the control never
+  /// causes an `AudioPlayer` to exist.
+  bool get canReadAloud => readAloudLanguage.canHear && _speech.isAvailable;
+
+  /// Turns read-aloud off, and silences anything mid-sentence.
+  ///
+  /// The off switch matters more than the on switch. An interview asks a
+  /// patient about their own body, often in a waiting room, and a question
+  /// read out loud is audible to everyone in it. Somebody who realises that
+  /// halfway through needs it to stop on the first tap, not at the end of the
+  /// current sentence.
+  void toggleReadAloud() {
+    _touchLock();
+    final next = !rxReadAloud.value;
+    rxReadAloud.value = next;
+    if (!next) {
+      unawaited(_speech.stop());
+      return;
+    }
+    // Turning it back on reads the question on the table, rather than leaving
+    // the patient to wait for the next one to learn whether it worked.
+    _readAloud(rxQuestion.value);
+  }
+
   // ── Answering out loud ────────────────────────────────────────────────────
 
-  /// Starts or stops recording.
+  /// Starts or stops the microphone.
+  ///
+  /// One control, two mechanisms underneath it. Where a room is open the taps
+  /// mute and unmute it; everywhere else they start and finish a recording, as
+  /// they always have. The patient is not asked to know which — see the note
+  /// on the live block in `patient_text.dart`.
   Future<void> toggleMicrophone() async {
     if (!rxVoiceAvailable.value || rxSending.value) return;
+    // A tap while the room is being dialled would start a second dial, or end
+    // what the first is still opening.
+    if (rxLive.value == VoiceSessionState.connecting) return;
     _touchLock();
 
     switch (rxMic.value) {
       case MicState.listening:
+        if (_isTalkingLive) {
+          _talkLive(false);
+          return;
+        }
         await _finishRecording();
       case MicState.working:
         // The transcriber has it. A second tap here would start a recording
         // over the top of the one being written down.
         return;
       case MicState.idle:
+        if (_isTalkingLive) {
+          _talkLive(true);
+          return;
+        }
+        // The one dial of the interview, if there is one to make. It takes the
+        // tap either way: a room that failed has already cost the patient
+        // several seconds, and starting a recording they are no longer
+        // expecting would capture whatever the waiting room is saying.
+        if (await _openLiveVoice()) return;
         await _startRecording();
     }
+  }
+
+  /// Opens a live room, once, and says whether it took this tap.
+  ///
+  /// True means "handled" and not "connected" — a failed attempt has been
+  /// reported and the microphone is idle and ready for the next tap. False
+  /// means no attempt was made and the caller should record as usual: this
+  /// build cannot hold a room, one has already been tried, or there is no
+  /// session to open one against.
+  Future<bool> _openLiveVoice() async {
+    // `rxFromSnapshot` is the phone showing what was on screen when the
+    // connection went. A room needs the hospital, and so does the answer it
+    // would produce.
+    if (_liveTried || rxFromSnapshot.value) return false;
+    final sessionId = _sessionId;
+    if (sessionId.isEmpty) return false;
+    // Reading this constructs the seam, which is why it is the last of the
+    // cheap checks rather than the first — and null where a harness never
+    // registered one, which reads as "there is no live conversation here".
+    final room = _room;
+    if (room == null || !room.isSupported) return false;
+
+    _liveTried = true;
+    rxLive.value = VoiceSessionState.connecting;
+
+    try {
+      final grant = await _repository.voiceGrant(
+        CaseVoiceTokenDraft(
+          sessionId: sessionId,
+          inputLanguage: _inputLanguageCode,
+          outputLanguage: _outputLanguageCode,
+        ),
+      );
+
+      // Subscribed before the join, not after it. The room announces `live`
+      // and can deliver its first segment from inside `join`, and a
+      // subscription taken out afterwards would miss both.
+      _heard = room.transcripts.listen(_onHeard);
+      _liveState = room.state.listen(_onLiveState);
+
+      await room.join(
+        grant,
+        inputLanguage: _inputLanguageCode,
+        outputLanguage: _outputLanguageCode,
+      );
+
+      if (room.isLive) {
+        rxMic.value = MicState.listening;
+        return true;
+      }
+
+      // The seam reported `dropped` rather than throwing — an unusable grant,
+      // an unreachable server, a dial past its budget. `_onLiveState` has
+      // already said so.
+      return true;
+    } on MediaRefusal catch (refusal) {
+      // A refusal is never a null — `media_access.dart` is explicit — and the
+      // exception *is* the sentence. Handled here rather than falling through
+      // to the recorder, which would ask for the same microphone and be told
+      // the same thing.
+      _withdrawVoice(refusal.message, needsSettings: refusal.canOpenSettings);
+      rxLive.value = VoiceSessionState.idle;
+      return true;
+    } catch (error, stack) {
+      // A site with no media server configured, which is most of them today.
+      // The route answers 404, this lands, and the interview goes on with the
+      // microphone it already had.
+      AppLog.error(
+          'CaseTakingController', 'no live voice room', error, stack);
+      _endLiveVoice(notice: PatientText.couldNotOpenLiveVoice);
+      return true;
+    }
+  }
+
+  /// Mutes or unmutes an open room, without closing it.
+  void _talkLive(bool talking) {
+    rxMic.value = talking ? MicState.listening : MicState.idle;
+    // Whatever was half-heard belonged to the moment the microphone was open.
+    if (!talking) rxLiveHeard.value = null;
+    _liveMic(talking);
+  }
+
+  /// True when an agent in the room is driving the interview.
+  ///
+  /// [VoiceSession.carriesTheVoice] goes true the moment something in the room
+  /// publishes audio, which only the agent does — and an agent that speaks is
+  /// an agent that is also posting the answers. That makes it the one honest
+  /// test for "somebody else owns the turn", which is the difference between
+  /// the two behaviours in [_onHeard].
+  bool get _agentDrivesTheTurn => _voice?.carriesTheVoice ?? false;
+
+  void _onHeard(VoiceTranscript heard) {
+    if (heard.isEmpty) return;
+
+    // ── The agent's own words ────────────────────────────────────────────────
+    //
+    // Never an answer, in either mode — nothing the room says may be filed as
+    // something the patient said, and that is structural in
+    // `livekit_voice_session.dart` rather than a flag here.
+    //
+    // They are still the next *question*, though, which is why they are no
+    // longer simply dropped. In conversation mode the agent is the thing that
+    // advanced the interview, so its final utterance is the app's cue that the
+    // session on the server has moved and the screen is now out of date.
+    if (heard.speaker == VoiceSpeaker.agent) {
+      if (!_agentDrivesTheTurn || !heard.isFinal) return;
+      _followAgent(heard.text);
+      return;
+    }
+
+    if (!heard.isFinal) {
+      rxLiveHeard.value = heard.text;
+      return;
+    }
+
+    rxLiveHeard.value = null;
+
+    // ── Conversation mode: the patient stops speaking and nothing is asked ──
+    //
+    // The agent has already endpointed this answer on a second of silence,
+    // transcribed it, posted it to `/turns` and is about to speak what came
+    // back. Drafting it here would put a "is this right?" card in front of
+    // somebody who is about to be asked the next question out loud, and
+    // confirming it would post the same answer a second time — the agent's copy
+    // is already on the chart.
+    //
+    // So the words go into the conversation as what they are, and the
+    // microphone **stays open**. That last part is the whole feature: a mic
+    // that closes after every answer is a button press per turn, which is what
+    // hands-free means not doing.
+    if (_agentDrivesTheTurn) {
+      rxTurns.add(
+        InterviewTurn.answered(
+          heard.text,
+          source: AnswerSource.spoken,
+          confidence: AnswerConfidence.fromScore(null),
+          fieldPath: rxQuestion.value?.fieldPath,
+        ),
+      );
+      unawaited(_saveSnapshot());
+      return;
+    }
+
+    // ── No agent: the room is only a transcriber ────────────────────────────
+    //
+    // Onto exactly the path a recorded answer takes: the patient is shown what
+    // was heard and confirms it. With nothing else in the room posting turns,
+    // this app is the only thing that can — and nothing it produces reaches a
+    // chart without that tap.
+    //
+    // No confidence, because the room measured none — and
+    // `AnswerConfidence.fromScore(null)` reads that as "check this", which is
+    // the honest reading of a sentence nothing scored.
+    rxDraft.value = CaseTranscript(
+      text: heard.text,
+      language: heard.language,
+    );
+    // Muted while the draft is on screen. Left open, the next thing said in
+    // the waiting room would arrive as a second final segment and replace a
+    // transcript the patient was in the middle of reading.
+    _liveMic(false);
+    rxMic.value = MicState.idle;
+  }
+
+  /// Serialises the session re-reads [_followAgent] triggers.
+  ///
+  /// The agent can speak twice in a row — a routing instruction before the
+  /// question, which is `engine.utterances()`' documented order — and two reads
+  /// in flight can land out of order, which would put the *previous* question
+  /// back on screen after the current one.
+  Future<void>? _following;
+
+  /// Catches the screen up with an interview somebody else is advancing.
+  ///
+  /// In conversation mode the app posts nothing, so it learns nothing from a
+  /// response — `_apply` is never called and `rxQuestion`, `rxProgress` and the
+  /// red-flag banner would all sit at whatever they held when the room opened.
+  /// The agent's spoken question would be the only thing that had moved, and it
+  /// would be audible rather than readable, which is exactly backwards for the
+  /// patient this mode is most useful to.
+  ///
+  /// So the server is asked. One cheap GET per agent utterance, against the
+  /// same session view the interview already reads everywhere else — rather
+  /// than parsing the agent's sentence into a question, which would make the
+  /// screen agree with the audio and disagree with the chart.
+  void _followAgent(String spoken) {
+    // On screen immediately, from the words themselves. The read is a round
+    // trip and the patient is already hearing this sentence; waiting would show
+    // the previous question underneath the new one being spoken.
+    rxTurns.add(InterviewTurn.asked(spoken));
+
+    if (_following != null) return;
+    _following = () async {
+      try {
+        final session = await _repository.session(_sessionId);
+        rxSession.value = session;
+        rxProgress.value = session.progress;
+        rxStatus.value = session.interviewStatus;
+        rxQuestion.value = session.currentQuestion;
+        if (session.redFlags.isNotEmpty) {
+          rxRedFlagRaised.value = true;
+          rxRedFlagQuote.value ??= _lastPatientWords();
+        }
+        if (session.interviewStatus.isFinished) {
+          // Nothing left to ask, so nothing left to listen for. The room is
+          // closed rather than left muted: an open microphone on a shared ward
+          // tablet outlives the reason it was opened.
+          await _endLiveVoiceQuietly();
+        }
+        unawaited(_saveSnapshot());
+      } catch (error, stack) {
+        // Swallowed. The audio is the conversation and it is still happening;
+        // a failed catch-up means the screen lags by a question, which is worth
+        // far less than an error banner over a patient mid-sentence. The next
+        // utterance tries again.
+        AppLog.error(
+          'CaseTakingController',
+          'could not follow the agent',
+          error,
+          stack,
+        );
+      } finally {
+        _following = null;
+      }
+    }();
+  }
+
+  /// Closes the room without a notice. Used when the interview simply ended.
+  Future<void> _endLiveVoiceQuietly() async {
+    rxMic.value = MicState.idle;
+    rxLiveHeard.value = null;
+    await _voice?.leave();
+    rxLive.value = VoiceSessionState.idle;
+  }
+
+  void _onLiveState(VoiceSessionState next) {
+    rxLive.value = next;
+    switch (next) {
+      case VoiceSessionState.dropped:
+        _endLiveVoice(
+          // Past tense, and only where a room was actually open: somebody who
+          // watched their words appear and then stop needs to know the app
+          // noticed. A dial that never connected says the other sentence.
+          notice: _liveWasOpen
+              ? PatientText.liveVoiceEnded
+              : PatientText.couldNotOpenLiveVoice,
+        );
+      case VoiceSessionState.live:
+        _liveWasOpen = true;
+      case VoiceSessionState.connecting:
+      case VoiceSessionState.idle:
+        break;
+    }
+  }
+
+  /// Whether a room ever actually opened, which decides which sentence a
+  /// failure gets. Not derived from [rxLive], which by then says `dropped`.
+  bool _liveWasOpen = false;
+
+  /// Closes the room and puts the interview back on the recorder.
+  ///
+  /// **Never withdraws the microphone.** That is the difference between this
+  /// and [_withdrawVoice], and it is the whole promise of this feature: a room
+  /// that failed costs a patient the live transcript and nothing else, because
+  /// the control it was behind still records, still uploads and still answers.
+  void _endLiveVoice({String? notice}) {
+    rxLive.value = VoiceSessionState.idle;
+    rxLiveHeard.value = null;
+    rxMic.value = MicState.idle;
+    unawaited(_heard?.cancel());
+    _heard = null;
+    unawaited(_liveState?.cancel());
+    _liveState = null;
+    unawaited(_voice?.leave());
+
+    // A toast rather than the banner `_withdrawVoice` raises, and deliberately
+    // — §3.3 forbids reporting a *load failure* only through a toast because
+    // it takes the retry with it. There is nothing to retry here: the
+    // microphone is still on screen, still works, and is the retry.
+    if (notice != null) showBentoToast(notice, tone: ToastTone.info);
   }
 
   Future<void> _startRecording() async {
@@ -589,7 +1327,7 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     try {
       final transcript = await _repository.transcribe(
         recording,
-        language: rxSession.value?.language ?? entry.language.code,
+        language: _inputLanguageCode,
       );
       if (transcript.isEmpty) {
         showBentoToast(PatientText.didNotHearAnything, tone: ToastTone.info);
@@ -610,13 +1348,25 @@ class CaseTakingController extends GetxController with LoadStateMixin {
   /// Throws the draft away and listens again.
   Future<void> recordAgain() async {
     rxDraft.value = null;
+    // An open room does not need starting again; it needs the microphone back.
+    // Starting a recorder here would run one alongside the room and post the
+    // same sentence twice.
+    if (_isTalkingLive) {
+      _talkLive(true);
+      return;
+    }
     await _startRecording();
   }
 
   /// The way out for somebody the microphone is never going to hear.
   void typeInstead() {
     rxDraft.value = null;
+    rxLiveHeard.value = null;
     rxMic.value = MicState.idle;
+    // Somebody who has given up on speaking should not still be published into
+    // a room while they type. The room stays open — the next question may go
+    // better — but it stops listening.
+    if (_isTalkingLive) _liveMic(false);
     typedFocus.requestFocus();
   }
 
@@ -632,6 +1382,56 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     unawaited(_level?.cancel());
     _level = null;
     unawaited(_recorder?.cancel());
+    // The microphone is gone, so the room has nothing left to carry. Closed
+    // without a notice: this path has already put a sentence on screen, and a
+    // toast about a live conversation on top of "the microphone is turned off
+    // for MediHive" is the app explaining itself twice.
+    if (_voice != null) _endLiveVoice();
+  }
+
+  /// Set when the microphone was put away because of the language rather than
+  /// because of a fault, so [_applyLanguageVoiceRule] can take that decision
+  /// back and a refused permission's cannot.
+  bool _voiceWithdrawnByLanguage = false;
+
+  /// Takes the microphone away where the language the patient speaks cannot be
+  /// transcribed.
+  ///
+  /// Still the right gate after the questions moved to English: what the
+  /// picker chooses is now *only* the language answers are given in, so it
+  /// governs exactly one control, and this is it.
+  ///
+  /// `faster-whisper` publishes no Odia checkpoint. A microphone offered there
+  /// records an answer that comes back empty, and an empty transcript reads
+  /// downstream as *the patient said nothing* — which is a clinical statement
+  /// nobody made, and the same failure `_finishRecording` refuses a thumb-brush
+  /// recording over. So the control is absent rather than present-and-broken,
+  /// which is `.agents/RULES.md` §0.1's rule pointed at a patient.
+  ///
+  /// It goes through [_withdrawVoice] rather than around it because everything
+  /// that has to be true afterwards — no half-recorded draft, no live level
+  /// subscription, no buffer sitting in a recorder on a shared tablet — is
+  /// already written there, and a second path that set only `rxVoiceAvailable`
+  /// would be the one that forgot.
+  ///
+  /// Reversible, unlike every other caller, and that is the reason for the
+  /// flag. The entry screen's answer is what is in force until the session
+  /// lands, and a patient who chose Odia on a phone that then resumed an
+  /// English interview must get their microphone back. A refused permission is
+  /// not reversible and is not touched here.
+  void _applyLanguageVoiceRule() {
+    if (!spokenLanguage.canSpeak) {
+      _voiceWithdrawnByLanguage = true;
+      _withdrawVoice(
+        PatientText.cannotAnswerOutLoudIn(spokenLanguage.nativeName),
+      );
+      return;
+    }
+
+    if (!_voiceWithdrawnByLanguage) return;
+    _voiceWithdrawnByLanguage = false;
+    rxVoiceAvailable.value = true;
+    rxVoiceNotice.value = null;
   }
 
   // ── Leaving ───────────────────────────────────────────────────────────────
@@ -642,6 +1442,86 @@ class CaseTakingController extends GetxController with LoadStateMixin {
   /// the server and `POST /sessions` hands the same one back. That is §37's
   /// resume, and it is why there is no "are you sure" here — nothing is lost.
   void leave() => PatientPortalNavigation.backToDashboard();
+
+  /// True while [startNewConversation] is in flight, so the button it drives
+  /// cannot be pressed twice.
+  ///
+  /// Its own flag rather than `LoadStateMixin`'s: the busy state belongs to one
+  /// button on the finished card, and putting the whole screen into loading
+  /// would replace the card — and the explanation on it — with a spinner, for
+  /// an action whose first step is irreversible.
+  final RxBool rxStartingNew = false.obs;
+
+  /// Sends this case to the hospital and opens a fresh interview.
+  ///
+  /// ── Why sending is part of it
+  ///
+  /// A patient who has answered everything and wants to raise something new has
+  /// nowhere to go: `POST /sessions` is start-*or-resume* and there is one open
+  /// session per patient, so it hands back the interview they have just
+  /// finished — `resumed: true`, `interviewStatus: complete`, no question on
+  /// screen. Reopening the app lands on the same dead end for ever.
+  ///
+  /// The server offers exactly one way out of it. `POST /sessions/:id/submit`
+  /// moves the session to `submitted`, and that is the only transition that
+  /// ends an interview — there is no abandon route, and nothing client-side can
+  /// stand in for one. So "start a new conversation" *is* "send this one", and
+  /// the button says so rather than discovering it afterwards. Silently filing a
+  /// clinical document to the hospital under a label about starting fresh is the
+  /// one thing this must not do.
+  ///
+  /// ── The half-done case
+  ///
+  /// The submit can succeed and the start can fail — a dropped connection
+  /// between two requests. That leaves the case correctly sent and no interview
+  /// open, which is a recoverable state and not a lost one: the next
+  /// `POST /sessions` finds nothing in progress and makes the new session. The
+  /// message says the case went, because it did, and [reload] is the retry.
+  Future<void> startNewConversation() async {
+    if (rxStartingNew.value) return;
+    final session = rxSession.value;
+    if (session == null) return;
+
+    rxStartingNew.value = true;
+    try {
+      await _repository.submitCase(session.id);
+    } catch (error, stack) {
+      AppLog.error('CaseTakingController', 'the case did not send', error, stack);
+      rxStartingNew.value = false;
+      showBentoToast(
+        parseErrorMessage(error, PatientText.couldNotSendCase),
+        tone: ToastTone.failure,
+      );
+      return;
+    }
+
+    // Sent. Everything from here is about the *next* interview, and a failure
+    // in it must not read as a failure to send.
+    await _cache.clear();
+    rxTurns.clear();
+    rxRedFlagRaised.value = false;
+    rxRedFlagQuote.value = null;
+    rxTurnError.value = null;
+    rxSettleStalled.value = false;
+
+    try {
+      final started = await _repository.startOrResume(
+        CaseSessionStartDraft(language: entry.language.code),
+      );
+      await _adopt(started);
+      showBentoToast(PatientText.caseSentNewStarted, tone: ToastTone.success);
+    } catch (error, stack) {
+      AppLog.error(
+        'CaseTakingController',
+        'the case was sent but the new interview did not open',
+        error,
+        stack,
+      );
+      showBentoToast(PatientText.caseSentNotReopened, tone: ToastTone.info);
+    } finally {
+      rxStartingNew.value = false;
+    }
+  }
 
   // ── Internals ─────────────────────────────────────────────────────────────
 
@@ -658,7 +1538,7 @@ class CaseTakingController extends GetxController with LoadStateMixin {
         CaseInterviewSnapshot(
           sessionId: _sessionId,
           savedAt: DateTime.now(),
-          language: rxSession.value?.language ?? entry.language.code,
+          language: _languageCode,
           progress: rxProgress.value,
           question: rxQuestion.value,
           turns: rxTurns.toList(),

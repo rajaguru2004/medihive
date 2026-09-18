@@ -1998,4 +1998,46 @@ void main() {
       );
     });
   });
+
+  group('CaseVoiceTokenDraft', () {
+    // VoiceTokenDto — being written alongside this, so the set below is the
+    // documented shape rather than one a running server has accepted. Pinned
+    // anyway: when the route lands, a field that was spelled differently fails
+    // here rather than as a live conversation that silently never appears.
+    const create = {'sessionId', 'inputLanguage', 'outputLanguage'};
+
+    test('names the interview and both languages', () {
+      const draft = CaseVoiceTokenDraft(
+        sessionId: 'sess_1',
+        inputLanguage: 'ta',
+        outputLanguage: 'en',
+      );
+      expectBody(draft.toCreateJson(), allowed: create, expected: create);
+    });
+
+    test('asks for a room and never for a credential', () {
+      const draft = CaseVoiceTokenDraft(
+        sessionId: 'sess_1',
+        inputLanguage: 'ta',
+        outputLanguage: 'en',
+      );
+      final body = draft.toCreateJson();
+
+      // The request cannot carry one and the response is not read for one. A
+      // key or a secret inside an APK belongs to everybody holding the APK,
+      // and a hospital cannot rotate what is already on a thousand phones.
+      for (final forbidden in const [
+        'apiKey',
+        'apiSecret',
+        'secret',
+        'token',
+      ]) {
+        expect(
+          body.containsKey(forbidden),
+          isFalse,
+          reason: 'the app asks for a room, it does not mint one',
+        );
+      }
+    });
+  });
 }

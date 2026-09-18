@@ -48,6 +48,20 @@ abstract final class CaseTakingKeys {
   /// rather than the milliseconds the happy path measures.
   static const Key sending = Key('case_taking_sending');
 
+  /// Where the panel gives up on a settling interview and offers the way out.
+  ///
+  /// Keyed for the same reason as [sending]: it is the only thing on the answer
+  /// panel when it shows, and what it replaces — a sentence saying an answer is
+  /// being written down — is a sentence that is no longer true by then.
+  static const Key settleStalled = Key('case_taking_settle_stalled');
+
+  /// The way out of a finished interview: send it, and start another.
+  ///
+  /// Keyed because it is the only control that ends a session, and because what
+  /// it does is irreversible — a test that means to press "Done for now" and
+  /// finds this instead has sent a clinical document to the hospital.
+  static const Key finishedStartNew = Key('case_taking_finished_start_new');
+
   // ── Answering by touch ────────────────────────────────────────────────────
 
   /// One tile, by the token it sends.
@@ -70,8 +84,33 @@ abstract final class CaseTakingKeys {
 
   static const Key mic = Key('case_taking_mic');
 
+  /// The switch that stops the questions being read out loud.
+  ///
+  /// Keyed because the thing worth asserting is that it is *reachable* — a
+  /// patient who realises the waiting room can hear their interview needs to
+  /// find it without reading, and a flow test is the only tier that would
+  /// notice it slipping behind a scroll.
+  static const Key readAloud = Key('case_taking_read_aloud');
+
   /// The bars that move with the patient's voice.
   static const Key listening = Key('case_taking_listening');
+
+  /// The words arriving while the patient is still speaking.
+  ///
+  /// Keyed separately from [draft], and the separation is the assertion. A
+  /// live fragment is **not an answer** — the recogniser revises it several
+  /// times a sentence and nothing under this key may ever be filed — while
+  /// everything under [draft] is one tap away from a patient's chart. One key
+  /// covering both would let a flow prove the wrong one of those two.
+  static const Key liveTranscript = Key('case_taking_live_transcript');
+
+  /// Where the microphone says it is dialling a room.
+  ///
+  /// Keyed because its job is to be *present*: between the tap and the room
+  /// answering, this is the only thing on the panel that says the tap landed,
+  /// and the path a flow needs to prove is that a room which never answers
+  /// gives the microphone back rather than leaving this on screen.
+  static const Key liveConnecting = Key('case_taking_live_connecting');
 
   /// What the app thinks it heard, before it is filed.
   static const Key draft = Key('case_taking_transcript_draft');
