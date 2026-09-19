@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:medihive/app/core/i18n/patient_text.dart';
+import 'package:medihive/app/core/i18n/patient_text_translations.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// MediHive — the language seam
@@ -76,27 +77,44 @@ void main() {
   });
 
   group('the language picker says what the choice actually does', () {
-    // The patient picks the language they will **speak**; everything they read
-    // and hear is English. This sentence is the whole honesty of that, and it
-    // is the first thing on the first screen of the interview.
+    // This sentence is the first thing on the first screen of the interview,
+    // and it has now said three different things, each true of the build it
+    // shipped in:
+    //
+    //   1. "The questions will be asked in the language you pick." True of a
+    //      build that phrased every question in the patient's own language.
+    //   2. "The questions will be in English." True of the build that replaced
+    //      it, where ten of eleven languages had no phrasebook and the honest
+    //      promise was the narrow one.
+    //   3. What it says now. The interview is conducted in the patient's own
+    //      language again — but this time the picker only offers the languages
+    //      that is actually true of, which is what makes the promise keepable.
+    //
+    // A screen that lies in its first sentence has spent the trust the rest of
+    // the interview runs on, so what these tests really pin is that the line
+    // and the build agree.
 
     test('it names speaking as the thing being chosen', () {
       final detail = PatientText.chooseYourLanguageDetail.toLowerCase();
       expect(detail, contains('speak'));
-      expect(detail, contains('english'));
     });
 
-    test('it does not promise the questions in the chosen language', () {
-      // The line this replaced — "The questions will be asked in the language
-      // you pick." It was true of a build where the server phrased every
-      // question in the patient's own language. A patient told that and then
-      // shown an English question has been lied to by the app rather than let
-      // down by it, and a screen that lies in its first sentence has spent the
-      // trust the rest of the interview runs on.
-      expect(
-        PatientText.chooseYourLanguageDetail,
-        isNot(contains('in the language you pick')),
-      );
+    test('it promises the questions in the same language', () {
+      final detail = PatientText.chooseYourLanguageDetail.toLowerCase();
+      expect(detail, contains('same language'));
+      // And no longer promises English, which is what it said while ten of the
+      // eleven Indian languages had no questions written in them.
+      expect(detail, isNot(contains('english')));
+    });
+
+    test('every offered language can keep that promise', () {
+      // The promise is only keepable because the picker is narrow. Each of
+      // these has a full phrasebook on the server, answer phrase lists that
+      // read it without a model, and a voice on disk — and this app has its own
+      // copy in it, which is what this assertion actually checks.
+      for (final code in const ['en', 'ta', 'hi']) {
+        expect(PatientTextTranslations.has(code), isTrue, reason: code);
+      }
     });
 
     test('the missing-microphone notice offers no reading in that language',

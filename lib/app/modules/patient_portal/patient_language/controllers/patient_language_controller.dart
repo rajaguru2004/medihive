@@ -3,10 +3,10 @@ import 'dart:async';
 import 'package:get/get.dart';
 
 import '../../../../core/app_log.dart';
+import '../../../../core/i18n/patient_text_translations.dart';
 import '../../../../data/repositories/case_taking_repository.dart';
 import '../../patient_entry.dart';
 import '../../patient_portal_navigation.dart';
-
 /// The first question of the interview, asked before the interview starts.
 ///
 /// It is here rather than inside the conversation because the answer decides
@@ -59,7 +59,21 @@ class PatientLanguageController extends GetxController {
     unawaited(_loadOfferedLanguages());
   }
 
-  void choose(PatientLanguageOffer offer) => selected.value = offer.language;
+  /// Tap a row and the screen changes language under your finger.
+  ///
+  /// The tile is the only sentence on this screen a patient who does not read
+  /// English can act on — it carries the language's name in its own script, and
+  /// that is deliberate. Everything around it stays English until they have
+  /// chosen, because until they have chosen there is nothing to choose it in.
+  ///
+  /// So the heading, the detail line and the Continue button switch here, at
+  /// the tap, rather than one screen later when the session is created. It is
+  /// also the first proof the patient gets that the app really does speak their
+  /// language, which is worth more on this screen than on any other.
+  void choose(PatientLanguageOffer offer) {
+    selected.value = offer.language;
+    PatientTextTranslations.use(offer.language.code);
+  }
 
   void continueToConsent() => PatientPortalNavigation.toConsent(
         entry.copyWith(language: selected.value),

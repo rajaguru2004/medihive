@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 
 import '../../../core/app_log.dart';
 import '../../../core/i18n/patient_text.dart';
+import '../../../core/i18n/patient_text_translations.dart';
 import '../../../data/models/case_session.dart';
 import '../../../data/models/drafts/case_taking_drafts.dart';
 import '../../../data/repositories/case_taking_repository.dart';
@@ -380,6 +381,20 @@ class CaseTakingController extends GetxController with LoadStateMixin {
   String get _outputLanguageCode =>
       rxSession.value?.outputLanguage ?? _languageCode;
 
+  /// Put the app's own copy into the language the interview is being held in.
+  ///
+  /// Idempotent and cheap — it installs a closure over a `const` map — so it is
+  /// safe to call on every session read rather than tracked as state. That
+  /// matters because a resumed session can change language: the patient picks
+  /// Tamil on the entry screen, the server moves `outputLanguage` with it, and
+  /// the screen has to follow without anybody remembering to tell it.
+  ///
+  /// A language this build has no table for installs nothing, and every line
+  /// stays on the English it was written in.
+  void _useLanguage(String? outputLanguage) {
+    PatientTextTranslations.use(outputLanguage);
+  }
+
   /// What the patient speaks, as this build knows it — the capability question
   /// behind the microphone. A tag with no row here lands on English.
   PatientLanguage get spokenLanguage =>
@@ -480,6 +495,12 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     }
 
     rxSession.value = current;
+    // Before anything is drawn. The session is the authority on what language
+    // this interview is being conducted in — `outputLanguage`, decided by the
+    // server and not by the phone — and every patient-facing line in this app
+    // reads through one lookup, so installing it here translates the whole
+    // surface at once. See `patient_text_translations.dart`.
+    _useLanguage(current.outputLanguage);
     rxProgress.value = current.progress;
     rxStatus.value = current.interviewStatus;
     rxQuestion.value = current.currentQuestion;
@@ -850,6 +871,7 @@ class CaseTakingController extends GetxController with LoadStateMixin {
       try {
         final fresh = await _repository.session(session.id);
         rxSession.value = fresh;
+        _useLanguage(fresh.outputLanguage);
         rxProgress.value = fresh.progress;
         rxStatus.value = fresh.interviewStatus;
         rxQuestion.value = fresh.currentQuestion;
@@ -1320,6 +1342,7 @@ class CaseTakingController extends GetxController with LoadStateMixin {
       try {
         final session = await _repository.session(_sessionId);
         rxSession.value = session;
+        _useLanguage(session.outputLanguage);
         rxProgress.value = session.progress;
         rxStatus.value = session.interviewStatus;
         rxQuestion.value = session.currentQuestion;

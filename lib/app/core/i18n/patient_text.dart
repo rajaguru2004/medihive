@@ -131,10 +131,17 @@ abstract final class PatientText {
   /// It still promises nothing about changing the choice later: the language is
   /// recorded on the case session when it is created, and this screen is not
   /// the thing that can move it.
+  ///
+  /// The sentence used to end "the questions will be in English", and that was
+  /// the honest thing to say while it was true. It is not any more: the server
+  /// conducts the interview in the patient's own language wherever the whole
+  /// experience exists in it, and the picker only offers those languages. See
+  /// `interviewLanguageFor` on the server and `INTERVIEW_LANGUAGE_CODES` beside
+  /// it.
   static String get chooseYourLanguageDetail => _of(
         'language.detail',
-        'Pick the language you will speak. The questions will be in English, '
-            'on screen and read aloud.',
+        'Pick the language you will speak. The questions will be in the same '
+            'language, on screen and read aloud.',
       );
 
   static String get languageContinue => _of('language.continue', 'Continue');
