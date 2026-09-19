@@ -226,6 +226,30 @@ class VoiceTranscript {
   bool get isEmpty => text.trim().isEmpty;
 }
 
+/// Something the interview said back that was not a question.
+///
+/// The room's agent publishes one of these when the patient interrupted rather
+/// than answered — "why do you ask?", "is it serious?", "hold on a second" —
+/// and the engine answered them before asking the same question again.
+///
+/// [intent] is the name of a closed set the server and the app both hold, and
+/// it is the field the screen draws from: `PatientText` has the app's own
+/// sentence for each one. [reply] is the server's wording, which is what the
+/// room actually said out loud. The screen prefers its own and falls back to
+/// this only if a build ever meets an intent it does not know — a server that
+/// has been updated and an app that has not.
+class VoiceAside {
+  const VoiceAside({required this.intent, required this.reply});
+
+  final String intent;
+
+  /// What the room said. Never rendered in preference to the app's own copy —
+  /// see the note on `_Notices` about server free text on this surface.
+  final String reply;
+
+  bool get isEmpty => intent.trim().isEmpty && reply.trim().isEmpty;
+}
+
 /// A live voice conversation.
 ///
 /// Every method is safe to call in any order and none of them throws for
@@ -310,6 +334,18 @@ abstract interface class VoiceSession {
   /// record-then-upload microphone.
   Stream<VoiceSessionState> get state;
 
+  /// What the interview said back to an interruption.
+  ///
+  /// Separate from [transcripts] on purpose, and for the same reason
+  /// [VoiceSpeaker] exists: these are two different kinds of thing. A
+  /// transcript is a measurement of what was said in the room and may be
+  /// revised; this is a structured statement from the engine about what it just
+  /// did, and it arrives once. Merging them would put a flag on the transcript
+  /// stream that somebody eventually forgets to read.
+  ///
+  /// Broadcast, and it outlives a [leave], on the same terms as the others.
+  Stream<VoiceAside> get asides;
+
   /// Releases everything this object holds. Idempotent, and terminal.
   ///
   /// The distinction from [leave] is the one `audio_source.dart` draws between
@@ -353,6 +389,9 @@ class StubVoiceSession implements VoiceSession {
   @override
   Stream<VoiceSessionState> get state =>
       const Stream<VoiceSessionState>.empty();
+
+  @override
+  Stream<VoiceAside> get asides => const Stream<VoiceAside>.empty();
 
   @override
   Future<void> join(

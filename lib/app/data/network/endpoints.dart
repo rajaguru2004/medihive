@@ -62,7 +62,7 @@ abstract class Endpoints {
   /// ```
   static const String baseUrl = String.fromEnvironment(
     'MEDIHIVE_API',
-    defaultValue: 'http://192.168.163.97:3000/',
+    defaultValue: 'http://192.168.0.108:3000/',
   );
 
   /// Where uploaded files live. The API returns storage-relative paths, which
@@ -78,17 +78,22 @@ abstract class Endpoints {
   /// all the free plan gives.
   static const String fileBaseUrl = String.fromEnvironment(
     'MEDIHIVE_FILES',
-    defaultValue: 'http://192.168.163.97:3000/',
+    defaultValue: 'http://192.168.0.108:3000/',
   );
 
   /// Whether this build is pointed somewhere only a developer can reach.
   ///
-  /// The default above is the Android emulator's loopback to the host machine,
-  /// which is right for `flutter run` and wrong for anything shipped: a
-  /// release build with no `--dart-define` reaches a host that does not exist,
-  /// over cleartext that both platforms refuse, and shows a network error on
-  /// its first screen with nothing explaining why. `main()` checks this and
-  /// says so out loud in debug.
+  /// The default above is a development machine's LAN address, which is right
+  /// for `flutter run` and wrong for anything shipped: a release build with no
+  /// `--dart-define` reaches a host that exists on one Wi-Fi network and
+  /// nowhere else, over cleartext that both platforms refuse, and shows a
+  /// network error on its first screen with nothing explaining why. `main()`
+  /// checks this and says so out loud in debug.
+  ///
+  /// Note this does not catch a *stale* LAN address — a DHCP lease that moved.
+  /// That one looks identical from inside the app (every request times out) and
+  /// is what `npm run dev`'s startup banner is for: it prints the machine's
+  /// current address and compares it against this constant.
   static bool get isLoopback =>
       baseUrl.contains('10.0.2.2') ||
       baseUrl.contains('localhost') ||

@@ -227,6 +227,122 @@ abstract final class PatientText {
             'one question at a time, or type your answer.',
       );
 
+  // ── When the patient interrupts ───────────────────────────────────────────
+  //
+  // The interview asks about ten questions and a patient answers them in a
+  // waiting room, out loud, to a machine. They interrupt: "why do you ask?",
+  // "how much longer?", "is it serious?" The server recognises a closed set of
+  // those, answers from its own phrasebook, and asks the question again — and
+  // it sends the **name** of what it recognised alongside its wording.
+  //
+  // These are the app's sentences for those names, and they are what gets
+  // drawn. The server's wording is what gets *said*, by the room's voice, and
+  // the two are written to agree. The split is not duplication for its own
+  // sake: `_Notices` and `CaseTakingController._followAgent` both record the
+  // rule that server free text is never rendered on this surface, because that
+  // is the hole through which a sentence telling a patient what is wrong with
+  // them would arrive. An intent name cannot carry one.
+  //
+  // A build that meets an intent it does not know falls back to the server's
+  // wording rather than to silence — see `asideReply`. That is the one case
+  // where the rule bends, and it bends towards a patient who asked something
+  // and would otherwise be ignored.
+
+  static String get asideRepeat => _of('aside.repeat', 'Of course.');
+
+  static String get asideNotUnderstood =>
+      _of('aside.not_understood', 'No problem. Let me ask it again.');
+
+  static String get asideWhyAsk => _of(
+        'aside.why_ask',
+        'It helps the doctor see the whole picture before they see you. You '
+            'can skip anything you would rather not answer.',
+      );
+
+  static String get asideHowLong => _of(
+        'aside.how_long',
+        'Not much longer. There are a few questions left, and you can stop at '
+            'any point.',
+      );
+
+  /// The one reply that is load-bearing.
+  ///
+  /// It must decline — this screen never tells a patient what is wrong with
+  /// them — without leaving somebody frightened enough to interrupt with
+  /// nothing at all. So it says who can answer, and what to do if waiting
+  /// stops being safe, which is the same routing instruction `RedFlagNotice`
+  /// gives in the same words.
+  static String get asideIsItSerious => _of(
+        'aside.is_it_serious',
+        'I cannot tell you that. I am only writing down what you say, and the '
+            'doctor will go through it with you. If you feel worse while you '
+            'are waiting, tell the front desk straight away.',
+      );
+
+  static String get asideWantHuman => _of(
+        'aside.want_human',
+        'Of course. Tell the front desk and someone will come to you. We can '
+            'carry on here in the meantime.',
+      );
+
+  static String get asideWhoAreYou => _of(
+        'aside.who_are_you',
+        'I am not a person. I take down your answers so the doctor has them '
+            'before they see you.',
+      );
+
+  static String get asideGreeting => _of('aside.greeting', 'Hello.');
+
+  static String get asideThanks => _of('aside.thanks', 'You are welcome.');
+
+  static String get asideWait => _of('aside.wait', 'Take your time.');
+
+  static String get asideUnrelated => _of(
+        'aside.unrelated',
+        'I hear you. I can only take down your answers for the doctor, and the '
+            'front desk can help with anything else.',
+      );
+
+  /// The app's sentence for an intent, or [fallback] for one it does not know.
+  ///
+  /// The fallback exists because the server can ship a new intent before the
+  /// app does, and the two are deployed separately. When that happens the
+  /// patient hears the reply and now also reads it — the server's wording, on a
+  /// surface that otherwise renders none. It is allowed here, and only here,
+  /// because the alternative is a patient who asked a question and gets a
+  /// repeated question with nothing in between.
+  ///
+  /// Returns null when there is neither, which the caller draws as nothing at
+  /// all rather than as an empty bubble.
+  static String? asideReply(String intent, {String fallback = ''}) {
+    switch (intent) {
+      case 'repeat':
+        return asideRepeat;
+      case 'not_understood':
+        return asideNotUnderstood;
+      case 'why_ask':
+        return asideWhyAsk;
+      case 'how_long':
+        return asideHowLong;
+      case 'is_it_serious':
+        return asideIsItSerious;
+      case 'want_human':
+        return asideWantHuman;
+      case 'who_are_you':
+        return asideWhoAreYou;
+      case 'greeting':
+        return asideGreeting;
+      case 'thanks':
+        return asideThanks;
+      case 'wait':
+        return asideWait;
+      case 'unrelated':
+        return asideUnrelated;
+    }
+    final spare = fallback.trim();
+    return spare.isEmpty ? null : spare;
+  }
+
   /// Above the text the app thinks it heard, before the patient confirms it.
   static String get youSaid => _of('draft.heading', 'You said');
   static String get thatIsRight => _of('draft.accept', "That's right");

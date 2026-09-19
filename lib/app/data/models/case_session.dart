@@ -702,6 +702,36 @@ class CaseExtraction {
       );
 }
 
+/// What the interview said back to an interruption.
+///
+/// Set on a turn where the patient asked something instead of answering. The
+/// server has already replied and re-asked, so [CaseTurnResult.nextQuestion]
+/// on such a turn is the question that was on the table, not a new one.
+///
+/// [intent] is the member of a closed set the server holds — `repeat`,
+/// `why_ask`, `is_it_serious` and the rest — and it is what the screen draws
+/// from, through `PatientText.asideReply`. [reply] is the server's own wording
+/// and is what the room said out loud; it is on this object so a voice client
+/// can speak it, and is the last resort for a screen that meets an intent this
+/// build does not know.
+class CaseAside {
+  const CaseAside({this.intent = '', this.reply = ''});
+
+  final String intent;
+  final String reply;
+
+  bool get isEmpty => intent.isEmpty && reply.isEmpty;
+
+  static CaseAside? maybeFrom(Object? raw) {
+    if (raw is! Map) return null;
+    final aside = CaseAside(
+      intent: asString(raw['intent']),
+      reply: asString(raw['reply']),
+    );
+    return aside.isEmpty ? null : aside;
+  }
+}
+
 /// `POST /sessions/:id/turns` — an answer in, the next question out.
 class CaseTurnResult {
   const CaseTurnResult({
@@ -714,6 +744,7 @@ class CaseTurnResult {
     this.progress = CaseProgress.empty,
     this.redFlags = const [],
     this.patientMessage,
+    this.aside,
     this.serverTimeMs = 0,
   });
 
@@ -734,6 +765,10 @@ class CaseTurnResult {
 
   final String? patientMessage;
 
+  /// Null on an ordinary turn. Set when the patient interrupted rather than
+  /// answered — and then [nextQuestion] is the same question again.
+  final CaseAside? aside;
+
   /// What the handler cost on the server. Reported because the whole design is
   /// built around it staying small; read in debug logging, never on screen.
   final int serverTimeMs;
@@ -749,6 +784,7 @@ class CaseTurnResult {
         progress: CaseProgress.fromJson(asMap(json['progress'])),
         redFlags: asModelList(json['redFlags'], CaseRedFlag.fromJson),
         patientMessage: asStringOrNull(json['patientMessage']),
+        aside: CaseAside.maybeFrom(json['aside']),
         serverTimeMs: asInt(json['serverTimeMs']),
       );
 }

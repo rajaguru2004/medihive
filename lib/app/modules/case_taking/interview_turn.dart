@@ -66,6 +66,18 @@ class InterviewTurn {
         fieldPath: fieldPath,
       );
 
+  /// Something the interview said that was not a question.
+  ///
+  /// Today there is exactly one kind: the answer to an interruption — the
+  /// patient asked "why do you ask?" and was told. It is an assistant turn like
+  /// a question, because that is who said it, and it carries no `fieldPath`
+  /// because it belongs to no question. The question it interrupted is asked
+  /// again straight after and arrives as its own turn.
+  factory InterviewTurn.said(String text) => InterviewTurn(
+        speaker: ConversationSpeaker.assistant,
+        text: text,
+      );
+
   /// What the patient answered.
   factory InterviewTurn.answered(
     String text, {

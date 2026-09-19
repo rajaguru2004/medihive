@@ -254,6 +254,7 @@ class CaseTakingController extends GetxController with LoadStateMixin {
 
   StreamSubscription<VoiceTranscript>? _heard;
   StreamSubscription<VoiceSessionState>? _liveState;
+  StreamSubscription<VoiceAside>? _asides;
 
   // ── Asking out loud ───────────────────────────────────────────────────────
 
@@ -411,6 +412,7 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     unawaited(_level?.cancel());
     unawaited(_heard?.cancel());
     unawaited(_liveState?.cancel());
+    unawaited(_asides?.cancel());
     // A room left open after the patient has walked away is a live microphone
     // on a shared ward tablet, which is the same disclosure `_player?.stop()`
     // below is here to prevent and a worse one. `dispose` rather than `leave`:
@@ -738,6 +740,19 @@ class CaseTakingController extends GetxController with LoadStateMixin {
   void _apply(CaseTurnResult result, {required String quoting}) {
     rxProgress.value = result.progress;
     rxStatus.value = result.interviewStatus;
+
+    // Before the question is pinned, and that ordering is load-bearing. On an
+    // interruption `nextQuestion` is the question that was already on the table
+    // — the server answered the patient and asked it again — so the reply has
+    // to go into the conversation while the pinned slot is still empty.
+    // Afterwards, `_appendAside` would see a pinned question, take it for one
+    // the patient had been asked and answered, and move a second copy of it
+    // into the transcript.
+    final aside = result.aside;
+    if (aside != null) {
+      _appendAside(aside.intent, fallback: aside.reply);
+    }
+
     rxQuestion.value = result.nextQuestion;
     _readAloud(result.nextQuestion);
 
@@ -1054,6 +1069,7 @@ class CaseTakingController extends GetxController with LoadStateMixin {
       // subscription taken out afterwards would miss both.
       _heard = room.transcripts.listen(_onHeard);
       _liveState = room.state.listen(_onLiveState);
+      _asides = room.asides.listen(_onAside);
 
       await room.join(
         grant,
@@ -1207,6 +1223,54 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     rxMic.value = MicState.idle;
   }
 
+  /// The room answered an interruption. Put it on screen.
+  ///
+  /// The patient asked something instead of answering — "why do you ask?", "is
+  /// it serious?" — the engine answered from its phrasebook and asked the same
+  /// question again. The room has already said the reply out loud; this is the
+  /// half a patient who cannot hear it would otherwise lose entirely.
+  ///
+  /// ── Why this is drawn when nothing else the agent says is
+  ///
+  /// `_followAgent` refuses to print agent utterances, for two reasons it
+  /// states there: the agent speaks `patientMessage` too, which is already on
+  /// screen in a red banner, and rendering server free text on this surface
+  /// reopens the hole `_Notices` closes — the rule that this screen never tells
+  /// a patient what is wrong with them.
+  ///
+  /// Neither applies here. What is drawn is **this app's own sentence**, chosen
+  /// by the intent name the server sent; the server's wording is used only if
+  /// this build does not know the intent, which happens when the server ships
+  /// one first. And an aside is the one thing with no other route to the
+  /// screen: the session is unchanged afterwards, so the refresh
+  /// `_followAgent` does would show a patient the same question with no sign
+  /// that anybody heard the question they asked.
+  void _onAside(VoiceAside aside) {
+    _appendAside(aside.intent, fallback: aside.reply);
+  }
+
+  /// Adds the bubble, shared by the live path and the tap path.
+  ///
+  /// Silent about an intent it does not know and was given no wording for —
+  /// nothing is worse than an empty bubble in the middle of a conversation.
+  void _appendAside(String intent, {required String fallback}) {
+    final text = PatientText.asideReply(intent, fallback: fallback);
+    if (text == null || text.isEmpty) return;
+
+    // The question moves into the conversation first, exactly as an answer
+    // does, so the reply lands under what it was a reply to rather than under
+    // the pinned slot. On the tap path `_submit` has already done this and
+    // `rxQuestion` is null, so this is the live path's share of it.
+    final asked = rxQuestion.value;
+    if (asked != null) {
+      rxTurns.add(InterviewTurn.asked(asked.spoken, fieldPath: asked.fieldPath));
+      rxQuestion.value = null;
+    }
+
+    rxTurns.add(InterviewTurn.said(text));
+    unawaited(_saveSnapshot());
+  }
+
   /// Serialises the session re-reads [_followAgent] triggers.
   ///
   /// The agent can speak twice in a row — a routing instruction before the
@@ -1352,6 +1416,8 @@ class CaseTakingController extends GetxController with LoadStateMixin {
     _heard = null;
     unawaited(_liveState?.cancel());
     _liveState = null;
+    unawaited(_asides?.cancel());
+    _asides = null;
     unawaited(_voice?.leave());
 
     // A toast rather than the banner `_withdrawVoice` raises, and deliberately

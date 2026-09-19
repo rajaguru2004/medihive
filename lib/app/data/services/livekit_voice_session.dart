@@ -34,6 +34,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:livekit_client/livekit_client.dart';
 
@@ -85,6 +86,10 @@ class LiveKitVoiceSession implements VoiceSession {
   final StreamController<VoiceSessionState> _state =
       StreamController<VoiceSessionState>.broadcast();
 
+  /// Same lifetime and same reasoning as [_transcripts].
+  final StreamController<VoiceAside> _asides =
+      StreamController<VoiceAside>.broadcast();
+
   Room? _room;
   EventsListener<RoomEvent>? _events;
 
@@ -106,6 +111,9 @@ class LiveKitVoiceSession implements VoiceSession {
 
   @override
   Stream<VoiceTranscript> get transcripts => _transcripts.stream;
+
+  @override
+  Stream<VoiceAside> get asides => _asides.stream;
 
   @override
   Stream<VoiceSessionState> get state => _state.stream;
@@ -227,6 +235,7 @@ class LiveKitVoiceSession implements VoiceSession {
     await _teardown();
     if (!_transcripts.isClosed) await _transcripts.close();
     if (!_state.isClosed) await _state.close();
+    if (!_asides.isClosed) await _asides.close();
   }
 
   @override
@@ -250,6 +259,7 @@ class LiveKitVoiceSession implements VoiceSession {
 
     events
       ..on<TranscriptionEvent>(_onTranscription)
+      ..on<DataReceivedEvent>(_onData)
       ..on<TrackSubscribedEvent>(_onTrackSubscribed)
       ..on<RoomDisconnectedEvent>((event) async {
         // The room went while the patient was using it. Not `_failed`: a
@@ -283,6 +293,53 @@ class LiveKitVoiceSession implements VoiceSession {
       );
     }
   }
+
+  /// The agent's structured messages, of which this reads exactly one kind.
+  ///
+  /// The worker publishes a `turn` on every turn, carrying the question, the
+  /// red flags and the routing message — and the app takes none of it. Those
+  /// all reach the screen through `GET /sessions/:id`, which is the session's
+  /// own account of itself rather than a second copy of it travelling over a
+  /// data channel that can be dropped. Reading them here would give this screen
+  /// two sources for the same state, and the first bug would be the two
+  /// disagreeing.
+  ///
+  /// `aside` is the exception because it is the one thing that exists nowhere
+  /// else: an interruption is answered and the interview carries on, and by the
+  /// time any GET lands the session looks exactly as it did before. Without
+  /// this the patient hears the reply and sees nothing, which on a screen built
+  /// for somebody who may not hear well is the same as it not happening.
+  ///
+  /// Nothing throws out of here. A malformed payload from a worker this build
+  /// does not know is dropped with a line in the log; it must not take down a
+  /// conversation that is otherwise working.
+  void _onData(DataReceivedEvent event) {
+    if (event.topic != _caseTakingTopic) return;
+    try {
+      final decoded = jsonDecode(utf8.decode(event.data));
+      if (decoded is! Map<String, dynamic>) return;
+      if (decoded['type'] != 'turn') return;
+
+      final aside = decoded['aside'];
+      if (aside is! Map<String, dynamic>) return;
+
+      final parsed = VoiceAside(
+        intent: (aside['intent'] ?? '').toString().trim(),
+        reply: (aside['reply'] ?? '').toString().trim(),
+      );
+      if (parsed.isEmpty || _asides.isClosed) return;
+      _asides.add(parsed);
+    } catch (error) {
+      AppLog.warn('LiveKitVoiceSession', 'unreadable room message: $error');
+    }
+  }
+
+  /// The worker's topic, spelled the same on both sides.
+  ///
+  /// `agent.py` publishes on this string; a mismatch is silent — the messages
+  /// arrive and are filtered out — which is why it is named here rather than
+  /// compared inline.
+  static const String _caseTakingTopic = 'medihive.case-taking';
 
   void _onTrackSubscribed(TrackSubscribedEvent event) {
     if (event.track is! AudioTrack) return;
