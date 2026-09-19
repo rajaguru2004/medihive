@@ -206,6 +206,26 @@ void installPatientDocumentsFixtures(FakeApi api, {bool withDocuments = false}) 
     });
   });
 
+  // The original itself, and unlike every other route here, not an envelope.
+  //
+  // `GET /api/patient-documents/:documentId/file` streams the stored object
+  // back through the API with the **row's** own `Content-Type` on it
+  // (`patient-documents.controller.ts` sets the header from
+  // `service.streamOriginal`), because the signed URL `/original` hands out
+  // names the bucket's host, which a phone cannot resolve and `Image.network`
+  // would reach without a bearer token anyway. So this is the route the app
+  // takes, and a fixture answering JSON here would be testing a contract the
+  // server does not have.
+  //
+  // These are the same bytes the gallery stub hands the uploader, so the page
+  // the patient is shown as evidence is the page the extraction was read out
+  // of. It matters that they decode: the controller refuses an empty body as a
+  // failure, and `Image.memory` on rubbish throws inside the render pass,
+  // where the exception surfaces as an unrelated test failure.
+  api.on('GET', '/api/patient-documents/:documentId/file', (_) {
+    return FakeResponse.binary(kPrescriptionPng, contentType: 'image/png');
+  });
+
   api.on('POST', '/api/patient-documents/:documentId/verify', (request) {
     final id = request.pathParams['documentId'] ?? '';
     final row = held[id];

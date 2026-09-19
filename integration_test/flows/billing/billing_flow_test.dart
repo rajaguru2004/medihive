@@ -366,7 +366,7 @@ void registerBillingFlows() {
       await billing.assertOnInvoiceDetail();
       billing.seeMarkSentAction();
       billing.seeCancelAction();
-      billing.seeNoPayments();
+      await billing.seeNoPayments();
 
       await billing.cancelInvoice('Raised against the wrong patient');
       billing.seeCancelledNotice();

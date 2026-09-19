@@ -35,6 +35,24 @@ class EditScreeningController extends GetxController {
 
   final sex = RxnString();
   final route = RxnString();
+
+  /// Where this screening was routed, when the picker cannot show it.
+  ///
+  /// The chips offer display labels - 'OPD', 'Pediatrics' - and the stored
+  /// value may be none of them: the backend seeds and the pre-triage API use
+  /// `adult_triage`, `mch_triage` and friends, and `add_to_queue` translates
+  /// its labels while this screen never did. An unmatched value left
+  /// `route.value` null, the form read "Decide later", and saving a corrected
+  /// temperature then sent `routedTo: null` - the update path transmits it
+  /// unconditionally, unlike create. The record kept `status: routed` with
+  /// nowhere to be routed, and the only trace of where a nurse had sent the
+  /// patient was gone.
+  ///
+  /// Held here so a value the screen could not render is handed back
+  /// unchanged instead of erased. Choosing a destination overrides it, and
+  /// choosing "Decide later" against a value the chips *could* show still
+  /// clears, because that is a decision rather than a gap.
+  String? _unrepresentedRoute;
   final isSubmitting = false.obs;
   final errorMessage = RxnString();
   final vitalsRevision = 0.obs;
@@ -112,9 +130,12 @@ class EditScreeningController extends GetxController {
     sex.value = sexes.firstWhereOrNull(
       (s) => s.toLowerCase() == (screening.gender ?? '').trim().toLowerCase(),
     );
+    final stored = (screening.route ?? '').trim();
     route.value = routes.firstWhereOrNull(
-      (r) => r.toLowerCase() == (screening.route ?? '').trim().toLowerCase(),
+      (r) => r.toLowerCase() == stored.toLowerCase(),
     );
+    _unrepresentedRoute =
+        route.value == null && stored.isNotEmpty ? stored : null;
   }
 
   void onVitalChanged(String _) => vitalsRevision.value++;
@@ -192,7 +213,7 @@ class EditScreeningController extends GetxController {
         pulse: pulse,
         bpSystolic: systolic,
         bpDiastolic: diastolic,
-        routedTo: route.value,
+        routedTo: route.value ?? _unrepresentedRoute,
       );
 
       if (!envelopeOk(response.data, statusCode: response.statusCode)) {

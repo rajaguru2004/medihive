@@ -376,8 +376,18 @@ final class BillingRobot extends Robot {
       .evaluate()
       .length;
 
-  void seeNoPayments() =>
-      expect(find.byKey(InvoiceDetailKeys.paymentsEmpty), findsOneWidget);
+  /// Scrolls first, because the payment history is the last sliver.
+  ///
+  /// `BentoScreen` is a `CustomScrollView`, and a sliver below the fold is not
+  /// built at all - so on a bill with nothing against it `find.byKey` returned
+  /// nothing and the assertion read as "the empty state is missing" when the
+  /// section had simply never been constructed. The actions this flow checks
+  /// on the same screen sit at the top and are built, which is why only this
+  /// one failed.
+  Future<void> seeNoPayments() async {
+    await tester.scrollToKey(InvoiceDetailKeys.paymentsEmpty);
+    expect(find.byKey(InvoiceDetailKeys.paymentsEmpty), findsOneWidget);
+  }
 
   void seeRecordPaymentAction() =>
       expect(find.byKey(InvoiceDetailKeys.recordPayment), findsOneWidget);

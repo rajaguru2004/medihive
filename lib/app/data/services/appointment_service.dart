@@ -28,7 +28,7 @@ class AppointmentService extends GetxService {
   }) {
     final payload = {
       'status': status,
-      if (additionalData != null) ...additionalData,
+      ...?additionalData,
     };
     return _dio.patch(
       Endpoints.appointments.update(id),
