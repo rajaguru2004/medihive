@@ -62,7 +62,7 @@ abstract class Endpoints {
   /// ```
   static const String baseUrl = String.fromEnvironment(
     'MEDIHIVE_API',
-    defaultValue: 'http://192.168.0.108:3000/',
+    defaultValue: 'http://10.169.136.129:3000/',
   );
 
   /// Where uploaded files live. The API returns storage-relative paths, which
@@ -78,7 +78,7 @@ abstract class Endpoints {
   /// all the free plan gives.
   static const String fileBaseUrl = String.fromEnvironment(
     'MEDIHIVE_FILES',
-    defaultValue: 'http://192.168.0.108:3000/',
+    defaultValue: 'http://10.169.136.129:3000/',
   );
 
   /// Whether this build is pointed somewhere only a developer can reach.

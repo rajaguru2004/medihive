@@ -7,8 +7,9 @@
   machine running `npm run dev`, which serves the API over plain http on 3000.
 
   There is no wildcard and no private-range entry, so a stray call to any other
-  http host still fails. That is deliberate: `192.168.0.0/16` would permit every
-  server on whatever Wi-Fi the handset happens to be joined to.
+  http host still fails. That is deliberate: a private-range entry such as
+  `10.0.0.0/8` would permit every server on whatever Wi-Fi the handset happens
+  to be joined to.
 
   This file governs release and profile builds. The debug source set has its own
   copy at `src/debug/res/xml/network_security_config.xml`, and Android resource
@@ -22,6 +23,6 @@
 <network-security-config>
     <base-config cleartextTrafficPermitted="false"/>
     <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">192.168.0.108</domain>
+        <domain includeSubdomains="false">10.169.136.129</domain>
     </domain-config>
 </network-security-config>
