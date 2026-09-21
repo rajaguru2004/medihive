@@ -14,6 +14,7 @@ import '../modules/appointments/appointment_routes.dart';
 import '../modules/appointments/bindings/appointments_binding.dart';
 import '../modules/appointments/views/appointments_view.dart';
 import '../modules/billing/billing_routes.dart';
+import '../modules/case_intake/case_intake_routes.dart';
 import '../modules/case_review/case_review_routes.dart';
 import '../modules/consultation_detail/bindings/consultation_detail_binding.dart';
 import '../modules/consultation_detail/views/consultation_detail_view.dart';
@@ -451,6 +452,11 @@ class AppPages {
     // The patient portal. A different audience on the same device, so its
     // screens are gated on the one verb only a patient holds rather than on a
     // role name — see `PatientShell`.
+    // The clinician's side of the intake — `/intakes/:submissionId`, outside
+    // the `/patient` tree on purpose: everything under that prefix is the
+    // portal, and this is somebody reading a case that is not their own.
+    ...CaseIntakePages.routes,
+
     ...PatientPortalPages.routes,
 
     // The two screens the portal grew into: the documents a patient hands

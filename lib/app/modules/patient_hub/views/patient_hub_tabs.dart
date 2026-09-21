@@ -194,6 +194,98 @@ class _Visits extends StatelessWidget {
   }
 }
 
+// ── Intake ──────────────────────────────────────────────────────────────────
+
+/// What the patient said before anybody saw them.
+///
+/// The row is a header and never the case: severity, how complete it was, and
+/// whether they answered in another language — the three things that decide
+/// whether this is the case to open first. Everything clinical is one tap
+/// away on `CaseIntakeView`, which is where there is room to print a line's
+/// presence beside it.
+class _Intakes extends StatelessWidget {
+  const _Intakes({required this.controller});
+
+  final PatientHubController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = controller.intakes.items;
+
+    return Column(
+      key: PatientHubKeys.body('intake'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Said once, above the list, rather than on every row: an intake is
+        // the patient's own account and a clinician reading it needs to know
+        // that nobody has checked it. Neutral, not amber — this is a property
+        // of the document, not a warning about this patient.
+        const NoticeBanner(
+          message: 'Written by the patient, in their own words. Nothing here '
+              'has been verified by a clinician.',
+          icon: Icons.record_voice_over_outlined,
+        ),
+        const SizedBox(height: BentoSpace.action),
+        BentoCard(
+          padding: const EdgeInsets.symmetric(vertical: BentoSpace.listCardPad),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < rows.length; i++) ...[
+                if (i > 0) const Hairline(indent: BentoSpace.listPad),
+                _IntakeRow(
+                  key: PatientHubKeys.row('intake', rows[i].id),
+                  intake: rows[i],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _IntakeRow extends StatelessWidget {
+  const _IntakeRow({super.key, required this.intake});
+
+  final IntakeSummary intake;
+
+  @override
+  Widget build(BuildContext context) {
+    return BentoRow(
+      icon: Icons.record_voice_over_outlined,
+      title: intake.submittedAt == null
+          ? 'Intake'
+          : 'Sent ${SettingsService.to.date(intake.submittedAt)} · '
+              '${SettingsService.to.time(intake.submittedAt)}',
+      subtitle: [
+        '${intake.percentComplete}% answered',
+        // §36 on a list row. A case with gaps in it is a case whose gaps are
+        // the part the clinician has to fill in person, and a row that said
+        // only "80%" leaves that to be discovered.
+        if (intake.hasGaps)
+          '${intake.missingCount} unanswered',
+        // Worth knowing before the consultation rather than during it: this
+        // patient may need an interpreter in the room.
+        // The language's name, the same way the intake itself says it. "TA"
+        // and "Tamil" on two screens is one fact spelled two ways, and the
+        // code is the spelling a reader cannot act on.
+        if (intake.wasInterpreted) 'answered in ${intake.inputLanguageName}',
+      ].join(' · '),
+      subtitleMaxLines: 2,
+      // A pill only when a rule actually fired. A green "none" pill on every
+      // intake that flagged nothing trains the eye to skip the column that is
+      // there to be noticed.
+      trailing: intake.hasRedFlags
+          ? StatusPill(status: intake.highestSeverity, compact: true)
+          : null,
+      onTap: () => CaseIntakeNavigation.toIntake(intake.id),
+    );
+  }
+}
+
 // ── Vitals ──────────────────────────────────────────────────────────────────
 
 class _Vitals extends StatelessWidget {

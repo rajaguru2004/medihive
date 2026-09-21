@@ -184,6 +184,19 @@ enum WorldRole {
             ..._all('PHARMACY'),
             ..._all('PRE_TRIAGE'),
             ..._all('QUEUE'),
+            // Read-only on both, and the seed says why: the intake is the
+            // patient's own account of why they came and the documents are
+            // what they brought. A clinician records their own findings in a
+            // consultation, so there is nothing here for them to edit — and
+            // an intake a clinician can rewrite stops being evidence of what
+            // the patient said.
+            //
+            // These two were missing from this table while the seed granted
+            // them, which is drift in the direction that hides a feature: the
+            // hub's Intake tab rendered the refusal screen for the one role
+            // it was written for.
+            'CASE_TAKING_READ',
+            'PATIENT_DOCUMENT_READ',
             'DASHBOARD_READ',
           ],
         WorldRole.nurse => [
@@ -193,6 +206,10 @@ enum WorldRole {
             ..._only('INPATIENT', _cru),
             ..._only('PRE_TRIAGE', _cru),
             ..._only('QUEUE', _cru),
+            // Same pair as the doctor, and for the same reason. The seed
+            // grants a nurse both reads.
+            'CASE_TAKING_READ',
+            'PATIENT_DOCUMENT_READ',
             'DASHBOARD_READ',
           ],
         WorldRole.receptionist => [

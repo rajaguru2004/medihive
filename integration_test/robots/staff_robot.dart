@@ -353,12 +353,25 @@ final class StaffRobot extends Robot {
   /// Opens one role's editor from its card, which is the only way in.
   Future<void> openRoleEditor(String roleId) async {
     await tester.tapKey(RolesKeys.card(roleId));
-    await tester.pumpUntilFound(find.byKey(StaffKeys.editorScreen));
-    await settle();
+    await assertOnEditor();
   }
 
+  /// The editor is open **and its catalogue has arrived**.
+  ///
+  /// Waiting on the screen alone is a race this suite has already lost:
+  /// `settle()` resolves on "no pending frame and no shimmer", and the
+  /// first-load skeleton only exists once `onReady`'s post-frame callback has
+  /// flipped `isLoading` — so a check that runs before that sees a settled
+  /// screen with an empty catalogue and renders the "No permission catalogue"
+  /// branch, where every `role_editor_*` key is genuinely absent.
+  ///
+  /// `editorGrid` is built **only** where the catalogue is non-empty
+  /// (`role_editor_view.dart`), so this both closes the race and makes the
+  /// other outcome honest: an empty catalogue now times out naming the grid,
+  /// rather than failing three assertions later on a key nobody can find.
   Future<void> assertOnEditor() async {
     await tester.pumpUntilFound(find.byKey(StaffKeys.editorScreen));
+    await tester.pumpUntilFound(find.byKey(StaffKeys.editorGrid));
     await settle();
   }
 

@@ -9,6 +9,7 @@ import '../../../core/app_clock.dart';
 import '../../../core/app_log.dart';
 import '../../../data/models/admission_model.dart';
 import '../../../data/models/appointment_model.dart';
+import '../../../data/models/case_intake.dart';
 import '../../../data/models/consultation_model.dart';
 import '../../../data/models/invoice.dart';
 import '../../../data/models/lab_order.dart';
@@ -17,6 +18,7 @@ import '../../../data/models/patient.dart';
 import '../../../data/models/prescription.dart';
 import '../../../data/models/queue_item.dart';
 import '../../../data/models/radiology_order.dart';
+import '../../../data/repositories/case_intake_repository.dart';
 import '../../../data/repositories/patient_repository.dart';
 import '../../../data/services/settings_service.dart';
 import '../../../data/utils/api_envelope.dart';
@@ -26,10 +28,14 @@ import '../../../data/utils/load_state.dart';
 import '../../../theme/theme.dart';
 import '../../patients/patient_routes.dart';
 
-/// The seven faces of one patient record.
+/// The eight faces of one patient record.
 enum PatientHubTab {
   summary,
   visits,
+  /// What the patient said before anybody saw them — the intake they filled in
+  /// themselves. Next to Visits rather than at the end: it is the thing a
+  /// clinician reads *before* the consultation, not an archive.
+  intake,
   vitals,
   orders,
   results,
@@ -41,6 +47,7 @@ extension PatientHubTabLabel on PatientHubTab {
   String get label => switch (this) {
         PatientHubTab.summary => 'Summary',
         PatientHubTab.visits => 'Visits',
+        PatientHubTab.intake => 'Intake',
         PatientHubTab.vitals => 'Vitals',
         PatientHubTab.orders => 'Orders',
         PatientHubTab.results => 'Results',
@@ -125,6 +132,7 @@ class PatientHubController extends GetxController with LoadStateMixin {
   final Patient? seed;
 
   final PatientRepository _repository = patientRepository;
+  final CaseIntakeRepository _intakes = caseIntakeRepository;
 
   final patient = Patient.empty.obs;
   final tab = PatientHubTab.summary.obs;
@@ -141,6 +149,14 @@ class PatientHubController extends GetxController with LoadStateMixin {
   // module refusing.
 
   final appointments = HubSection<AppointmentModel>('Appointments');
+
+  /// The intakes this patient has sent in themselves.
+  ///
+  /// Its own section like every other, which is what makes a site that has
+  /// never switched case-taking on cost this hub one greyed tab rather than a
+  /// screen-wide error: the route answers 403, `loadSection` records it as
+  /// `noAccess`, and the other seven tabs are unaffected.
+  final intakes = HubSection<IntakeSummary>('Intakes');
   final consultations = HubSection<ConsultationModel>('Consultations');
   final labOrders = HubSection<LabOrder>('Lab orders');
   final radiologyOrders = HubSection<RadiologyOrder>('Imaging orders');
@@ -238,6 +254,7 @@ class PatientHubController extends GetxController with LoadStateMixin {
         // last visit, which is the first question anybody asks.
         PatientHubTab.summary => [appointments, consultations],
         PatientHubTab.visits => [appointments, consultations],
+        PatientHubTab.intake => [intakes],
         PatientHubTab.vitals => [consultations],
         PatientHubTab.orders => [labOrders, radiologyOrders],
         // Results come **inside** the orders: `/api/laboratory/results` takes
@@ -290,6 +307,9 @@ class PatientHubController extends GetxController with LoadStateMixin {
     }
     if (section == consultations) {
       return loadSection(consultations, () => _repository.consultationsFor(_id));
+    }
+    if (section == intakes) {
+      return loadSection(intakes, () => _intakes.forPatient(_id));
     }
     if (section == labOrders) {
       return loadSection(labOrders, () => _repository.labOrdersFor(_id));

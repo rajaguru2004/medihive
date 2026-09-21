@@ -2,6 +2,7 @@ import 'package:integration_test/integration_test.dart';
 
 import '../flows/auth/login_flow_test.dart';
 import '../flows/billing/billing_flow_test.dart';
+import '../flows/case_intake/case_intake_flow_test.dart';
 import '../flows/case_review/case_review_flow_test.dart';
 import '../flows/case_taking/case_taking_flow_test.dart';
 import '../flows/clinical/appointment_flow_test.dart';
@@ -72,5 +73,6 @@ void main() {
   // interview because that is the order a patient meets them in, and because
   // both boot the same portal account.
   registerPatientDocumentsFlows();
+  registerCaseIntakeFlows();
   registerCaseReviewFlows();
 }

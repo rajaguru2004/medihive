@@ -222,11 +222,17 @@ final class PatientPortalRobot extends Robot {
   }
 
   /// Chooses a clinician from the picker sheet.
+  ///
+  /// Through `pickFromSheet` rather than `find.text(...).last`, and the
+  /// difference is not stylistic: a doctor's name is also on the appointment
+  /// rows of the dashboard underneath, so the loose finder could land on the
+  /// copy *behind* the sheet — which is not hit-testable, so the tap was
+  /// silently missed and the failure surfaced two steps later as "no slot
+  /// 15:00". It passed alone and failed in the suite, which is what a finder
+  /// that depends on what else happens to be on screen looks like.
   Future<void> chooseDoctor(String name) async {
     await tester.tapKeyWithoutKeyboard(PatientPortalKeys.bookDoctor);
-    await tester.pumpUntilFound(find.text(name));
-    await tester.tap(find.text(name).last);
-    await settle();
+    await pickFromSheet(name);
   }
 
   /// Taps one offered slot, by the value the request will carry — `09:30` and

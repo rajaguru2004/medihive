@@ -183,6 +183,23 @@ abstract class Endpoints {
 
   static String caseSession(String sessionId) => '$caseSessions/$sessionId';
 
+  /// GET: the intakes patients have sent in, for the clinician who reads them.
+  ///
+  /// A **different controller** on the server to the routes above it, and the
+  /// difference is the point: everything under `/case-taking/sessions` goes
+  /// through `PatientSelfGuard`, which rewrites any patient id in the request
+  /// to the caller's own — right for a patient's own interview, and wrong for
+  /// a doctor opening somebody's finished case. These two are gated on
+  /// `case-taking: read`, which a doctor and a nurse hold and which carries no
+  /// write with it.
+  ///
+  /// `?patientId=` narrows it to one chart. A patient's own token is narrowed
+  /// to their own rows by the server whatever it sends.
+  static const String caseSubmissions = '/api/case-taking/submissions';
+
+  static String caseSubmission(String submissionId) =>
+      '$caseSubmissions/$submissionId';
+
   /// POST: consent, or a refusal. The wording's version travels with it.
   static String caseSessionConsent(String sessionId) =>
       '$caseSessions/$sessionId/consent';

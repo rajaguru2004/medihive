@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../../core/keys/patient_hub_keys.dart';
 import '../../../data/models/access_map.dart';
+import '../../../data/models/case_intake.dart';
 import '../../../data/models/invoice.dart';
 import '../../../data/models/lab_result.dart';
 import '../../../data/models/patient.dart';
@@ -14,6 +15,7 @@ import '../../../routes/app_pages.dart';
 import '../../../theme/theme.dart';
 import '../../appointments/appointment_routes.dart';
 import '../../billing/billing_routes.dart';
+import '../../case_intake/case_intake_routes.dart';
 import '../../consultations/consultation_routes.dart';
 import '../../laboratory/laboratory_routes.dart';
 import '../../patients/patient_routes.dart';
@@ -440,6 +442,9 @@ class _TabShell extends StatelessWidget {
         PatientHubTab.summary => _Summary(controller: controller),
         PatientHubTab.visits =>
           controller.visits.isEmpty ? null : _Visits(controller: controller),
+        PatientHubTab.intake => controller.intakes.items.isEmpty
+            ? null
+            : _Intakes(controller: controller),
         PatientHubTab.vitals => controller.latestConsultation == null
             ? null
             : _Vitals(controller: controller),
@@ -463,6 +468,7 @@ class _TabShell extends StatelessWidget {
         compact: true,
         icon: switch (tab) {
           PatientHubTab.visits => Icons.event_note_outlined,
+          PatientHubTab.intake => Icons.record_voice_over_outlined,
           PatientHubTab.vitals => Icons.favorite_border_rounded,
           PatientHubTab.orders => Icons.assignment_outlined,
           PatientHubTab.results => Icons.science_outlined,
@@ -472,6 +478,9 @@ class _TabShell extends StatelessWidget {
         },
         title: switch (tab) {
           PatientHubTab.visits => 'No visits recorded',
+          // Not "no intake": the patient may be filling one in right now, and
+          // this list only ever holds the ones they have sent.
+          PatientHubTab.intake => 'Nothing sent in yet',
           PatientHubTab.vitals => 'No observations recorded',
           PatientHubTab.orders => 'Nothing has been ordered',
           PatientHubTab.results => 'No results yet',

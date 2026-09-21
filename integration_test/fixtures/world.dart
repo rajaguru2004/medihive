@@ -3,6 +3,7 @@ import 'package:medihive/app/core/app_clock.dart';
 import '../fakes/fake_api.dart';
 import 'fake_jwt.dart';
 import 'modules/billing_fixtures.dart';
+import 'modules/case_intake_fixtures.dart';
 import 'modules/case_review_fixtures.dart';
 import 'modules/case_taking_fixtures.dart';
 import 'modules/clinical_fixtures.dart';
@@ -96,6 +97,13 @@ abstract final class World {
     // rows — later registrations win, which is the mechanism the whole file is
     // ordered around.
     installPatientDocumentsFixtures(api);
+
+    // The clinician's side of the intake: the submissions a doctor opens off
+    // a chart. Installed for **every** flow rather than only its own, for the
+    // reason the documents above it are — the patient hub now has an Intake
+    // tab, and `AppHarness.dispose` fails any test that touches an endpoint
+    // nothing answered.
+    installCaseIntakeFixtures(api);
 
     // "Here is what we understood about you", and the submission it becomes.
     //
