@@ -19,6 +19,7 @@ import 'package:medihive/app/data/services/pre_triage_service.dart';
 import 'package:medihive/app/data/services/queue_service.dart';
 import 'package:medihive/app/data/services/session_manager.dart';
 import 'package:medihive/app/data/services/settings_service.dart';
+import 'package:medihive/app/data/services/speech_player.dart';
 import 'package:medihive/app/modules/home/controllers/home_controller.dart';
 import 'package:medihive/app/modules/patient_portal/patient_shell.dart';
 import 'package:medihive/app/routes/app_pages.dart';
@@ -156,6 +157,22 @@ class AppHarness {
     // harness without it silently takes a different path through `/auth/me`
     // than the app does.
     final access = Get.put(AccessService());
+
+    // Read-aloud, stubbed before any binding can reach for the real one.
+    //
+    // `CaseTakingBinding` registers `AudioPlayersSpeechPlayer` only when
+    // nothing is registered already, and that guard exists for exactly this.
+    // Left to itself the real player runs: every question is read aloud as it
+    // arrives, so the plugin starts a `FramePositionUpdater` whose ticker is
+    // still registered when the tree is torn down, and the flow fails on "an
+    // animation is still running even after the widget tree was disposed" -
+    // an audio plugin's heartbeat reported as the test's own leak.
+    //
+    // `StubSpeechPlayer` reports itself unavailable, which also hides the
+    // read-aloud control. That is the honest default here: no flow asserts on
+    // that control, and a suite that silently played audio through a real
+    // plugin was testing the plugin.
+    Get.put<SpeechPlayer>(const StubSpeechPlayer(), permanent: true);
 
     // The domain services every module reaches for through `Get.find`.
     Get.put(HomeService());

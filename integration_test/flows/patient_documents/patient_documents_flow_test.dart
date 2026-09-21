@@ -300,11 +300,15 @@ void registerPatientDocumentsFlows() {
 
       await documents.openOriginal();
 
-      // §22: the evidence is reachable, and the link is fetched at the moment
-      // it is wanted rather than held — it expires in five minutes.
+      // §22: the evidence is reachable, and it arrives over the authenticated
+      // origin rather than as a signed bucket URL — `/original` names a host a
+      // handset cannot resolve, and nothing that reached it would carry this
+      // patient's token. Asserted on the route the screen actually takes, so
+      // that a regression back to the signed link fails here rather than in
+      // somebody's hand.
       documents.api.requireCall(
         'GET',
-        '/api/patient-documents/:documentId/original',
+        '/api/patient-documents/:documentId/file',
       );
     });
 

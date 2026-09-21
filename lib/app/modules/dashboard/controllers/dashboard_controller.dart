@@ -188,13 +188,47 @@ class DashboardController extends GetxController with LoadStateMixin {
       () async {
         // Both started before either is awaited: neither call needs the
         // other, and a cold start on hospital wifi pays for every round trip
-        // it makes in series. Not `Future.wait`, which would erase the two
-        // different result types into `Object`.
+        // it makes in series.
+        //
+        // The organisation is *not allowed to fail this screen*, and that is
+        // the whole shape of what follows. It supplies one string - the site
+        // name, which [siteName] already falls back to 'MediHive' for - and it
+        // comes from `/settings/organization`, which is gated on
+        // SETTINGS_READ. A doctor is refused it. Letting that refusal reach
+        // `runGuarded` set the no-access state for the whole board, so every
+        // doctor's census rendered as "not available to your role" while
+        // `/api/dashboard` had answered 200 with their real figures.
+        //
+        // Two bugs came out of that one line, and both are fixed by giving
+        // the organisation its own error handler at the moment it is started:
+        //
+        //  * awaiting the two in sequence left the refusal unobserved while
+        //    the census was still in flight, and Dart reports a rejection
+        //    with no listener as an unhandled exception - which is what a
+        //    doctor's launch logged, every time;
+        //  * `Future.wait` would have observed it, but completes with the
+        //    error that arrived *first* and discards the rest, so a fast 403
+        //    beside a slow 500 hid a genuine census failure behind the same
+        //    lock, with no banner and no retry.
+        //
+        // Now the census owns the load state on its own, and a refused
+        // organisation costs the screen its title and nothing else.
         final dashboard = _homeService.fetchDashboard();
-        final organization = _homeService.fetchOrganization();
+        final organization = _homeService.fetchOrganization().then<
+            OrganizationData?>(
+          (value) => value,
+          onError: (Object error) {
+            AppLog.info(
+              'DashboardController',
+              'site name unavailable, using the fallback: $error',
+            );
+            return null;
+          },
+        );
 
         _dashboard.value = await dashboard;
-        _organization.value = await organization;
+        final site = await organization;
+        if (site != null) _organization.value = site;
 
         _renderedTick = _currentTick;
       },

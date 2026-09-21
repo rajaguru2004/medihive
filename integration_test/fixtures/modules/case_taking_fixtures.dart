@@ -245,13 +245,61 @@ void installCaseTakingFixtures(
       'available': true,
     });
   });
+
+  // Words in, speech out - and unlike every other route here, not an envelope.
+  //
+  // `POST /case-taking/tts` answers `audio/wav` bytes directly
+  // (`case-taking.controller.ts` sets the content type and sends the buffer),
+  // because the player is handed bytes rather than a URL: the audio sits
+  // behind a bearer token and a JSON body, which no bare audio player sends.
+  // A fixture returning JSON here would be testing a contract the server does
+  // not have.
+  //
+  // This route is reached without anybody asking for it. Every question is
+  // read aloud when the session's output language has a voice, so the
+  // interview calls it on its own and a suite with no fixture for it fails
+  // whole flows on the unstubbed-endpoint check rather than on anything the
+  // flow was written to prove.
+  //
+  // The bytes are a real, minimal WAV header describing zero samples: enough
+  // that a player handed them has something well-formed to reject or ignore,
+  // and short enough to read. Nothing plays in a test - `SpeechPlayer` is
+  // stubbed at its own seam - so the content beyond the header is not what is
+  // under test here.
+  api.on('POST', '/api/case-taking/tts', (_) {
+    return FakeResponse.binary(kSilentWav, contentType: 'audio/wav');
+  });
 }
+
+/// A well-formed WAV that is silent, for the read-aloud fixture.
+///
+/// 44 bytes: the canonical RIFF/WAVE header for 8 kHz mono 16-bit PCM with a
+/// zero-length data chunk. Written out rather than base64-decoded so that what
+/// it is stays legible at the call site.
+const List<int> kSilentWav = <int>[
+  0x52, 0x49, 0x46, 0x46, // "RIFF"
+  0x24, 0x00, 0x00, 0x00, // chunk size: 36 + 0 bytes of data
+  0x57, 0x41, 0x56, 0x45, // "WAVE"
+  0x66, 0x6d, 0x74, 0x20, // "fmt "
+  0x10, 0x00, 0x00, 0x00, // fmt chunk size: 16
+  0x01, 0x00, // PCM
+  0x01, 0x00, // mono
+  0x40, 0x1f, 0x00, 0x00, // 8000 Hz
+  0x80, 0x3e, 0x00, 0x00, // byte rate: 8000 * 1 * 16/8
+  0x02, 0x00, // block align
+  0x10, 0x00, // 16 bits per sample
+  0x64, 0x61, 0x74, 0x61, // "data"
+  0x00, 0x00, 0x00, 0x00, // no samples
+];
 
 /// What the transcriber hears in this world.
 ///
 /// Two sentences, deliberately: the server treats an answer with a sentence
-/// boundary in it as a narrative rather than a reply, so this is also the
-/// answer that makes `extraction.queued` true.
+/// boundary in it as a narrative rather than a reply, so this is the answer
+/// that makes the engine harvest a second field out of one utterance. It used
+/// to be described as the answer that makes `extraction.queued` true; nothing
+/// is queued any more, because the harvest finishes before the response is
+/// built.
 const String kSpokenAnswer =
     'I have had a pain in the middle of my chest since Tuesday. It is worse '
     'when I walk up the stairs.';

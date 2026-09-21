@@ -155,6 +155,65 @@ void registerShiftFlows() {
       );
     });
 
+    testWidgets('a refused organisation does not escape as an unhandled error',
+        (tester) async {
+      // `/settings/organization` is refused to a doctor, and that refusal is
+      // an answer rather than a fault - `runGuarded` turns
+      // `ApiForbiddenException` into the no-access state on purpose.
+      //
+      // It still reached the console as `Unhandled Exception: Insufficient
+      // permissions` on every doctor sign-in, because the board starts the
+      // census and the organisation together and used to await them one after
+      // the other. The refusal landed while the census was still in flight,
+      // when nothing was listening to the organisation future yet, and Dart
+      // reports a rejection with no listener as unhandled - however carefully
+      // the caller handles it a moment later.
+      //
+      // Nothing in the world fixtures refuses that route, which is why every
+      // other test on this screen passed while a real doctor's handset logged
+      // an unhandled exception at launch. An unhandled async error fails the
+      // test outright, so this reproduces it rather than asserting around it.
+      //
+      // The delay is what gives the bug somewhere to happen, and without it
+      // this test passes against the broken code: the fake router answers in
+      // the same turn it is called, so both futures are already complete by
+      // the first `await` and the refusal is never unobserved. Holding the
+      // census back reproduces the ordering a real network produces - the
+      // refusal returns first, while the slower call is still outstanding.
+      final harness = await AppHarness.bootSignedIn(
+        tester,
+        role: WorldRole.doctor,
+        overrides: (api) {
+          api.failWith('GET', '/api/settings/organization', 403);
+          api.delay('GET', '/api/dashboard', const Duration(milliseconds: 300));
+        },
+      );
+      final board = DashboardRobot(harness);
+
+      // The board is still the board. The bands are named rather than looped
+      // over, because a loop over an empty list asserts nothing - and an
+      // empty list is one of the ways this could fail.
+      await board.assertVisible();
+      expect(board.bandIds(), [
+        ShiftBandId.waiting,
+        ShiftBandId.screenings,
+        ShiftBandId.clinic,
+        ShiftBandId.ward,
+      ]);
+      for (final id in board.bandIds()) {
+        board.seeBandLoaded(id);
+      }
+
+      // And the census is *present*, which is the half that was actually
+      // broken. A refused organisation used to set the no-access state for
+      // the whole screen, so a doctor read "not available to your role" over
+      // figures the server had already sent. Asserting only the bands here
+      // would have recorded that as acceptable.
+      board.seeFigure('Waiting');
+      board.seeFigure('Booked today');
+      board.seeUpdatedAt();
+    });
+
     testWidgets('a failed silent refresh keeps the last good figures',
         (tester) async {
       final harness =
