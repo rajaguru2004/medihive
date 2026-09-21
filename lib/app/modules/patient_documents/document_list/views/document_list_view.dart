@@ -235,7 +235,15 @@ class _Documents extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      if (controller.hasLoadError) {
+      // An error *instead of* the list only when there is no list.
+      //
+      // The refresh that runs when a patient comes back from a document is
+      // silent and can fail — a clinic's wifi drops for a second — and the
+      // documents it failed to re-read are still on screen and still true.
+      // Replacing them with a retry banner throws away what they came back
+      // to, to report a failure about something they did not ask for. With
+      // rows present the banner goes *above* them instead, further down.
+      if (controller.hasLoadError && controller.documents.isEmpty) {
         return ErrorRetryBanner(
           key: PatientDocumentsKeys.error,
           margin: EdgeInsets.zero,
@@ -244,7 +252,15 @@ class _Documents extends StatelessWidget {
         );
       }
 
-      if (controller.rxFirstLoad.value && controller.isLoading) {
+      // Nothing to show *and* something in flight — not "the first load".
+      //
+      // Those come apart the moment anything reloads: a controller that is
+      // rebuilt, a pull to refresh, or a return from a document all put a
+      // populated list into a loading state, and keying the skeleton off
+      // `rxFirstLoad` replaced rows the patient was reading with grey bars.
+      // Tied to emptiness instead, the skeleton appears exactly when there is
+      // genuinely nothing else to draw.
+      if (controller.isLoading && controller.documents.isEmpty) {
         return const BentoCard(child: BentoSkeleton(rows: 2));
       }
 
@@ -276,6 +292,17 @@ class _Documents extends StatelessWidget {
         key: PatientDocumentsKeys.list,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // A refresh that failed while rows were on screen. Above them, not
+          // instead of them — see the note on the early return above.
+          if (controller.hasLoadError) ...[
+            ErrorRetryBanner(
+              key: PatientDocumentsKeys.error,
+              margin: EdgeInsets.zero,
+              message: controller.rxLoadError.value ?? '',
+              onRetry: controller.reload,
+            ),
+            const SizedBox(height: BentoSpace.header),
+          ],
           _ToCheck(controller: controller),
           _Filters(controller: controller),
           if (groups.isEmpty)

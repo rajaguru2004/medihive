@@ -339,7 +339,31 @@ class DocumentListController extends GetxController with LoadStateMixin {
     }
   }
 
-  /// Opens one document's reading.
-  void open(PatientDocument document) =>
-      PatientDocumentsNavigation.toReview(document.id);
+  /// Opens one document's reading, and takes in what happened while they were
+  /// there.
+  ///
+  /// The refresh is **silent** — `runGuarded(silent: true)` leaves the
+  /// loading flag alone — so the list the patient is coming back to is the
+  /// list they left, with the rows already on it, and a status quietly
+  /// corrected if they confirmed something. Blanking a screen somebody is
+  /// looking at, to redraw the same rows a moment later, reads as the app
+  /// having lost their documents.
+  ///
+  /// It is also not optional. A document confirmed on the next screen is
+  /// `verified` on the server and still "Please check" in this list, and the
+  /// filter counts above it are wrong until something re-reads them.
+  Future<void> open(PatientDocument document) async {
+    await PatientDocumentsNavigation.openReview(document.id);
+    // `isClosed` because the patient can leave this screen too — a back tap
+    // that pops both, or a deep link elsewhere — and a controller disposed
+    // mid-await must not write to its own observables afterwards.
+    if (isClosed) return;
+    await runGuarded(
+      () async {
+        documents.value = await _repository.mine();
+      },
+      fallback: PatientText.couldNotLoadDocuments,
+      silent: true,
+    );
+  }
 }

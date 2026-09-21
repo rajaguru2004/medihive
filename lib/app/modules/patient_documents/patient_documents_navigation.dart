@@ -37,10 +37,26 @@ abstract final class PatientDocumentsNavigation {
   /// sent three prescriptions wants the third one's reading on top of the two
   /// they already checked, not instead of them.
   static void toReview(String documentId) {
-    unawaited(
-      Get.toNamed<void>(PatientDocumentsRoutes.review(documentId)) ??
-          Future<void>.value(),
-    );
+    unawaited(openReview(documentId));
+  }
+
+  /// [toReview], for the one caller that has a reason to know when the patient
+  /// comes back.
+  ///
+  /// This is the exception the header warns about, and it is safe for the
+  /// same reason the warning exists: the danger is a caller that holds state
+  /// — an uploading flag, a lock, a spinner — across the await, because the
+  /// `finally` that clears it will not run until the patient returns from the
+  /// next screen. The list's row tap holds nothing. What it does with the
+  /// completion is refresh quietly, because a document whose reading the
+  /// patient just confirmed should not still say "Please check" on the list
+  /// behind it.
+  ///
+  /// Anything that *does* hold state across navigation must keep using
+  /// [toReview] and must not await this.
+  static Future<void> openReview(String documentId) async {
+    await (Get.toNamed<void>(PatientDocumentsRoutes.review(documentId)) ??
+        Future<void>.value());
   }
 
   /// From a duplicate onto the copy that actually holds the reading.
