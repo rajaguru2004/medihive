@@ -11,6 +11,7 @@ import '../../../../data/models/patient_document.dart';
 import '../../../../data/repositories/patient_documents_repository.dart';
 import '../../../../data/utils/error_handler.dart';
 import '../../../../data/utils/load_state.dart';
+import '../../../login/demo_accounts.dart';
 import '../../patient_documents_routes.dart';
 
 /// What the patient has said about one extracted value.
@@ -332,10 +333,16 @@ class DocumentReviewController extends GetxController with LoadStateMixin {
   /// screen that let somebody confirm a document while one line on it was
   /// marked wrong would be filing that word against something they disagreed
   /// with.
+  /// In demo builds the second rule is relaxed — see
+  /// [DemoAccounts.confirmAnyway]. The server's own rule is not: `canVerify`
+  /// still gates the control, because a flag on a phone cannot make a 400 a
+  /// 200. [isBlocked] is deliberately left alone, so the notice saying a
+  /// clinician will look at the document stays on screen beside the button.
   bool get canConfirm {
     if (!document.value.canVerify) return false;
     final rows = allRows;
     if (rows.isEmpty) return false;
+    if (DemoAccounts.confirmAnyway) return true;
     return rows.every((row) => checkOf(row.field) == ValueCheck.confirmed);
   }
 

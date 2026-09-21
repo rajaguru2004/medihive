@@ -23,6 +23,46 @@ import '../../patient_documents_navigation.dart';
 /// A screen that asked "camera or not" could not say either.
 enum DocumentOrigin { camera, gallery, file }
 
+/// Which slice of the pile is on screen.
+///
+/// Three, not a search box: this list is a handful of rows on a phone held by
+/// somebody in a waiting room, and the only question they arrive with that
+/// the list can answer is "is there anything I still have to do".
+enum DocumentFilter { all, needsCheck, confirmed }
+
+/// One calendar day's worth of documents.
+///
+/// [day] is floored to midnight local, which is what makes two documents from
+/// the same afternoon one heading rather than two.
+///
+/// [fromPaper] records where that date came from, and the screen is required
+/// to show it. A document carries its own date once the extraction has read
+/// one off it; until then all we honestly know is the day it arrived. Filing
+/// a January discharge letter under "Today" because it was photographed this
+/// morning would be this screen inventing a clinical date - see §13 and the
+/// note in `patient_text.dart`.
+class DocumentDateGroup {
+  const DocumentDateGroup({
+    required this.day,
+    required this.documents,
+    required this.fromPaper,
+  });
+
+  final DateTime day;
+  final List<PatientDocument> documents;
+  final bool fromPaper;
+
+  /// The one group that is not a date: documents carrying no date anywhere,
+  /// neither on the paper nor an `uploadedAt`. It sorts last and is headed by
+  /// a sentence rather than a day.
+  ///
+  /// The epoch stands in for "no date" so the group can travel through the
+  /// same list as every other one. Nothing reads [day] on an undated group,
+  /// and this getter is how a caller says so out loud rather than comparing
+  /// against a magic timestamp at each use.
+  bool get isUndated => day.millisecondsSinceEpoch == 0;
+}
+
 /// Everything the patient has handed over, and the three ways to hand over
 /// another.
 ///
@@ -53,6 +93,103 @@ class DocumentListController extends GetxController with LoadStateMixin {
       PatientDocumentsRepositories.instance;
 
   final RxList<PatientDocument> documents = <PatientDocument>[].obs;
+
+  /// Which slice is showing. Never persisted: a filter that outlived the
+  /// screen would hide a document from somebody who does not remember setting
+  /// it, and "I uploaded it and it vanished" is the report that follows.
+  final Rx<DocumentFilter> filter = DocumentFilter.all.obs;
+
+  /// The date this document should be filed under, and where it came from.
+  ///
+  /// The paper's own date wins. `uploadedAt` is the fallback and is marked as
+  /// such all the way to the heading.
+  static (DateTime?, bool) filedUnder(PatientDocument document) {
+    final onPaper = document.extraction?.documentDate;
+    if (onPaper != null) return (onPaper.toLocal(), true);
+    final arrived = document.uploadedAt;
+    return (arrived?.toLocal(), false);
+  }
+
+  int countFor(DocumentFilter which) => switch (which) {
+        DocumentFilter.all => documents.length,
+        DocumentFilter.needsCheck =>
+          documents.where((d) => d.status.isAwaitingPatient).length,
+        DocumentFilter.confirmed => documents
+            .where((d) => d.status == DocumentStatus.verified)
+            .length,
+      };
+
+  /// How many are waiting on the patient, for the one line at the top.
+  int get needsCheckCount => countFor(DocumentFilter.needsCheck);
+
+  /// The list the screen draws: newest day first, newest document first
+  /// within a day.
+  ///
+  /// Documents with no date at all - neither on the paper nor an `uploadedAt`,
+  /// which a row in flight can be - are not dropped. They are collected into a
+  /// final undated group, because a document that does not appear is a
+  /// document the patient uploads again.
+  List<DocumentDateGroup> get groups {
+    final visible = documents.where(_matchesFilter).toList();
+
+    final byDay = <DateTime, List<PatientDocument>>{};
+    final byDayFromPaper = <DateTime, bool>{};
+    final undated = <PatientDocument>[];
+
+    for (final document in visible) {
+      // `filedAt` rather than `when`: `when` is a pattern keyword and cannot
+      // be bound by a record destructure.
+      final (filedAt, fromPaper) = filedUnder(document);
+      if (filedAt == null) {
+        undated.add(document);
+        continue;
+      }
+      final day = DateTime(filedAt.year, filedAt.month, filedAt.day);
+      byDay.putIfAbsent(day, () => <PatientDocument>[]).add(document);
+      // A heading claims the paper's date only when *every* document under it
+      // has one. One fallback in the group is enough to make the whole
+      // heading an arrival date, which is the honest reading of a mixed day.
+      byDayFromPaper[day] = (byDayFromPaper[day] ?? true) && fromPaper;
+    }
+
+    final days = byDay.keys.toList()..sort((a, b) => b.compareTo(a));
+
+    final groups = [
+      for (final day in days)
+        DocumentDateGroup(
+          day: day,
+          documents: byDay[day]!..sort(_newestFirst),
+          fromPaper: byDayFromPaper[day] ?? false,
+        ),
+    ];
+
+    if (undated.isNotEmpty) {
+      groups.add(
+        DocumentDateGroup(
+          day: DateTime.fromMillisecondsSinceEpoch(0),
+          documents: undated,
+          fromPaper: false,
+        ),
+      );
+    }
+
+    return groups;
+  }
+
+  bool _matchesFilter(PatientDocument document) => switch (filter.value) {
+        DocumentFilter.all => true,
+        DocumentFilter.needsCheck => document.status.isAwaitingPatient,
+        DocumentFilter.confirmed => document.status == DocumentStatus.verified,
+      };
+
+  static int _newestFirst(PatientDocument a, PatientDocument b) {
+    final (left, _) = filedUnder(a);
+    final (right, _) = filedUnder(b);
+    if (left == null && right == null) return 0;
+    if (left == null) return 1;
+    if (right == null) return -1;
+    return right.compareTo(left);
+  }
 
   /// The interview this upload belongs to, when the patient came here from one.
   ///

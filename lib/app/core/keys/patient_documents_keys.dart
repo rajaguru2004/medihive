@@ -48,6 +48,32 @@ abstract final class PatientDocumentsKeys {
 
   static Key document(String id) => Key('patient_documents_row_$id');
 
+  /// The list is filed by date. These key the furniture that filing added.
+  ///
+  /// [day] takes the heading's own `yyyy-mm-dd` rather than an index: the
+  /// groups are the patient's documents in date order, so "the second
+  /// heading" is an assertion that starts failing the day somebody uploads a
+  /// document dated in between.
+  static Key day(DateTime value) => Key(
+        'patient_documents_day_${value.year}'
+        '-${value.month.toString().padLeft(2, '0')}'
+        '-${value.day.toString().padLeft(2, '0')}',
+      );
+
+  /// The group that holds documents carrying no date of their own.
+  static const Key dayUndated = Key('patient_documents_day_undated');
+
+  /// One line above the list when something is waiting on the patient.
+  static const Key toCheck = Key('patient_documents_to_check');
+
+  /// All / To check / Confirmed.
+  static Key filter(Object value) => Key('patient_documents_filter_$value');
+
+  /// A filter that hides everything is its own state, and emphatically not
+  /// [empty]: telling a patient who has uploaded six documents that they have
+  /// none is how a support call starts.
+  static const Key emptyFilter = Key('patient_documents_empty_filter');
+
   // ── One document, reviewed ────────────────────────────────────────────────
 
   static const Key review = Key('patient_document_review_screen');

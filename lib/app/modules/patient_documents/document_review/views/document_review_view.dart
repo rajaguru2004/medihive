@@ -7,6 +7,7 @@ import '../../../../core/keys/app_keys.dart';
 import '../../../../data/models/patient_document.dart';
 import '../../../../data/services/settings_service.dart';
 import '../../../../theme/theme.dart';
+import '../../../login/demo_accounts.dart';
 import '../../patient_documents_navigation.dart';
 import '../controllers/document_review_controller.dart';
 
@@ -793,7 +794,7 @@ class _Confirm extends StatelessWidget {
             ),
             const SizedBox(height: BentoSpace.action),
           ],
-          if (c.isBlocked)
+          if (c.isBlocked) ...[
             // The honest ending for a document the patient disagrees with.
             // `verify` means "what was extracted is correct", so it is not
             // sent — and the screen says what happens instead rather than
@@ -802,8 +803,29 @@ class _Confirm extends StatelessWidget {
               key: PatientDocumentsKeys.confirmBlocked,
               icon: Icons.flag_outlined,
               message: PatientText.documentGoesToAClinician,
-            )
-          else
+            ),
+            // Demo builds only, and the notice above stays. A run in front of
+            // a room dies on one "I don't know" otherwise — the extraction on
+            // a photographed prescription is rarely clean — and what is shown
+            // here is the real warning with a way past it, never a screen
+            // pretending the values were agreed with.
+            // See `DemoAccounts.confirmAnyway`.
+            if (DemoAccounts.confirmAnyway) ...[
+              const SizedBox(height: BentoSpace.action),
+              PrimaryBar(
+                key: PatientDocumentsKeys.confirm,
+                label: PatientText.confirmThisDocument,
+                icon: Icons.check_rounded,
+                busy: c.isConfirming.value,
+                enabled: c.canConfirm,
+                onPressed: () async {
+                  if (await c.confirmDocument()) {
+                    showBentoToast(PatientText.documentConfirmedGoBack);
+                  }
+                },
+              ),
+            ],
+          ] else
             PrimaryBar(
               key: PatientDocumentsKeys.confirm,
               label: PatientText.confirmThisDocument,

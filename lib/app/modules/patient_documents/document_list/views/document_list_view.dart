@@ -5,6 +5,7 @@ import '../../../../core/i18n/patient_text.dart';
 import '../../../../core/keys/app_keys.dart';
 import '../../../../data/models/patient_document.dart';
 import '../../../../data/services/settings_service.dart';
+import '../../../../data/utils/formatters.dart';
 import '../../../../theme/theme.dart';
 import '../controllers/document_list_controller.dart';
 
@@ -20,6 +21,10 @@ import '../controllers/document_list_controller.dart';
 /// differs between them in the way that matters when the device says no: a
 /// patient who declines the camera is told they can attach a photo they
 /// already have, and the row that does that is already on screen.
+///
+/// **What they have added is filed by date, newest first.** The reasoning is
+/// on [_Documents]; the short version is that the pile in their hand has
+/// dates on it and the list should be readable against that pile.
 class DocumentListView extends GetView<DocumentListController> {
   const DocumentListView({super.key});
 
@@ -206,7 +211,22 @@ class _Sending extends StatelessWidget {
   }
 }
 
-/// What they have already handed over.
+/// What they have already handed over, filed by date.
+///
+/// ── Why this is grouped rather than one flat list
+///
+/// The question a patient arrives with is "have you got the March report?",
+/// never "which of these did I upload third". A list ordered by upload time
+/// answers only the second, and it answers it in an order with no relation to
+/// the bundle of paper in their hand: a discharge letter from January
+/// photographed this morning sorts above a report from last week.
+///
+/// So the heading is the date the **document** carries, and the day it
+/// arrived is the fallback — marked as the fallback, on the heading and again
+/// on the row. Those are two different facts and neither stands in for the
+/// other silently. Filing a January letter under "Today" because that is when
+/// it was photographed would be this screen inventing a clinical date, which
+/// is the one thing this whole module is built not to do.
 class _Documents extends StatelessWidget {
   const _Documents({required this.controller});
 
@@ -228,8 +248,7 @@ class _Documents extends StatelessWidget {
         return const BentoCard(child: BentoSkeleton(rows: 2));
       }
 
-      final rows = controller.documents;
-      if (rows.isEmpty) {
+      if (controller.documents.isEmpty) {
         return BentoCard(
           child: EmptyState(
             key: PatientDocumentsKeys.empty,
@@ -241,22 +260,194 @@ class _Documents extends StatelessWidget {
         );
       }
 
-      return BentoCard(
+      // Read explicitly, and not only through `groups`.
+      //
+      // `groups` does reach `filter.value` — inside `_matchesFilter`, which
+      // `documents.where(...).toList()` forces — and GetX tracks reads for
+      // the whole execution of this callback, nested calls included. So the
+      // subscription exists today. It exists *by way of* a lazy iterable
+      // being forced over a non-empty list, which is a thread thin enough
+      // that the next person to touch either end breaks the filter and finds
+      // out from a patient. One line here makes it a fact of this widget.
+      final _ = controller.filter.value;
+      final groups = controller.groups;
+
+      return Column(
         key: PatientDocumentsKeys.list,
-        padding: const EdgeInsets.symmetric(vertical: BentoSpace.listCardPad),
-        child: Column(
-          children: [
-            for (var i = 0; i < rows.length; i++) ...[
-              if (i > 0) const Hairline(indent: BentoSpace.listPad),
-              _DocumentRow(
-                document: rows[i],
-                onTap: () => controller.open(rows[i]),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _ToCheck(controller: controller),
+          _Filters(controller: controller),
+          if (groups.isEmpty)
+            BentoCard(
+              child: EmptyState(
+                key: PatientDocumentsKeys.emptyFilter,
+                compact: true,
+                icon: Icons.filter_alt_off_outlined,
+                title: PatientText.noDocumentsYet,
+                message: PatientText.documentsNoneInFilter,
               ),
+            )
+          else
+            for (var g = 0; g < groups.length; g++) ...[
+              if (g > 0) const SizedBox(height: BentoSpace.section),
+              _DayHeading(group: groups[g]),
+              const SizedBox(height: BentoSpace.header),
+              _DayCard(group: groups[g], controller: controller),
             ],
-          ],
-        ),
+        ],
       );
     });
+  }
+}
+
+/// The one line that says there is something to do.
+///
+/// Above the filters rather than inside them: a patient who has a document
+/// waiting should not have to discover a chip to find that out. Amber, never
+/// red — §0.1, a document that needs checking is not a deteriorating patient.
+class _ToCheck extends StatelessWidget {
+  const _ToCheck({required this.controller});
+
+  final DocumentListController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final waiting = controller.needsCheckCount;
+    if (waiting == 0) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: BentoSpace.header),
+      child: NoticeBanner(
+        key: PatientDocumentsKeys.toCheck,
+        icon: Icons.fact_check_outlined,
+        tint: AppColors.warning,
+        message: PatientText.documentsNeedChecking(waiting),
+      ),
+    );
+  }
+}
+
+/// All / To check / Confirmed, each carrying its count.
+///
+/// Hidden below two documents: a filter over a single row is furniture.
+class _Filters extends StatelessWidget {
+  const _Filters({required this.controller});
+
+  final DocumentListController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    if (controller.documents.length < 2) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: BentoSpace.header),
+      child: FilterChips<DocumentFilter>(
+        options: DocumentFilter.values,
+        selected: controller.filter.value,
+        onSelected: (value) => controller.filter.value = value,
+        countOf: controller.countFor,
+        keyOf: (value) => PatientDocumentsKeys.filter(value.name),
+        labelOf: (value) => switch (value) {
+          DocumentFilter.all => PatientText.documentsFilterAll,
+          DocumentFilter.needsCheck => PatientText.documentsFilterNeedsCheck,
+          DocumentFilter.confirmed => PatientText.documentsFilterConfirmed,
+        },
+      ),
+    );
+  }
+}
+
+/// `Today`, `Yesterday`, or `12 Mar 2026`.
+///
+/// When the group's date came from the upload rather than off the paper, the
+/// heading says so — once, on the right, quietly. A group whose documents all
+/// carry their own date says nothing, because that is the expected case and a
+/// label on it would be noise on every row of a full screen.
+class _DayHeading extends StatelessWidget {
+  const _DayHeading({required this.group});
+
+  final DocumentDateGroup group;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final undated = group.isUndated;
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, right: BentoSpace.page),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              undated ? PatientText.documentsUndatedHeading : _label(),
+              key: undated
+                  ? PatientDocumentsKeys.dayUndated
+                  : PatientDocumentsKeys.day(group.day),
+              style: isDark
+                  ? AppTextStyles.darkTitle3()
+                  : AppTextStyles.lightTitle3(),
+            ),
+          ),
+          if (!group.fromPaper && !undated)
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Text(
+                PatientText.documentsDateAdded,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: (isDark
+                        ? AppTextStyles.darkFootnote()
+                        : AppTextStyles.lightFootnote())
+                    .copyWith(color: tertiaryLabelColor(context)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Relative for the two days a patient thinks of by name, absolute after
+  /// that. `Formatters.relativeDay` is not used: it says "6 days ago", which
+  /// is a duration, and a heading over a medical document wants the date.
+  String _label() {
+    final now = DateTime.now();
+    final midnight = DateTime(now.year, now.month, now.day);
+    final days = midnight.difference(group.day).inDays;
+
+    return switch (days) {
+      0 => PatientText.documentsToday,
+      1 => PatientText.documentsYesterday,
+      _ => Formatters.dateMedium(group.day),
+    };
+  }
+}
+
+/// One day's documents, ruled like every other list card in the app.
+class _DayCard extends StatelessWidget {
+  const _DayCard({required this.group, required this.controller});
+
+  final DocumentDateGroup group;
+  final DocumentListController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = group.documents;
+
+    return BentoCard(
+      padding: const EdgeInsets.symmetric(vertical: BentoSpace.listCardPad),
+      child: Column(
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) const Hairline(indent: BentoSpace.listPad),
+            _DocumentRow(
+              document: rows[i],
+              onTap: () => controller.open(rows[i]),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 
@@ -268,9 +459,19 @@ class _DocumentRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final when = document.uploadedAt == null
+    // `filedAt` rather than `when`: `when` is a pattern keyword, and a record
+    // destructure cannot bind it.
+    final (filedAt, fromPaper) = DocumentListController.filedUnder(document);
+
+    // Which date this is, in words. The heading has already grouped by it;
+    // the row repeats it because somebody scrolling past a heading still has
+    // to be able to tell a report dated in March from one we only know the
+    // arrival of.
+    final dated = filedAt == null
         ? ''
-        : SettingsService.to.date(document.uploadedAt);
+        : fromPaper
+            ? PatientText.documentDated(Formatters.dateMedium(filedAt))
+            : PatientText.documentAdded(SettingsService.to.date(filedAt));
 
     return BentoRow(
       key: PatientDocumentsKeys.document(document.id),
@@ -281,7 +482,7 @@ class _DocumentRow extends StatelessWidget {
       // this document", "We couldn't read this document clearly". Two lines,
       // because it is a sentence and a sentence cut in half is a status
       // nobody can act on.
-      subtitle: [if (when.isNotEmpty) when, document.message].join(' · '),
+      subtitle: [if (dated.isNotEmpty) dated, document.message].join(' · '),
       subtitleMaxLines: 2,
       titleMaxLines: 2,
       onTap: onTap,

@@ -693,6 +693,81 @@ abstract final class PatientText {
         {'size': size},
       );
 
+  // ── Reading the pile by date ──────────────────────────────────────────
+  //
+  // A patient arrives holding a bundle of paper and the question they have is
+  // "have I given you the March report?", not "which of these did I upload
+  // first". So the list groups by the date the *document* carries, and falls
+  // back to the day it was added only when nothing could be read off it.
+  //
+  // Those two dates are not the same fact and the row says which one it is
+  // showing. A discharge letter from January uploaded this morning under a
+  // heading that said "Today" would be the screen quietly inventing a
+  // clinical date, which is the one thing this module is careful never to do.
+
+  static String get documentsToday => _of('documents.day.today', 'Today');
+
+  static String get documentsYesterday =>
+      _of('documents.day.yesterday', 'Yesterday');
+
+  /// The date printed on the paper.
+  static String documentDated(String date) => _of(
+        'documents.dated',
+        'Dated {date}',
+        {'date': date},
+      );
+
+  /// The day it reached us, used when the document itself carries no date.
+  static String documentAdded(String date) => _of(
+        'documents.added',
+        'Added {date}',
+        {'date': date},
+      );
+
+  /// Heads the last group: documents carrying no date anywhere at all.
+  static String get documentsUndatedHeading =>
+      _of('documents.day.undated', 'No date yet');
+
+  /// Sits beside a heading whose date is the day the document reached us,
+  /// because the paper itself carried none.
+  ///
+  /// Deliberately not the same words as [documentsUndatedHeading]. Those are
+  /// two different states - "we have no date for this at all" and "this is
+  /// filed under the day it arrived" - and one phrase covering both leaves a
+  /// patient unable to tell which of their documents actually carries a date.
+  static String get documentsDateAdded =>
+      _of('documents.day.added', 'Date added');
+
+  static String get documentsFilterAll => _of('documents.filter.all', 'All');
+
+  static String get documentsFilterNeedsCheck =>
+      _of('documents.filter.check', 'To check');
+
+  static String get documentsFilterConfirmed =>
+      _of('documents.filter.done', 'Confirmed');
+
+  /// Shown when a filter is on and hides everything.
+  static String get documentsNoneInFilter => _of(
+        'documents.filter.empty',
+        'Nothing here yet. Choose "All" to see everything you have added.',
+      );
+
+  /// The one line that tells a patient there is something to do.
+  ///
+  /// Two keys rather than one with a `{count}` in it, because the singular is
+  /// a different sentence and not a plural with the number swapped out - and
+  /// a later translator needs both, not a rule guessed from the English.
+  static String documentsNeedChecking(int count) => count == 1
+      ? _of(
+          'documents.needs.checking.one',
+          'One document is waiting for you to check it.',
+        )
+      : _of(
+          'documents.needs.checking.many',
+          '{count} documents are waiting for you to check them.',
+          {'count': '$count'},
+        );
+
   static String get couldNotSendDocument => _of(
         'documents.error.send',
         'That document did not reach us. Try it again.',

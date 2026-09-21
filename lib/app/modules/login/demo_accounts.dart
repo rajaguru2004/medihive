@@ -65,6 +65,36 @@ abstract final class DemoAccounts {
   static const bool enabled =
       bool.fromEnvironment('MEDIHIVE_DEMO', defaultValue: kDebugMode);
 
+  /// Lets a patient confirm a document they have marked wrong or uncertain.
+  ///
+  /// **This loosens a clinical rule, and it is the only flag here that does.**
+  /// Normally `verify` means "what was extracted is correct", so a document
+  /// with a corrected or unsure value on it is not sent at all: it stays
+  /// unconfirmed and goes to a clinician. That is §18 and it is right.
+  ///
+  /// A demo cannot show the end of the flow that way. The extraction on a
+  /// photographed prescription is rarely perfect, one "I don't know" stops the
+  /// run, and the audience is left looking at the screen before the one worth
+  /// showing. So this exists, and three things keep it honest:
+  ///
+  ///  * it follows [enabled], so a release build without `MEDIHIVE_DEMO=true`
+  ///    behaves exactly as before — the dangerous case is still the one you
+  ///    have to ask for;
+  ///  * the notice explaining that a clinician will look at the document
+  ///    **stays on screen** next to the button, rather than being swapped out
+  ///    for it. What the demo shows is the real warning plus a way past it,
+  ///    not a screen pretending the values were agreed with;
+  ///  * nothing about the record changes. The server still marks the
+  ///    corrections as the patient's words, and the document still carries
+  ///    every "I don't know" into whatever reads it next.
+  ///
+  /// Turn it off on its own, keeping the rest of demo mode, with
+  /// `--dart-define=MEDIHIVE_DEMO_CONFIRM_ANYWAY=false`.
+  static const bool confirmAnyway = bool.fromEnvironment(
+    'MEDIHIVE_DEMO_CONFIRM_ANYWAY',
+    defaultValue: enabled,
+  );
+
   /// The patient first: this build's new work is the patient's side, and it is
   /// what a demo is most likely to be about.
   static const List<DemoAccount> all = [
