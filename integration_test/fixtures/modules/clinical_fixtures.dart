@@ -171,7 +171,67 @@ void _appointments(FakeApi api) {
     bookings.remove(request.pathParams['id']);
     return const FakeResponse(204, null);
   });
+
+  // ── The two booking lookups ───────────────────────────────────────────────
+  //
+  // Registered **after** `/api/appointments/:id`, and that is load-bearing:
+  // `FakeApi.on` inserts at the front, so the last registration wins. Put
+  // either of these above the parameterised route and the app would be handed
+  // an appointment whose id is "doctors". The live server has the same trap
+  // pointing the other way — Nest matches in declaration order, so there the
+  // literals go first.
+
+  // The clinicians a patient may book with. A slimmer projection than
+  // `/api/users/staff`: no email and no role, because the route is readable by
+  // a patient and a name and a specialism is all a picker needs.
+  api.on('GET', '/api/appointments/doctors', (_) {
+    return FakeResponse.ok([
+      for (final doctor in _bookableDoctors)
+        {
+          'id': doctor.id,
+          'fullName': doctor.fullName,
+          'specialization': doctor.specialization,
+        },
+    ]);
+  });
+
+  // What is already taken in one clinician's day, read off the same bookings
+  // this file serves everywhere else — so a slot the POST above just wrote is
+  // a slot this route stops offering, and a flow can prove the grid narrows.
+  api.on('GET', '/api/appointments/availability', (request) {
+    final doctorId = request.query['doctorId'] ?? '';
+    final date = request.query['date'] ?? '';
+
+    return FakeResponse.ok({
+      'doctorId': doctorId,
+      'date': date,
+      'taken': [
+        for (final row in bookings.values)
+          if (row['doctorId'] == doctorId &&
+              '${row['appointmentDate']}'.startsWith(date) &&
+              row['status'] != 'cancelled')
+            {
+              'appointmentTime': row['appointmentTime'],
+              'durationMinutes': row['durationMinutes'] ?? 30,
+            },
+      ],
+    });
+  });
 }
+
+/// The three clinicians `staff_fixtures.dart` puts in this world, named here
+/// as the booking routes' own answer.
+///
+/// Duplicated deliberately rather than imported: the two routes are different
+/// projections on the live server as well, and a fixture that shared one list
+/// would hide the day somebody adds a column to the staff route and forgets
+/// this one.
+const List<({String id, String fullName, String? specialization})>
+    _bookableDoctors = [
+  (id: 'd-1', fullName: 'Dr Amara Okonkwo', specialization: 'Emergency medicine'),
+  (id: 'd-2', fullName: 'Dr Priya Raman', specialization: 'Acute medicine'),
+  (id: 'd-3', fullName: 'Dr Samuel Achterberg', specialization: 'Orthopaedics'),
+];
 
 /// One booking per status, through one clinic morning.
 /// The three bookings the shared world puts on the clinic board.

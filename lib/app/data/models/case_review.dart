@@ -284,6 +284,41 @@ class CaseReview {
             if (item.isRecorded) item,
       ];
 
+  /// The presenting complaint in one line, for a booking made straight off
+  /// the back of the interview.
+  ///
+  /// Built from the **recorded** lines of the `chief_complaint` section and
+  /// nothing else. Three properties this has to keep, and each one is a way of
+  /// getting it wrong:
+  ///
+  ///  * **Only what the patient actually said.** A line whose presence is
+  ///    "denied", "unsure" or "not asked" prints its presence wording in
+  ///    [CaseReviewItem.display] — safe on the review screen, where it sits
+  ///    under its own question, and nonsense in a booking's complaint field,
+  ///    where "Nobody asked" would arrive at a clinic as the reason for the
+  ///    visit.
+  ///
+  ///  * **No inference.** It is the patient's own words joined with a comma,
+  ///    not a summary of them. §43: this app has no code that assembles a
+  ///    clinical conclusion, and a booking reason is read by a clinician who
+  ///    would reasonably take it for one if it were phrased like one.
+  ///
+  ///  * **Empty is an answer.** An interview that never got as far as the
+  ///    complaint gives back an empty string, and the booking screen then
+  ///    asks the patient in plain words rather than sending them to a clinic
+  ///    with a blank reason.
+  String get complaintSummary {
+    final section = sections.firstWhere(
+      (s) => s.section == 'chief_complaint',
+      orElse: () => const CaseReviewSection(section: '', title: ''),
+    );
+    return [
+      for (final item in section.items)
+        if (item.isRecorded && item.display.trim().isNotEmpty)
+          item.display.trim(),
+    ].join(', ');
+  }
+
   /// §36's list, with the questions' own wording on it.
   ///
   /// [missingInformation] carries the same set as bare field keys —

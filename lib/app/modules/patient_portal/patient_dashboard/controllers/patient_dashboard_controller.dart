@@ -10,6 +10,7 @@ import '../../../../data/models/case_session.dart';
 import '../../../../data/models/patient_document.dart';
 import '../../../../data/models/patient_portal_state.dart';
 import '../../../../data/repositories/case_review_repository.dart';
+import '../../../../data/repositories/clinical_repository.dart';
 import '../../../../data/repositories/patient_documents_repository.dart';
 import '../../../../data/repositories/patient_portal_repository.dart';
 import '../../../../data/services/data_bus.dart';
@@ -92,6 +93,14 @@ class PatientDashboardController extends GetxController with LoadStateMixin {
         DataBus.to.tick(PatientDocumentEntities.documents),
         (_) => unawaited(_loadDocuments()),
       );
+      // A booking made on the screen above this one. `CrudRepository.create`
+      // announces it, so the booking screen never reaches back here — and the
+      // list is re-read rather than having the new row pushed into it, because
+      // what the server stored is what this screen shows.
+      ever<int>(
+        DataBus.to.tick(AppointmentRepository.entityName),
+        (_) => unawaited(_loadAppointments()),
+      );
     }
   }
 
@@ -102,12 +111,9 @@ class PatientDashboardController extends GetxController with LoadStateMixin {
   /// awaits and the pull-to-refresh spinner snaps back before the request has
   /// left.
   Future<void> reload() async {
-    await runGuarded(
-      () async {
-        portal.value = await _repository.portalState();
-      },
-      fallback: "We couldn't load your record just now.",
-    );
+    await runGuarded(() async {
+      portal.value = await _repository.portalState();
+    }, fallback: "We couldn't load your record just now.");
     await _loadAppointments();
     await _loadDocuments();
     await _loadCase();
@@ -124,8 +130,10 @@ class PatientDashboardController extends GetxController with LoadStateMixin {
     try {
       documents.value = await _documentsRepository.mine(limit: 5);
     } catch (e, stack) {
-      documentsError.value =
-          parseErrorMessage(e, PatientText.couldNotLoadDocuments);
+      documentsError.value = parseErrorMessage(
+        e,
+        PatientText.couldNotLoadDocuments,
+      );
       AppLog.error('PatientDashboardController', 'documents failed', e, stack);
     }
   }
@@ -159,7 +167,12 @@ class PatientDashboardController extends GetxController with LoadStateMixin {
         e,
         "We couldn't load your appointments.",
       );
-      AppLog.error('PatientDashboardController', 'appointments failed', e, stack);
+      AppLog.error(
+        'PatientDashboardController',
+        'appointments failed',
+        e,
+        stack,
+      );
     }
   }
 
@@ -207,14 +220,22 @@ class PatientDashboardController extends GetxController with LoadStateMixin {
   /// another.
   void openDocuments() => PatientDocumentsNavigation.toDocuments();
 
+  /// Asks for an appointment.
+  ///
+  /// Nothing is handed over: the booking screen reads this patient's own id
+  /// from the record, and the new booking comes back here on the `DataBus`
+  /// rather than as a return value — `Get.toNamed` completes when the route
+  /// is popped, so a caller that awaited it would be waiting for the patient.
+  void bookAppointment() => PatientPortalNavigation.toBooking();
+
   /// Opens "here is what we understood about you".
   ///
   /// The session id is handed over when this device knows one — a case that
   /// has already been sent is only reachable that way, because
   /// `sessions/current` finds open sessions and a submitted one is not open.
   void openCaseReview() => CaseReviewNavigation.toReview(
-        sessionId: submission?.sessionId ?? openCase.value?.id,
-      );
+    sessionId: submission?.sessionId ?? openCase.value?.id,
+  );
 
   /// Hands the device back.
   ///
@@ -223,7 +244,7 @@ class PatientDashboardController extends GetxController with LoadStateMixin {
   /// order, and this screen is more likely than most to be running on a device
   /// that belongs to the hospital rather than to the person holding it.
   Future<void> signOut() => SessionManager.to.endSession(
-        reason: SessionEndReason.userLogout,
-        revokeToken: true,
-      );
+    reason: SessionEndReason.userLogout,
+    revokeToken: true,
+  );
 }

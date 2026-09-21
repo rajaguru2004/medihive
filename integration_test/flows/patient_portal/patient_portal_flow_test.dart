@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:medihive/app/routes/app_pages.dart';
 
+import '../../fakes/fake_api.dart';
 import '../../fixtures/modules/patient_portal_fixtures.dart';
 import '../../fixtures/world_roles.dart';
 import '../../robots/login_robot.dart';
@@ -266,6 +267,111 @@ void registerPatientPortalFlows() {
       await portal.setPassword(password: 'short');
       await portal.seeFieldError('Use at least 8 characters');
       harness.api.requireNoCall('POST', '/api/patient-auth/activate');
+    });
+
+    // ── Booking ───────────────────────────────────────────────────────────
+
+    testWidgets('a patient books their own appointment', (tester) async {
+      final harness = await AppHarness.bootSignedIn(
+        tester,
+        role: WorldRole.patient,
+      );
+      final portal = PatientPortalRobot(harness);
+
+      await portal.assertOnPortal();
+      await portal.openBooking();
+      await portal.assertOnBooking();
+
+      await portal.chooseDoctor('Dr Priya Raman');
+      // 15:00 rather than 09:00: the clock is frozen at 14:20, and a slot
+      // earlier today is a slot the server would refuse after the patient had
+      // already chosen it.
+      await portal.chooseSlot('15:00');
+      await portal.enterReason('A cough that will not go away');
+      await portal.submitBooking();
+
+      // Back on their own screen, and the booking is on the wire with the
+      // patient it belongs to.
+      await portal.assertOnPortal();
+      final booked = harness.api.requireCall('POST', '/api/appointments');
+      final body = booked.jsonBody;
+      expect(body['patientId'], 'p-1');
+      expect(body['doctorId'], 'd-2');
+      expect(body['appointmentTime'], '15:00');
+      expect(body['chiefComplaint'], 'A cough that will not go away');
+      // The keys a patient's booking must not carry: a duration they do not
+      // set, and a status they do not get to choose.
+      expect(body.containsKey('durationMinutes'), isFalse);
+      expect(body.containsKey('status'), isFalse);
+    });
+
+    testWidgets('a slot the clinic has already given away is not offered',
+        (tester) async {
+      final harness = await AppHarness.bootSignedIn(
+        tester,
+        role: WorldRole.patient,
+        overrides: (api) {
+          // One clinician's day with the afternoon's first slot gone. The
+          // world's own bookings are all before the frozen 14:20, so without
+          // this the filter under test would have nothing to remove and the
+          // assertion would pass on an empty set.
+          api.on('GET', '/api/appointments/availability', (request) {
+            return FakeResponse.ok({
+              'doctorId': request.query['doctorId'],
+              'date': request.query['date'],
+              'taken': [
+                {'appointmentTime': '14:30', 'durationMinutes': 30},
+              ],
+            });
+          });
+        },
+      );
+      final portal = PatientPortalRobot(harness);
+
+      await portal.assertOnPortal();
+      await portal.openBooking();
+      await portal.chooseDoctor('Dr Priya Raman');
+
+      await portal.seeSlotNotOffered('14:30');
+      await portal.closeSlots();
+      // And the rest of the afternoon is still bookable — a screen that
+      // subtracted too much would pass the assertion above by offering
+      // nothing at all.
+      await portal.chooseSlot('15:00');
+    });
+
+    testWidgets('a booking refused as taken says so on the screen',
+        (tester) async {
+      final harness = await AppHarness.bootSignedIn(
+        tester,
+        role: WorldRole.patient,
+        overrides: (api) {
+          // The slot goes between the grid being drawn and the booking being
+          // sent — somebody at the desk took it. The server answers 409, and
+          // the patient must be told rather than left looking at a form that
+          // did nothing.
+          api.on('POST', '/api/appointments', (_) {
+            return FakeResponse.fail(
+              409,
+              'That time has just been taken. Please choose another.',
+              errorCode: 'APPOINTMENT_CONFLICT',
+            );
+          });
+        },
+      );
+      final portal = PatientPortalRobot(harness);
+
+      await portal.assertOnPortal();
+      await portal.openBooking();
+      await portal.chooseDoctor('Dr Priya Raman');
+      await portal.chooseSlot('15:00');
+      await portal.enterReason('A cough that will not go away');
+      await portal.submitBooking();
+
+      await portal.seeBookingError('just been taken');
+      // Still on the booking screen with their answers, rather than dropped
+      // back on the dashboard with nothing booked and nothing said.
+      await portal.assertOnBooking();
     });
   });
 }

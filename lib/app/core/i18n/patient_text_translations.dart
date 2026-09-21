@@ -213,6 +213,18 @@ abstract final class PatientTextTranslations {
       'review.error.submit': 'அது மருத்துவமனையை வந்து சேரவில்லை. மீண்டும் முயலுங்கள்.',
       'review.error.correct': 'அந்த மாற்றம் எங்களை வந்து சேரவில்லை. மீண்டும் முயலுங்கள்.',
       'review.progress': '{expected}-ல் {addressed} பதிலளிக்கப்பட்டது',
+      'review.book.title': 'சந்திப்பு நேரம் வேண்டுமா?',
+      'review.book.body':
+          'நீங்கள் இப்போது சொன்னதை வைத்து ஒரு சந்திப்பைத் தொடங்கலாம்: '
+              '"{complaint}". மருத்துவரையும் நேரத்தையும் நீங்கள்தான் தேர்வு செய்வீர்கள்.',
+      'review.book.body.empty':
+          'உங்களுக்கு ஒரு சந்திப்பைத் தொடங்கலாம். மருத்துவரையும் நேரத்தையும் '
+              'நீங்கள்தான் தேர்வு செய்வீர்கள்.',
+      'review.book.yes': 'சந்திப்பு நேரம் பதிவு செய்',
+      'review.book.no': 'இப்போது வேண்டாம்',
+      'book.reason.from-case':
+          'நீங்கள் இப்போது அனுப்பிய பதில்களிலிருந்து எடுக்கப்பட்டது. சரியில்லை '
+              'என்றால் மாற்றுங்கள்.',
   };
 
   static const Map<String, String> _hindi = {
@@ -342,5 +354,15 @@ abstract final class PatientTextTranslations {
       'review.error.submit': 'वह अस्पताल तक नहीं पहुँचा। फिर कोशिश कीजिए।',
       'review.error.correct': 'वह बदलाव हम तक नहीं पहुँचा। फिर कोशिश कीजिए।',
       'review.progress': '{expected} में से {addressed} के जवाब मिले',
+      'review.book.title': 'क्या आप अपॉइंटमेंट लेना चाहेंगे?',
+      'review.book.body':
+          'आपने अभी जो बताया, उसी से हम बुकिंग शुरू कर सकते हैं: '
+              '"{complaint}". डॉक्टर और समय आप ही चुनेंगे।',
+      'review.book.body.empty':
+          'हम आपके लिए बुकिंग शुरू कर सकते हैं। डॉक्टर और समय आप ही चुनेंगे।',
+      'review.book.yes': 'अपॉइंटमेंट बुक करें',
+      'review.book.no': 'अभी नहीं',
+      'book.reason.from-case':
+          'आपने अभी जो जवाब भेजे, उन्हीं से लिया गया है। सही न हो तो बदल दीजिए।',
   };
 }

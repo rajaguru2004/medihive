@@ -6,6 +6,8 @@ import '../case_taking/bindings/case_taking_binding.dart';
 import '../case_taking/views/case_taking_view.dart';
 import 'patient_activate/bindings/patient_activate_binding.dart';
 import 'patient_activate/views/patient_activate_view.dart';
+import 'patient_book/bindings/patient_book_binding.dart';
+import 'patient_book/views/patient_book_view.dart';
 import 'patient_claim/bindings/patient_claim_binding.dart';
 import 'patient_claim/views/patient_claim_view.dart';
 import 'patient_consent/bindings/patient_consent_binding.dart';
@@ -35,6 +37,11 @@ abstract final class PatientPortalRoutes {
 
   /// The interview itself, which the case-taking phase owns.
   static const String caseTaking = '/patient/case';
+
+  /// Asking for an appointment. `/patient/book` and not `/appointments/new`:
+  /// the latter is the desk's booking form, which chooses a patient and can
+  /// book anybody in.
+  static const String book = '/patient/book';
 
   /// Getting in: a hospital card, then a password. Both are **public** — they
   /// are how somebody with no account gets one — so neither carries
@@ -66,70 +73,88 @@ abstract final class PatientPortalPages {
   /// than on a dashboard whose every request would come back 403 — which is
   /// the same rule the staff modules follow, pointed the other way.
   static List<GetMiddleware> get _portal => [
-        AuthMiddleware(
-          module: Modules.caseTaking,
-          moduleName: 'Your health record',
-          verb: AccessVerb.create,
-        ),
-      ];
+    AuthMiddleware(
+      module: Modules.caseTaking,
+      moduleName: 'Your health record',
+      verb: AccessVerb.create,
+    ),
+  ];
 
   static List<GetPage<dynamic>> get routes => [
-        GetPage<dynamic>(
-          name: PatientPortalRoutes.dashboard,
-          page: () => const PatientDashboardView(),
-          binding: PatientDashboardBinding(),
-          middlewares: _portal,
-          transition: Transition.cupertino,
-        ),
-        GetPage<dynamic>(
-          name: PatientPortalRoutes.language,
-          page: () => const PatientLanguageView(),
-          binding: PatientLanguageBinding(),
-          middlewares: _portal,
-          transition: Transition.cupertino,
-        ),
-        GetPage<dynamic>(
-          name: PatientPortalRoutes.consent,
-          page: () => const PatientConsentView(),
-          binding: PatientConsentBinding(),
-          middlewares: _portal,
-          transition: Transition.cupertino,
-        ),
+    GetPage<dynamic>(
+      name: PatientPortalRoutes.dashboard,
+      page: () => const PatientDashboardView(),
+      binding: PatientDashboardBinding(),
+      middlewares: _portal,
+      transition: Transition.cupertino,
+    ),
+    GetPage<dynamic>(
+      name: PatientPortalRoutes.language,
+      page: () => const PatientLanguageView(),
+      binding: PatientLanguageBinding(),
+      middlewares: _portal,
+      transition: Transition.cupertino,
+    ),
+    GetPage<dynamic>(
+      name: PatientPortalRoutes.consent,
+      page: () => const PatientConsentView(),
+      binding: PatientConsentBinding(),
+      middlewares: _portal,
+      transition: Transition.cupertino,
+    ),
 
-        // The interview, which lives in its own module.
-        //
-        // It is routed from here rather than from a table of its own because
-        // this is where the entry sequence ends: the language and the consent
-        // it needs arrive in the arguments as `PatientEntry`, handed over by
-        // the consent screen two lines above. A second route table holding one
-        // page would put the two halves of one journey in two files.
-        GetPage<dynamic>(
-          name: PatientPortalRoutes.caseTaking,
-          page: () => const CaseTakingView(),
-          binding: CaseTakingBinding(),
-          middlewares: _portal,
-          transition: Transition.cupertino,
-        ),
+    // The interview, which lives in its own module.
+    //
+    // It is routed from here rather than from a table of its own because
+    // this is where the entry sequence ends: the language and the consent
+    // it needs arrive in the arguments as `PatientEntry`, handed over by
+    // the consent screen two lines above. A second route table holding one
+    // page would put the two halves of one journey in two files.
+    GetPage<dynamic>(
+      name: PatientPortalRoutes.caseTaking,
+      page: () => const CaseTakingView(),
+      binding: CaseTakingBinding(),
+      middlewares: _portal,
+      transition: Transition.cupertino,
+    ),
 
-        // ── Public ────────────────────────────────────────────────────────
-        //
-        // No middleware at all, and deliberately not `GuestMiddleware` either:
-        // that one bounces a signed-in user to `/home`, which for a patient
-        // who tapped the wrong thing would be the staff shell. Somebody who is
-        // already signed in and opens Claim simply sees the form; claiming a
-        // second record is refused by the server, which is where that decision
-        // belongs.
-        GetPage<dynamic>(
-          name: PatientPortalRoutes.claim,
-          page: () => const PatientClaimView(),
-          binding: PatientClaimBinding(),
-          transition: Transition.cupertino,
-        ),
-        GetPage<dynamic>(
-          name: PatientPortalRoutes.activate,
-          page: () => const PatientActivateView(),
-          binding: PatientActivateBinding(),
-          transition: Transition.cupertino,
-        ),
-      ];
+    // Booking, which is gated with the rest of the portal rather than on
+    // `appointments: create`.
+    //
+    // A portal account holds both verbs, so either gate lets the right
+    // person in — but `appointments: create` is held by a doctor and a
+    // receptionist too, and this is not the screen either of them should
+    // land on: it books for the *caller*, and the server would write a
+    // receptionist's own appointment if they filled it in. The portal gate
+    // sends them to the refusal screen instead, which is where a desk
+    // opening a patient's screen belongs.
+    GetPage<dynamic>(
+      name: PatientPortalRoutes.book,
+      page: () => const PatientBookView(),
+      binding: PatientBookBinding(),
+      middlewares: _portal,
+      transition: Transition.cupertino,
+    ),
+
+    // ── Public ────────────────────────────────────────────────────────
+    //
+    // No middleware at all, and deliberately not `GuestMiddleware` either:
+    // that one bounces a signed-in user to `/home`, which for a patient
+    // who tapped the wrong thing would be the staff shell. Somebody who is
+    // already signed in and opens Claim simply sees the form; claiming a
+    // second record is refused by the server, which is where that decision
+    // belongs.
+    GetPage<dynamic>(
+      name: PatientPortalRoutes.claim,
+      page: () => const PatientClaimView(),
+      binding: PatientClaimBinding(),
+      transition: Transition.cupertino,
+    ),
+    GetPage<dynamic>(
+      name: PatientPortalRoutes.activate,
+      page: () => const PatientActivateView(),
+      binding: PatientActivateBinding(),
+      transition: Transition.cupertino,
+    ),
+  ];
 }

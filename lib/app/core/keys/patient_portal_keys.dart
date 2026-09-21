@@ -20,7 +20,17 @@ abstract final class PatientPortalKeys {
   static const Key startCaseTaking = Key('patient_dashboard_start_case');
 
   static const Key appointments = Key('patient_dashboard_appointments');
-  static const Key appointmentsEmpty = Key('patient_dashboard_appointments_empty');
+  static const Key appointmentsEmpty = Key(
+    'patient_dashboard_appointments_empty',
+  );
+
+  /// The way to the booking screen, from the appointments section.
+  ///
+  /// One key for one action, wherever the section is showing it from: the
+  /// control sits on the empty card when nothing is booked and above the list
+  /// when something is, and a flow should not have to know which of those a
+  /// world it did not write is in.
+  static const Key bookAppointment = Key('patient_dashboard_book');
   static const Key record = Key('patient_dashboard_record');
   static const Key documents = Key('patient_dashboard_documents');
 
@@ -103,6 +113,30 @@ abstract final class PatientPortalKeys {
 
   static const Key consentAgree = Key('patient_consent_agree');
   static const Key consentDecline = Key('patient_consent_decline');
+
+  // ── Booking ───────────────────────────────────────────────────────────────
+
+  static const Key book = Key('patient_book_screen');
+  static const Key bookDoctor = Key('patient_book_doctor');
+  static const Key bookDate = Key('patient_book_date');
+  static const Key bookTime = Key('patient_book_time');
+  static const Key bookReason = Key('patient_book_reason');
+  static const Key bookSubmit = Key('patient_book_submit');
+  static const Key bookError = Key('patient_book_error');
+
+  /// One offered slot, by the exact string the request will carry — `09:30`,
+  /// never the site's 12-hour rendering of it. What a patient taps and what
+  /// the server stores are then the same value, and a site switching its
+  /// clock format moves no assertion.
+  static Key bookSlot(String time) => Key('patient_book_slot_$time');
+
+  /// Where the screen says this clinician's day has nothing left on it.
+  ///
+  /// Keyed because it is the state the feature is most likely to get wrong: a
+  /// full day and a day the availability call failed on look identical to
+  /// somebody reading the screen, and only one of them means "choose another
+  /// day".
+  static const Key bookNoSlots = Key('patient_book_no_slots');
 
   // ── The hand-off to the interview ─────────────────────────────────────────
   //

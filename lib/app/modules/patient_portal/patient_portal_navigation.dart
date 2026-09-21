@@ -57,6 +57,27 @@ abstract final class PatientPortalNavigation {
     );
   }
 
+  /// Into a booking, from the dashboard or from the end of an interview.
+  ///
+  /// No patient id travels with it: the booking screen reads that from the
+  /// record, and a screen that took one in its arguments would be a screen
+  /// somebody could deep-link with somebody else's.
+  ///
+  /// [reason] is the complaint the interview recorded, carried across so the
+  /// patient does not type out what they have just finished saying. It is
+  /// text in a field they can still edit, not a decision — see
+  /// `CaseReview.complaintSummary` for what is and is not allowed into it.
+  static void toBooking({String? reason}) {
+    final text = (reason ?? '').trim();
+    unawaited(
+      Get.toNamed<void>(
+            PatientPortalRoutes.book,
+            arguments: text.isEmpty ? null : {'reason': text},
+          ) ??
+          Future<void>.value(),
+    );
+  }
+
   /// All the way back to the patient's own screen, clearing whatever is on the
   /// stack behind it.
   static void backToDashboard() {

@@ -161,6 +161,12 @@ void registerCaseReviewFlows() {
       await review.openFromDashboard();
 
       await review.submit();
+      // The offer of an appointment comes up over the screen the moment the
+      // case has gone. Declined here so the rest of this flow is about the
+      // sending; the booking has its own two tests below.
+      await review.seeBookingOffer(quoting: kComplaintValue);
+      await review.declineBooking();
+
       // The toast first: it is on a three-second timer, and the scrolling the
       // assertions below do takes longer than that on a device.
       review.seeToast(containing: 'sent');
@@ -187,6 +193,49 @@ void registerCaseReviewFlows() {
       await review.back();
       await portal.assertOnPortal();
       await review.seeCaseOnDashboard(saying: 'have been sent');
+    });
+
+    testWidgets('declining the appointment costs the patient nothing',
+        (tester) async {
+      final (review, portal) = await openPortal(tester);
+      await review.openFromDashboard();
+
+      await review.submit();
+      await review.seeBookingOffer(quoting: kComplaintValue);
+      await review.declineBooking();
+      await review.letToastsExpire();
+
+      // The case is still sent — the two are separate things, and the offer
+      // is raised after the submission rather than in front of it precisely
+      // so that answering "not now" cannot undo it.
+      await review.seeSent();
+      review.api.requireNoCall('POST', '/api/appointments');
+    });
+
+    testWidgets('accepting it opens a booking with the complaint already in it',
+        (tester) async {
+      final (review, portal) = await openPortal(tester);
+      await review.openFromDashboard();
+
+      await review.submit();
+      await review.seeBookingOffer(quoting: kComplaintValue);
+      await review.acceptBooking();
+      await review.letToastsExpire();
+
+      // The interview's complaint, in a field the patient can still change.
+      // What did **not** travel is the rest of a booking: the clinician, the
+      // day and the time are theirs to choose, and a screen that guessed them
+      // would be guessing at the only part of this they have an opinion on.
+      await portal.assertOnBooking();
+      portal.seeReason(kComplaintValue);
+
+      await portal.chooseDoctor('Dr Priya Raman');
+      await portal.chooseSlot('15:00');
+      await portal.submitBooking();
+
+      final booked = review.api.requireCall('POST', '/api/appointments');
+      expect(booked.jsonBody['chiefComplaint'], kComplaintValue);
+      expect(booked.jsonBody['patientId'], 'p-1');
     });
   });
 }

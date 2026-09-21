@@ -7,6 +7,7 @@ import '../../../data/models/case_review.dart';
 import '../../../data/models/case_session.dart';
 import '../../../data/services/settings_service.dart';
 import '../../../theme/theme.dart';
+import '../../patient_portal/patient_portal_navigation.dart';
 import '../controllers/case_review_controller.dart';
 
 /// "Here is what we understood about you."
@@ -731,11 +732,49 @@ class _Submit extends StatelessWidget {
             icon: Icons.send_rounded,
             busy: c.isSubmitting.value,
             onPressed: () async {
-              if (await c.submit()) showBentoToast(PatientText.caseSent);
+              if (!await c.submit()) return;
+              showBentoToast(PatientText.caseSent);
+              if (!context.mounted) return;
+              await _offerBooking(context, c);
             },
           ),
         ],
       );
     });
   }
+}
+
+/// Offers a booking, with the complaint the interview just recorded.
+///
+/// Asked **after** the case has gone and never before it: the two are separate
+/// things a patient may want, and a dialog in front of the send button would
+/// make the one they came to do conditional on an answer about the other.
+/// Declining is a plain "not now" with no consequence — the answers are
+/// already with the hospital, and a clinic that reads them will book whatever
+/// it thinks is needed.
+///
+/// What crosses over is the complaint and nothing else. The day, the time and
+/// the clinician are chosen on the booking screen by the patient, because the
+/// interview never asked them and a screen that filled them in would be
+/// guessing at the one part of a booking a patient has an opinion about.
+Future<void> _offerBooking(
+  BuildContext context,
+  CaseReviewController c,
+) async {
+  final complaint = c.review.value.complaintSummary;
+
+  final wantsBooking = await ConfirmDialog.show(
+    context,
+    title: PatientText.bookAfterCaseTitle,
+    message: complaint.isEmpty
+        ? PatientText.bookAfterCaseBodyNoComplaint
+        : PatientText.bookAfterCaseBody(complaint),
+    confirmLabel: PatientText.bookAfterCaseYes,
+    cancelLabel: PatientText.bookAfterCaseNo,
+    confirmKey: CaseReviewKeys.bookConfirm,
+    cancelKey: CaseReviewKeys.bookDecline,
+  );
+
+  if (!wantsBooking) return;
+  PatientPortalNavigation.toBooking(reason: complaint);
 }

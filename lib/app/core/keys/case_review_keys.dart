@@ -67,4 +67,12 @@ abstract final class CaseReviewKeys {
   /// The banner on a case that has already gone, where every control on the
   /// screen would be a 409.
   static const Key locked = Key('case_review_locked');
+
+  /// The offer of an appointment, raised once the case has gone.
+  ///
+  /// Two keys and not one: declining is the answer with the consequence worth
+  /// testing — the case is already with the hospital, so "not now" must leave
+  /// the patient on a screen that says so rather than anywhere else.
+  static const Key bookConfirm = Key('case_review_book_confirm');
+  static const Key bookDecline = Key('case_review_book_decline');
 }

@@ -240,6 +240,31 @@ final class CaseReviewRobot extends Robot {
     expect(find.byKey(CaseReviewKeys.submitted), findsOneWidget);
   }
 
+  /// The offer of an appointment, raised once the case has gone.
+  ///
+  /// Asserted on the complaint it quotes rather than on the dialog alone: the
+  /// point of the offer is that the patient does not retype what they have
+  /// just spent an interview saying, and a dialog that had lost the complaint
+  /// would look identical.
+  Future<void> seeBookingOffer({required String quoting}) async {
+    await tester.pumpUntilFound(find.byKey(CaseReviewKeys.bookConfirm));
+    expect(find.textContaining(quoting), findsWidgets);
+  }
+
+  /// "Not now." The answer with the consequence worth testing: the case has
+  /// already gone, so declining must cost nothing.
+  Future<void> declineBooking() async {
+    await tester.pumpUntilFound(find.byKey(CaseReviewKeys.bookDecline));
+    await tester.tapKeyWithoutKeyboard(CaseReviewKeys.bookDecline);
+    await settle();
+  }
+
+  Future<void> acceptBooking() async {
+    await tester.pumpUntilFound(find.byKey(CaseReviewKeys.bookConfirm));
+    await tester.tapKeyWithoutKeyboard(CaseReviewKeys.bookConfirm);
+    await settle();
+  }
+
   /// A sent case cannot be changed here, and the screen stops offering to.
   Future<void> seeLockedAfterSending() async {
     await tester.scrollToKey(CaseReviewKeys.locked);

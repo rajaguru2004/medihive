@@ -62,7 +62,7 @@ abstract class Endpoints {
   /// ```
   static const String baseUrl = String.fromEnvironment(
     'MEDIHIVE_API',
-    defaultValue: 'http://10.193.206.192:3000/',
+    defaultValue: 'http://192.168.163.136:3000/',
   );
 
   /// Where uploaded files live. The API returns storage-relative paths, which
@@ -321,6 +321,22 @@ abstract class Endpoints {
   static const roles = Crud('/api/roles');
   static const patients = Crud('/api/patients', updateVerb: HttpVerb.put);
   static const appointments = Crud('/api/appointments');
+
+  /// The clinicians a booking can be made with.
+  ///
+  /// Not [staff], which answers the same question for the staff pickers and is
+  /// gated on `patients: read` — the one module a portal account deliberately
+  /// holds nothing in. This route is gated on `appointments: create` instead:
+  /// whoever may book may see who they can book with, and a name and a
+  /// specialism is all that comes back.
+  static const String appointmentDoctors = '/api/appointments/doctors';
+
+  /// What is already taken in one clinician's day.
+  ///
+  /// `?doctorId=&date=`, both required. Answers times and lengths and nothing
+  /// about who holds them, because a patient may ask it.
+  static const String appointmentAvailability =
+      '/api/appointments/availability';
   static const consultations = Crud('/api/consultations');
   static const preTriage = Crud('/api/pre-triage');
   static const queue = Crud('/api/queue');

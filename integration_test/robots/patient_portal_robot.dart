@@ -206,6 +206,93 @@ final class PatientPortalRobot extends Robot {
     expect(Get.currentRoute, PatientPortalRoutes.caseTaking);
   }
 
+  // ── Booking ───────────────────────────────────────────────────────────────
+
+  /// From the dashboard's appointments section into the booking screen.
+  Future<void> openBooking() async {
+    await tester.scrollToKey(PatientPortalKeys.bookAppointment);
+    await tester.tapKey(PatientPortalKeys.bookAppointment);
+    await tester.pumpUntilFound(find.byKey(PatientPortalKeys.book));
+    await settle();
+  }
+
+  Future<void> assertOnBooking() async {
+    await tester.pumpUntilFound(find.byKey(PatientPortalKeys.book));
+    expect(Get.currentRoute, PatientPortalRoutes.book);
+  }
+
+  /// Chooses a clinician from the picker sheet.
+  Future<void> chooseDoctor(String name) async {
+    await tester.tapKeyWithoutKeyboard(PatientPortalKeys.bookDoctor);
+    await tester.pumpUntilFound(find.text(name));
+    await tester.tap(find.text(name).last);
+    await settle();
+  }
+
+  /// Taps one offered slot, by the value the request will carry — `09:30` and
+  /// never the site's rendering of it, which changes with a setting.
+  Future<void> chooseSlot(String time) async {
+    await tester.tapKeyWithoutKeyboard(PatientPortalKeys.bookTime);
+    await tester.pumpUntilFound(find.byKey(PatientPortalKeys.bookSlot(time)));
+    await tester.tapKeyWithoutKeyboard(PatientPortalKeys.bookSlot(time));
+    await settle();
+  }
+
+  /// A slot the clinic has already given away is not on the sheet.
+  ///
+  /// The assertion the availability read exists for: the grid is generated
+  /// from the site's working hours, so a screen that never subtracted the
+  /// bookings would offer every slot and look perfectly correct until two
+  /// people arrived for the same one.
+  Future<void> seeSlotNotOffered(String time) async {
+    await tester.tapKeyWithoutKeyboard(PatientPortalKeys.bookTime);
+    await settle();
+    expect(
+      find.byKey(PatientPortalKeys.bookSlot(time)),
+      findsNothing,
+      reason: '$time is already booked and was still offered',
+    );
+  }
+
+  Future<void> closeSlots() async {
+    await tester.tapAt(const Offset(10, 10));
+    await settle();
+  }
+
+  Future<void> enterReason(String text) async {
+    await tester.enterTextByKey(PatientPortalKeys.bookReason, text);
+  }
+
+  /// What is in the reason box, whoever put it there.
+  void seeReason(String text) {
+    expect(
+      find.descendant(
+        of: find.byKey(PatientPortalKeys.bookReason),
+        matching: find.text(text),
+      ),
+      findsOneWidget,
+      reason: 'expected the reason field to hold "$text"',
+    );
+  }
+
+  Future<void> submitBooking() async {
+    await tester.tapKeyWithoutKeyboard(PatientPortalKeys.bookSubmit);
+    await settle();
+  }
+
+  /// The booking screen refused, and said why on the screen rather than in a
+  /// toast that takes the reason away with it after three seconds.
+  Future<void> seeBookingError(String phrase) async {
+    await tester.pumpUntilFound(find.byKey(PatientPortalKeys.bookError));
+    expect(
+      find.descendant(
+        of: find.byKey(PatientPortalKeys.bookError),
+        matching: find.textContaining(phrase),
+      ),
+      findsOneWidget,
+    );
+  }
+
   // ── Getting in ────────────────────────────────────────────────────────────
 
   /// From the sign-in screen, the way somebody holding a card would.

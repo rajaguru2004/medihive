@@ -19,6 +19,7 @@ import '../models/consultation_model.dart';
 import '../models/consultation_record.dart';
 import '../models/doctor_model.dart';
 import '../models/drafts/appointment_draft.dart';
+import '../models/drafts/draft_json.dart';
 import '../models/patient_ref.dart';
 import '../network/endpoints.dart';
 import '../utils/api_envelope.dart';
@@ -75,13 +76,13 @@ abstract final class AppointmentStatus {
   /// `rescheduled` is treated as a fresh booking, which is what it is — the
   /// server keeps the old row and points a new date at it.
   static List<String> nextFrom(String? status) => switch (normalise(status)) {
-        scheduled => const [confirmed, checkedIn, noShow],
-        rescheduled => const [confirmed, checkedIn, noShow],
-        confirmed => const [checkedIn, noShow],
-        checkedIn => const [inProgress, completed, noShow],
-        inProgress => const [completed],
-        _ => const [],
-      };
+    scheduled => const [confirmed, checkedIn, noShow],
+    rescheduled => const [confirmed, checkedIn, noShow],
+    confirmed => const [checkedIn, noShow],
+    checkedIn => const [inProgress, completed, noShow],
+    inProgress => const [completed],
+    _ => const [],
+  };
 
   /// Whether [status] may be moved to [next] from where it is now.
   static bool allows(String? status, String next) =>
@@ -98,7 +99,7 @@ abstract final class AppointmentStatus {
 /// so this class never states which.
 class AppointmentRepository extends CrudRepository<AppointmentModel> {
   const AppointmentRepository()
-      : super(Endpoints.appointments, AppointmentModel.fromJson, entityName);
+    : super(Endpoints.appointments, AppointmentModel.fromJson, entityName);
 
   /// What a write to a booking announces itself as on the `DataBus`. The same
   /// string the clinic board listens on, so a booking made here refreshes the
@@ -115,14 +116,13 @@ class AppointmentRepository extends CrudRepository<AppointmentModel> {
     String id,
     String status, {
     String? cancellationReason,
-  }) =>
-      update(
-        id,
-        AppointmentDraft(
-          status: status,
-          cancellationReason: cancellationReason,
-        ).toUpdateJson(),
-      );
+  }) => update(
+    id,
+    AppointmentDraft(
+      status: status,
+      cancellationReason: cancellationReason,
+    ).toUpdateJson(),
+  );
 
   /// Moves a booking to another slot.
   ///
@@ -134,21 +134,62 @@ class AppointmentRepository extends CrudRepository<AppointmentModel> {
     String id, {
     required DateTime date,
     required String time,
-  }) =>
-      update(
-        id,
-        AppointmentDraft(
-          appointmentDate: date,
-          appointmentTime: time,
-          status: AppointmentStatus.rescheduled,
-        ).toUpdateJson(),
-      );
+  }) => update(
+    id,
+    AppointmentDraft(
+      appointmentDate: date,
+      appointmentTime: time,
+      status: AppointmentStatus.rescheduled,
+    ).toUpdateJson(),
+  );
+
+  /// The clinicians a booking can be made with, asked the way a **patient**
+  /// may ask it.
+  ///
+  /// [ClinicLookups.doctors] answers the same question from
+  /// `GET /api/users/staff`, which is gated on `patients: read` — the one
+  /// module a portal account holds nothing in, because holding it would open
+  /// the register. This route is gated on `appointments: create` instead, so
+  /// it is the only one a patient booking their own appointment can use.
+  ///
+  /// Staff screens keep the existing lookup: it carries the email and the role
+  /// as well, and their pickers show them.
+  Future<List<DoctorModel>> bookableDoctors() async {
+    final response = await client.get(Endpoints.appointmentDoctors);
+    return ApiEnvelope.of(response).orThrow().listOf(DoctorModel.fromJson);
+  }
+
+  /// The start times already spoken for in one clinician's day.
+  ///
+  /// Start times and not intervals, which is the same comparison the server
+  /// refuses a clash on. A clinic booking a forty-minute appointment across
+  /// two twenty-minute slots does that deliberately, so treating the second
+  /// slot as taken would hide half a diary the desk is using on purpose.
+  ///
+  /// `date` is sent as `yyyy-MM-dd`: an instant would be read in the server's
+  /// zone, and a morning clinic asked about from a UTC+ phone would answer
+  /// with the day before.
+  Future<Set<String>> takenSlots({
+    required String doctorId,
+    required DateTime date,
+  }) async {
+    final response = await client.get(
+      Endpoints.appointmentAvailability,
+      queryParameters: {'doctorId': doctorId, 'date': isoDay(date)},
+    );
+    final taken = ApiEnvelope.of(response).orThrow().object['taken'];
+    if (taken is! List) return <String>{};
+    return {
+      for (final row in taken)
+        if (row is Map) '${row['appointmentTime'] ?? ''}'.trim(),
+    }..remove('');
+  }
 }
 
 /// Consultations.
 class ConsultationRepository extends CrudRepository<ConsultationModel> {
   const ConsultationRepository()
-      : super(Endpoints.consultations, ConsultationModel.fromJson, entityName);
+    : super(Endpoints.consultations, ConsultationModel.fromJson, entityName);
 
   static const String entityName = 'consultations';
 
@@ -175,8 +216,7 @@ class ConsultationRepository extends CrudRepository<ConsultationModel> {
 /// route answers a bare array and takes no `search`.
 abstract final class ClinicLookups {
   /// Patients, by name or MRN.
-  static const CrudRepository<PatientRef> patients =
-      CrudRepository<PatientRef>(
+  static const CrudRepository<PatientRef> patients = CrudRepository<PatientRef>(
     Endpoints.patients,
     PatientRef.fromJson,
     'patients',

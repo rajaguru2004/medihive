@@ -41,7 +41,10 @@ class PatientDashboardView extends GetView<PatientDashboardController> {
         bottomClearance: false,
         onRefresh: c.reload,
         slivers: [
-          BentoSection(top: BentoSpace.page, child: _Greeting(controller: c)),
+          BentoSection(
+            top: BentoSpace.page,
+            child: _Greeting(controller: c),
+          ),
 
           // The screen's own failure, above everything it would have filled in.
           BentoSection(
@@ -50,13 +53,13 @@ class PatientDashboardView extends GetView<PatientDashboardController> {
               () => c.hasNoAccess
                   ? const _NotAPatientAccount()
                   : c.hasLoadError
-                      ? ErrorRetryBanner(
-                          key: PatientPortalKeys.dashboardError,
-                          margin: EdgeInsets.zero,
-                          message: c.rxLoadError.value ?? '',
-                          onRetry: c.reload,
-                        )
-                      : const SizedBox.shrink(),
+                  ? ErrorRetryBanner(
+                      key: PatientPortalKeys.dashboardError,
+                      margin: EdgeInsets.zero,
+                      message: c.rxLoadError.value ?? '',
+                      onRetry: c.reload,
+                    )
+                  : const SizedBox.shrink(),
             ),
           ),
 
@@ -69,7 +72,10 @@ class PatientDashboardView extends GetView<PatientDashboardController> {
           // §39. Absent when there is nothing to say, which is the first
           // screen a patient ever sees; present the moment there is an
           // interview open or one already sent.
-          BentoSection(top: BentoSpace.action, child: _YourCase(controller: c)),
+          BentoSection(
+            top: BentoSpace.action,
+            child: _YourCase(controller: c),
+          ),
 
           const SliverToBoxAdapter(
             child: Padding(
@@ -158,10 +164,11 @@ class _Greeting extends StatelessWidget {
                   SettingsService.to.settings.siteName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: (isDark
-                          ? AppTextStyles.darkCallout()
-                          : AppTextStyles.lightCallout())
-                      .copyWith(color: secondaryLabelColor(context)),
+                  style:
+                      (isDark
+                              ? AppTextStyles.darkCallout()
+                              : AppTextStyles.lightCallout())
+                          .copyWith(color: secondaryLabelColor(context)),
                 ),
               ],
             );
@@ -224,10 +231,12 @@ class _StartCaseTakingCard extends StatelessWidget {
             'Answer some questions about your symptoms and your health before '
             'you see the doctor. You can speak, type or tap, and you can stop '
             'at any time.',
-            style: (isDark
-                    ? AppTextStyles.darkBody()
-                    : AppTextStyles.lightBody())
-                .copyWith(color: secondaryLabelColor(context), height: 1.45),
+            style:
+                (isDark ? AppTextStyles.darkBody() : AppTextStyles.lightBody())
+                    .copyWith(
+                      color: secondaryLabelColor(context),
+                      height: 1.45,
+                    ),
           ),
           const SizedBox(height: BentoSpace.section),
           // 56 rather than the kit's default, matching the conversation layer's
@@ -248,7 +257,13 @@ class _StartCaseTakingCard extends StatelessWidget {
   }
 }
 
-/// What the hospital has booked for them.
+/// What is booked for them, and the way to ask for one more.
+///
+/// The booking control is outside the `Obx` branch above it on purpose: it is
+/// the same offer whether the list is empty, full, or failed to load. A
+/// patient whose appointments could not be fetched can still book one — the
+/// two requests are unrelated — and hiding the button inside the error state
+/// would take that away for a reason they would have no way to understand.
 class _Appointments extends StatelessWidget {
   const _Appointments({required this.controller});
 
@@ -256,47 +271,62 @@ class _Appointments extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() {
-      final error = controller.appointmentsError.value;
-      if (error != null) {
-        return ErrorRetryBanner(
-          margin: EdgeInsets.zero,
-          message: error,
-          onRetry: controller.reload,
-        );
-      }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Obx(() {
+          final error = controller.appointmentsError.value;
+          if (error != null) {
+            return ErrorRetryBanner(
+              margin: EdgeInsets.zero,
+              message: error,
+              onRetry: controller.reload,
+            );
+          }
 
-      if (controller.rxFirstLoad.value && controller.isLoading) {
-        return const BentoCard(child: BentoSkeleton(rows: 2));
-      }
+          if (controller.rxFirstLoad.value && controller.isLoading) {
+            return const BentoCard(child: BentoSkeleton(rows: 2));
+          }
 
-      final rows = controller.ordered;
-      if (rows.isEmpty) {
-        return const BentoCard(
-          child: EmptyState(
-            key: PatientPortalKeys.appointmentsEmpty,
-            compact: true,
-            icon: Icons.event_available_outlined,
-            title: 'Nothing booked',
-            message: 'When the hospital books you an appointment it will show '
-                'here. You can still answer the questions above.',
-          ),
-        );
-      }
+          final rows = controller.ordered;
+          if (rows.isEmpty) {
+            return const BentoCard(
+              child: EmptyState(
+                key: PatientPortalKeys.appointmentsEmpty,
+                compact: true,
+                icon: Icons.event_available_outlined,
+                title: 'Nothing booked',
+                message:
+                    'Nothing is booked for you yet. You can ask for an '
+                    'appointment below, or answer the questions above.',
+              ),
+            );
+          }
 
-      return BentoCard(
-        key: PatientPortalKeys.appointments,
-        padding: const EdgeInsets.symmetric(vertical: BentoSpace.listCardPad),
-        child: Column(
-          children: [
-            for (var i = 0; i < rows.length; i++) ...[
-              if (i > 0) const Hairline(indent: BentoSpace.listPad),
-              _AppointmentRow(appointment: rows[i]),
-            ],
-          ],
+          return BentoCard(
+            key: PatientPortalKeys.appointments,
+            padding: const EdgeInsets.symmetric(
+              vertical: BentoSpace.listCardPad,
+            ),
+            child: Column(
+              children: [
+                for (var i = 0; i < rows.length; i++) ...[
+                  if (i > 0) const Hairline(indent: BentoSpace.listPad),
+                  _AppointmentRow(appointment: rows[i]),
+                ],
+              ],
+            ),
+          );
+        }),
+        const SizedBox(height: BentoSpace.action),
+        SecondaryBar(
+          key: PatientPortalKeys.bookAppointment,
+          label: 'Ask for an appointment',
+          icon: Icons.event_available_outlined,
+          onPressed: controller.bookAppointment,
         ),
-      );
-    });
+      ],
+    );
   }
 }
 
@@ -376,10 +406,14 @@ class _Record extends StatelessWidget {
             Text(
               'If anything here is wrong, tell the desk when you arrive — they '
               'can change it.',
-              style: (Theme.of(context).brightness == Brightness.dark
-                      ? AppTextStyles.darkSubheadline()
-                      : AppTextStyles.lightSubheadline())
-                  .copyWith(color: secondaryLabelColor(context), height: 1.4),
+              style:
+                  (Theme.of(context).brightness == Brightness.dark
+                          ? AppTextStyles.darkSubheadline()
+                          : AppTextStyles.lightSubheadline())
+                      .copyWith(
+                        color: secondaryLabelColor(context),
+                        height: 1.4,
+                      ),
             ),
           ],
         ),
@@ -446,21 +480,26 @@ class _YourCase extends StatelessWidget {
               sent
                   ? PatientText.caseSentBody
                   : 'You can read them back, change anything that is not '
-                      'right, and send them when you are ready.',
-              style: (Theme.of(context).brightness == Brightness.dark
-                      ? AppTextStyles.darkBody()
-                      : AppTextStyles.lightBody())
-                  .copyWith(color: secondaryLabelColor(context), height: 1.45),
+                        'right, and send them when you are ready.',
+              style:
+                  (Theme.of(context).brightness == Brightness.dark
+                          ? AppTextStyles.darkBody()
+                          : AppTextStyles.lightBody())
+                      .copyWith(
+                        color: secondaryLabelColor(context),
+                        height: 1.45,
+                      ),
             ),
             if (sent && when != null) ...[
               const SizedBox(height: 6),
               Text(
                 '${SettingsService.to.date(when)} · '
                 '${SettingsService.to.time(when)}',
-                style: (Theme.of(context).brightness == Brightness.dark
-                        ? AppTextStyles.darkFootnote()
-                        : AppTextStyles.lightFootnote())
-                    .copyWith(color: tertiaryLabelColor(context)),
+                style:
+                    (Theme.of(context).brightness == Brightness.dark
+                            ? AppTextStyles.darkFootnote()
+                            : AppTextStyles.lightFootnote())
+                        .copyWith(color: tertiaryLabelColor(context)),
               ),
             ],
             const SizedBox(height: BentoSpace.section),
@@ -505,10 +544,11 @@ class _Documents extends StatelessWidget {
                 padding: const EdgeInsets.all(BentoSpace.listPad),
                 child: Text(
                   error,
-                  style: (Theme.of(context).brightness == Brightness.dark
-                          ? AppTextStyles.darkSubheadline()
-                          : AppTextStyles.lightSubheadline())
-                      .copyWith(color: secondaryLabelColor(context)),
+                  style:
+                      (Theme.of(context).brightness == Brightness.dark
+                              ? AppTextStyles.darkSubheadline()
+                              : AppTextStyles.lightSubheadline())
+                          .copyWith(color: secondaryLabelColor(context)),
                 ),
               )
             else if (rows.isEmpty)
@@ -574,7 +614,8 @@ class _NotAPatientAccount extends StatelessWidget {
       child: EmptyState(
         icon: Icons.badge_outlined,
         title: 'This account is not a patient record',
-        message: 'These screens are for patients reading their own record. '
+        message:
+            'These screens are for patients reading their own record. '
             'Sign out and sign back in with your own account.',
       ),
     );

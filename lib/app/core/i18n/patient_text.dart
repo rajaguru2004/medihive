@@ -902,6 +902,41 @@ abstract final class PatientText {
         'That change did not reach us. Try it again.',
       );
 
+  // ── Booking, off the back of the interview ────────────────────────────────
+
+  static String get bookAfterCaseTitle => _of(
+        'review.book.title',
+        'Would you like an appointment?',
+      );
+
+  /// Asked with the complaint the interview recorded, so the patient can see
+  /// what would be carried across before they agree to it.
+  static String bookAfterCaseBody(String complaint) => _of(
+        'review.book.body',
+        'We can start a booking with what you have just told us: '
+            '"{complaint}". You still choose the doctor and the time.',
+        {'complaint': complaint},
+      );
+
+  /// The same question when the interview never reached the complaint. No
+  /// quotation, because there is nothing to quote and an empty pair of
+  /// quotation marks reads as something having been lost.
+  static String get bookAfterCaseBodyNoComplaint => _of(
+        'review.book.body.empty',
+        'We can start a booking for you. You choose the doctor and the time.',
+      );
+
+  static String get bookAfterCaseYes =>
+      _of('review.book.yes', 'Book an appointment');
+
+  static String get bookAfterCaseNo => _of('review.book.no', 'Not now');
+
+  /// On the booking screen, above a reason that arrived from the interview.
+  static String get reasonFromYourAnswers => _of(
+        'book.reason.from-case',
+        'Taken from the answers you just sent. Change it if it is not right.',
+      );
+
   /// `4 of 11 answered`, under the rail on the review screen.
   static String answeredProgress(int addressed, int expected) => _of(
         'review.progress',
